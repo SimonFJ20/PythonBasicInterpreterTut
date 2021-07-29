@@ -6,7 +6,7 @@ while True:
         try:
             text = input('❱❱❱ ')
         except UnicodeEncodeError:
-            text = input('>>> ')
+            text = input('>>> ').replace('\n', '')
     except KeyboardInterrupt:
         exit()
 
