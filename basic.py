@@ -97,6 +97,7 @@ class Position:
 
 TT_INT          = 'INT'
 TT_FLOAT        = 'FLOAT'
+TT_STRING       = 'STRING'
 TT_IDENTIFIER   = 'IDENTIFIER'
 TT_KEYWORD      = 'KEYWORD'
 TT_PLUS         = 'PLUS'
@@ -180,6 +181,8 @@ class Lexer:
                 tokens.append(self.make_number())
             elif self.current_char in LETTERS:
                 tokens.append(self.make_identifier())
+            elif self.current_char == '"':
+                tokens.append(self.make_string())
             elif self.current_char == '+':
                 tokens.append(Token(TT_PLUS, pos_start=self.pos))
                 self.advance()
@@ -240,6 +243,31 @@ class Lexer:
             return Token(TT_INT, int(num_str), pos_start, self.pos)
         else:
             return Token(TT_FLOAT, float(num_str), pos_start, self.pos)
+
+    def make_string(self):
+        string = ''
+        pos_start = self.pos.copy()
+        escape_character = False
+        self.advance()
+
+        escaped_characters = {
+            'n': '\n',
+            't': '\t'
+        }
+
+        while self.current_char != None and (self.current_char != '"' or escape_character):
+            if escape_character:
+                string += escaped_characters.get(self.current_char, self.current_char)
+            else:   
+                if self.current_char == '\\':
+                    escape_character = True
+                else:
+                    string += self.current_char
+            self.advance()
+            escape_character = False
+
+        self.advance()
+        return Token(TT_STRING, string, pos_start, self.pos)
 
     def make_identifier(self):
         id_string = ''
@@ -312,6 +340,16 @@ class Lexer:
 # =============
 
 class NumberNode:
+    def __init__(self, tok):
+        self.tok = tok
+
+        self.pos_start = self.tok.pos_start
+        self.pos_end = self.tok.pos_end
+    
+    def __repr__(self):
+        return f'{self.tok}'
+
+class StringNode:
     def __init__(self, tok):
         self.tok = tok
 
@@ -671,6 +709,11 @@ class Parser:
             self.advance()
             return res.success(NumberNode(tok))
 
+        elif tok.type == TT_STRING:
+            res.register_advancement()
+            self.advance()
+            return res.success(StringNode(tok))
+
         elif tok.type == TT_IDENTIFIER:
             res.register_advancement()
             self.advance()
@@ -1008,19 +1051,19 @@ class Number(Value):
         if isinstance(other, Number):
             return Number(self.value + other.value).set_context(self.context), None
         else:
-            return None, Value.illegal_operation(self.pos_start, other.pos_end)
+            return None, Value.illegal_operation(self, other)
 
     def subbed_by(self, other):
         if isinstance(other, Number):
             return Number(self.value - other.value).set_context(self.context), None
         else:
-            return None, Value.illegal_operation(self.pos_start, other.pos_end)
+            return None, Value.illegal_operation(self, other)
 
     def multed_by(self, other):
         if isinstance(other, Number):
             return Number(self.value * other.value).set_context(self.context), None
         else:
-            return None, Value.illegal_operation(self.pos_start, other.pos_end)
+            return None, Value.illegal_operation(self, other)
 
     def dived_by(self, other):
         if isinstance(other, Number):
@@ -1032,61 +1075,61 @@ class Number(Value):
                 )
             return Number(self.value / other.value).set_context(self.context), None
         else:
-            return None, Value.illegal_operation(self.pos_start, other.pos_end)
+            return None, Value.illegal_operation(self, other)
     
     def powed_by(self, other):
         if isinstance(other, Number):
             return Number(self.value ** other.value).set_context(self.context), None
         else:
-            return None, Value.illegal_operation(self.pos_start, other.pos_end)
+            return None, Value.illegal_operation(self, other)
     
     def get_comparison_eq(self, other):
         if isinstance(other, Number):
             return Number(int(self.value == other.value)).set_context(self.context), None
         else:
-            return None, Value.illegal_operation(self.pos_start, other.pos_end)
+            return None, Value.illegal_operation(self, other)
     
     def get_comparison_ne(self, other):
         if isinstance(other, Number):
             return Number(int(self.value != other.value)).set_context(self.context), None
         else:
-            return None, Value.illegal_operation(self.pos_start, other.pos_end)
+            return None, Value.illegal_operation(self, other)
     
     def get_comparison_lt(self, other):
         if isinstance(other, Number):
             return Number(int(self.value < other.value)).set_context(self.context), None
         else:
-            return None, Value.illegal_operation(self.pos_start, other.pos_end)
+            return None, Value.illegal_operation(self, other)
     
     def get_comparison_gt(self, other):
         if isinstance(other, Number):
             return Number(int(self.value > other.value)).set_context(self.context), None
         else:
-            return None, Value.illegal_operation(self.pos_start, other.pos_end)
+            return None, Value.illegal_operation(self, other)
     
     def get_comparison_lte(self, other):
         if isinstance(other, Number):
             return Number(int(self.value <= other.value)).set_context(self.context), None
         else:
-            return None, Value.illegal_operation(self.pos_start, other.pos_end)
+            return None, Value.illegal_operation(self, other)
     
     def get_comparison_gte(self, other):
         if isinstance(other, Number):
             return Number(int(self.value >= other.value)).set_context(self.context), None
         else:
-            return None, Value.illegal_operation(self.pos_start, other.pos_end)
+            return None, Value.illegal_operation(self, other)
     
     def anded_by(self, other):
         if isinstance(other, Number):
             return Number(int(self.value and other.value)).set_context(self.context), None
         else:
-            return None, Value.illegal_operation(self.pos_start, other.pos_end)
+            return None, Value.illegal_operation(self, other)
     
     def ored_by(self, other):
         if isinstance(other, Number):
             return Number(int(self.value or other.value)).set_context(self.context), None
         else:
-            return None, Value.illegal_operation(self.pos_start, other.pos_end)
+            return None, Value.illegal_operation(self, other)
 
     def nottet(self):
         return Number(1 if self.value == 0 else 0).set_context(self.context), None
@@ -1149,6 +1192,35 @@ class Function(Value):
     def __repr__(self):
         return f"<function {self.name}>"
 
+class String(Value):
+    def __init__(self, value):
+        super().__init__()
+        self.value = value
+
+    def added_to(self, other):
+        if isinstance(other, String):
+            return String(self.value + other.value).set_context(self.context), None
+        else:
+            return None, Value.illegal_operation(self, other)
+
+    def multed_by(self, other):
+        if isinstance(other, Number):
+            return String(self.value * other.value).set_context(self.context), None
+        else:
+            return None, Value.illegal_operation(self, other)
+    
+    def is_true(self):
+        return len(self.value) > 0
+
+    def copy(self):
+        copy = String(self.value)
+        copy.set_context(self.context)
+        copy.set_pos(self.pos_start, self.pos_end)
+        return copy
+
+    def __repr__(self):
+        return f'"{self.value}"'
+
 # ===============
 # === CONTEXT ===
 # ===============
@@ -1199,6 +1271,11 @@ class Interpreter:
     def visit_NumberNode(self, node, context):
         return RTResult().success(
             Number(node.tok.value).set_context(context).set_pos(node.pos_start, node.pos_end)
+        )
+
+    def visit_StringNode(self, node, context):
+        return RTResult().success(
+            String(node.tok.value).set_context(context).set_pos(node.pos_start, node.pos_end)
         )
 
     def visit_VarAccessNode(self, node, context):
