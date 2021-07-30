@@ -1576,9 +1576,6 @@ class Interpreter:
         res = RTResult()
         args = []
 
-        if node.node_to_call.var_name_tok.value == 'exit':
-            exit()
-
         value_to_call = res.register(self.visit(node.node_to_call, context))
         if res.error: return res
         value_to_call = value_to_call.copy().set_pos(node.pos_start, node.pos_end)
@@ -1599,7 +1596,6 @@ global_symbol_table = SymbolTable()
 global_symbol_table.set('NULL', Number(0))
 global_symbol_table.set('FALSE', Number(0))
 global_symbol_table.set('TRUE', Number(1))
-global_symbol_table.set('exit', Function('exit', None, []))
 
 def run(fn, text):
     # generate tokens
