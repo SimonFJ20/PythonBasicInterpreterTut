@@ -1,4 +1,3 @@
 {
-    "editor.fontLigatures": false,
-    "python.formatting.provider": "black"
+    "editor.fontLigatures": false
 }
