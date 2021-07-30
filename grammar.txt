@@ -1,4 +1,3 @@
-
 expr            : KEYWORD:VAR IDENTIFIER EQ expr
                 : comp-expr ((KEYWORD:AND|KEYWORD:OR) comp-expr)*
 
@@ -18,10 +17,13 @@ call            : atom (LPAREN (expr (COMMA expr)*)? RPAREN)?
 
 atom            : INT|FLOAT|STRING|IDENTIFIER
                 : LPAREN expr RPAREN
+                : list-expr
                 : if-expr
                 : for-expr
                 : while-expr
                 : func-def
+
+list-expr       : LSQUARE (COMMA expr)*)? RSQUARE
 
 if-expr         : KEYWORD:IF expr KEYWORD:THEN expr
                   (KEYWORD:ELIF expr KEYWORD:THEN expr)*
