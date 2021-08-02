@@ -1,6 +1,8 @@
 #ifndef TOKENS_H
 #define TOKENS_H
 
+#include <stdbool.h>
+
 #define TT_NUMBER   0
 #define TT_PLUS     1
 #define TT_MINUS    2
@@ -12,9 +14,10 @@
 typedef struct
 {
     int type;
+    bool has_value;
     double value;
 } Token;
 
-void print_tokens(Token tokens);
+void print_tokens(Token tokens[], size_t len);
 
 #endif
