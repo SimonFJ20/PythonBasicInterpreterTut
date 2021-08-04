@@ -1,0 +1,43 @@
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    background-color: #141414;
+    text-align: center;
+}
+
+textarea {
+    background-color: #282828;
+    color: #f0f0f0;
+    border: 0;
+    width: 50%;
+    height: 20em;
+    font-size: 16px;
+    font-family: "MonoLisa Medium", Verdana, Geneva, Tahoma, sans-serif;
+}
+
+button {
+    margin: 5px;
+    width: 15%;
+    height: 2em;
+}
+
+pre {
+    margin: 0;
+    margin-left: 25%;
+    width: 50%;
+    background-color: #282828;
+    text-align: left;
+    padding: 5px;
+    height: 20em;
+    overflow: auto;
+    font-size: 16px;
+}
+
+code {
+    color: #f0f0f0;
+    border: 0;
+    font-family: "MonoLisa Medium", Verdana, Geneva, Tahoma, sans-serif;
+}
