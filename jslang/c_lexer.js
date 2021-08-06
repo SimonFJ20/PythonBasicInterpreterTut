@@ -13,6 +13,7 @@ class LexerError extends Error {
 
 const TT = {
     HASHTAG: 'HASHTAG',
+    INCLUDESTRING: 'INCLUDESTRING',
     INT: 'INT',
     FLOAT: 'FLOAT',
     CHAR: 'CHAR',
@@ -73,8 +74,9 @@ const KEYWORDS = [
 ];
 
 class Token {
-    constructor(type, value=null) {
+    constructor(type, text, value=null) {
         this.type = type;
+        this.text = text;
         this.value = value;
     }
     toString = () => {
@@ -86,26 +88,28 @@ class Token {
 }
 
 class Lexer {
-    constructor() {
-        this.text = null;
-        this.index = -1;
-        this.currentChar = null;
-    }
 
-    advance = () => {
+    advance = (preserveAcc=false) => {
+        if (!preserveAcc)
+            this.accText = '';
         this.index++;
         this.currentChar = this.text.charAt(this.index) !== '' ? this.text.charAt(this.index) : null;
+        this.accText += this.currentChar;
     }
 
+    getAccText = (start=0, end=0) => this.accText.slice(start, end);
+
     lex = (text) => {
-        const tokens = [];
         this.text = text;
+        this.index = -1;
+        this.currentChar = null;
+        const tokens = [];
         this.advance();
         while (this.currentChar !== null) {
             if (LETTERS.includes(this.currentChar)) {
-                this.makeIdentifier();
+                tokens.push(this.makeIdentifier());
             } else if (DIGITS.includes(this.currentChar)) {
-                this.makeNumber();
+                tokens.push(this.makeNumber());
             } else {
                 switch (this.currentChar) {
                     case "'":
@@ -115,35 +119,35 @@ class Lexer {
                         tokens.push(this.makeString());
                         break;
                     case '#':
-                        tokens.push(new Token(TT.HASHTAG));
+                        tokens.push(new Token(TT.HASHTAG, '#'));
                         this.advance();
                         break;
                     case ' ':
-                        tokens.push(new Token(TT.SPACE));
+                        tokens.push(new Token(TT.SPACE, ' '));
                         this.advance();
                         break;
                     case '\t':
-                        tokens.push(new Token(TT.TAB));
+                        tokens.push(new Token(TT.TAB, '\t'));
                         this.advance();
                         break;
                     case '\n':
-                        tokens.push(new Token(TT.NEWLINE));
+                        tokens.push(new Token(TT.NEWLINE, '\n'));
                         this.advance();
                         break;
                     case ':':
-                        tokens.push(new Token(TT.COLON));
+                        tokens.push(new Token(TT.COLON, ':'));
                         this.advance();
                         break;
                     case ';':
-                        tokens.push(new Token(TT.SEMICOLON));
+                        tokens.push(new Token(TT.SEMICOLON, ';'));
                         this.advance();
                         break;
                     case ',':
-                        tokens.push(new Token(TT.COMMA));
+                        tokens.push(new Token(TT.COMMA, ','));
                         this.advance();
                         break;
                     case '.':
-                        tokens.push(new Token(TT.DOT));
+                        tokens.push(new Token(TT.DOT, '.'));
                         this.advance();
                         break;
                     case '+':
@@ -165,7 +169,10 @@ class Lexer {
                         tokens.push(this.makeNotOrNE());
                         break;
                     case '<':
-                        tokens.push(this.makeLtOrLte());
+                        if (this.afterIncludeStatement)
+                            tokens.push(this.makeIncludeString());
+                        else
+                            tokens.push(this.makeLtOrLte());
                         break;
                     case '>':
                         tokens.push(this.makeGtOrGte());
@@ -177,27 +184,27 @@ class Lexer {
                         tokens.push(this.makeOr());
                         break;
                     case '(':
-                        tokens.push(new Token(TT.LPAREN));
+                        tokens.push(new Token(TT.LPAREN, '('));
                         this.advance();
                         break;
                     case ')':
-                        tokens.push(new Token(TT.RPAREN));
+                        tokens.push(new Token(TT.RPAREN, ')'));
                         this.advance();
                         break;
                     case '[':
-                        tokens.push(new Token(TT.LSQUARE));
+                        tokens.push(new Token(TT.LSQUARE, '['));
                         this.advance();
                         break;
                     case ']':
-                        tokens.push(new Token(TT.RSQUARE));
+                        tokens.push(new Token(TT.RSQUARE, ']'));
                         this.advance();
                         break;
                     case '{':
-                        tokens.push(new Token(TT.LBRACE));
+                        tokens.push(new Token(TT.LBRACE, '{'));
                         this.advance();
                         break;
                     case '}':
-                        tokens.push(new Token(TT.RBRACE));
+                        tokens.push(new Token(TT.RBRACE, '}'));
                         this.advance();
                         break;
                     default:
@@ -205,6 +212,7 @@ class Lexer {
                 }
             }
         }
+        tokens.push(new Token(TT.EOF, ''));
         return tokens;
     }
 
@@ -212,12 +220,14 @@ class Lexer {
         let idString = '';
         while (this.currentChar !== null && (LETTERS + DIGITS).includes(this.currentChar)) {
             idString += this.currentChar;
-            this.advance();
+            this.advance(true);
         }
-        if (idString in KEYWORDS)
-            return new Token(TT.KEYWORD, idString);
-        else
-            return new Token(TT.IDENTIFIER, idString);
+        if (KEYWORDS.includes(idString)) {
+            if (idString === 'include')
+                this.afterIncludeStatement = true;
+            return new Token(TT.KEYWORD, this.getAccText(0, -1), idString);
+        } else
+            return new Token(TT.IDENTIFIER, this.getAccText(0, -1), idString);
     }
 
     makeNumber = () => {
@@ -230,147 +240,153 @@ class Lexer {
                 dotCount++;
             }
             numString += this.currentChar;
-            this.advance();
+            this.advance(true);
         }
         if (dotCount === 0) 
-            return new Token(TT.INT, parseInt(numString));
+            return new Token(TT.INT, this.getAccText(0, -1), parseInt(numString));
         else
-            return new Token(TT.FLOAT, parseFloat(numString));
+            return new Token(TT.FLOAT, this.getAccText(0, -1), parseFloat(numString));
     }
 
     makeString = () => {
         let string = '';
-        let escaped = false;
         const escapeChars = {
             n: '\n',
             t: '\t'
         }
-        this.advance();
-        while (this.currentChar !== null && (this.currentChar !== '"' || escaped)) {
-            if (escaped) {
+        this.advance(true);
+        while (this.currentChar !== null && (this.currentChar !== '"')) {
+            if (this.currentChar === '\\')
                 string += escapeChars[this.currentChar] ? escapeChars[this.currentChar] : this.currentChar
-            } else {
-                if (this.currentChar === '\\')
-                    escaped = true;
-                else
-                    string += this.currentChar;
-            }
-            escaped = false;
-            this.advance();
+            else
+                string += this.currentChar;
+            this.advance(true);
         }
-        this.advance();
-        return new Token(TT.STRING, string);
+        this.advance(true);
+        return new Token(TT.STRING, this.getAccText(0, -1), string);
+    }
+
+    makeIncludeString = () => {
+        let string = '';
+        this.afterIncludeStatement = false;
+        this.advance(true);
+        while (this.currentChar !== null && this.currentChar !== '>') {
+            string += this.currentChar;
+            this.advance(true);
+        }
+        this.advance(true);
+        return new Token(TT.INCLUDESTRING, this.getAccText(0, -1), string);
     }
 
     makeChar = () => {
         const charCode = this.currentChar.charCodeAt(0);
         let char = String.fromCharCode(charCode);
-        this.advance();
+        this.advance(true);
         if (charCode < 0 || charCode > 255)
             char = '?';
-        this.advance();
+        this.advance(true);
         if (this.currentChar !== "'")
             throw new LexerError("Expected `'` after 'CHAR'");
-        this.advance();
-        return new Token(TT.CHAR, char);
+        this.advance(true);
+        return new Token(TT.CHAR, this.getAccText(0, -1), char);
     }
     
     makePlusOrPlusEq = () => {
         let tokenType = TT.PLUS;
-        this.advance();
+        this.advance(true);
         if (this.currentChar === '=') {
             tokenType = TT.PLUSEQ;
-            this.advance();
+            this.advance(true);
         }
-        return new Token(tokenType);
+        return new Token(tokenType, this.getAccText(0, -1));
     }
 
     makeMinusOrMinusEq = () => {
         let tokenType = TT.MINUS;
-        this.advance();
+        this.advance(true);
         if (this.currentChar === '=') {
             tokenType = TT.MINUSEQ;
-            this.advance();
+            this.advance(true);
         }
-        return new Token(tokenType);
+        return new Token(tokenType, this.getAccText(0, -1));
     }
 
     makeMultiplyOrMultiplyEq = () => {
         let tokenType = TT.MULTIPLY;
-        this.advance();
+        this.advance(true);
         if (this.currentChar === '=') {
             tokenType = TT.MULTIPLYEQ;
-            this.advance();
+            this.advance(true);
         }
-        return new Token(tokenType);
+        return new Token(tokenType, this.getAccText(0, -1));
     }
 
     makeDivideOrDivideEq = () => {
         let tokenType = TT.DIVIDE;
-        this.advance();
+        this.advance(true);
         if (this.currentChar === '=') {
             tokenType = TT.DIVIDEEQ;
-            this.advance();
+            this.advance(true);
         }
-        return new Token(tokenType);
+        return new Token(tokenType, this.getAccText(0, -1));
     }
 
     makeEqualOrEE = () => {
         let tokenType = TT.EQUAL;
-        this.advance();
+        this.advance(true);
         if (this.currentChar === '=') {
             tokenType = TT.EE;
-            this.advance();
+            this.advance(true);
         }
-        return new Token(tokenType);
+        return new Token(tokenType, this.getAccText(0, -1));
     }
 
     makeNotOrNE = () => {
         let tokenType = TT.NOT;
-        this.advance();
+        this.advance(true);
         if (this.currentChar === '=') {
             tokenType = TT.NE;
-            this.advance();
+            this.advance(true);
         }
-        return new Token(tokenType);
+        return new Token(tokenType, this.getAccText(0, -1));
     }
 
     makeLtOrLte = () => {
         let tokenType = TT.LT;
-        this.advance();
+        this.advance(true);
         if (this.currentChar === '=') {
             tokenType = TT.LTE;
-            this.advance();
+            this.advance(true);
         }
-        return new Token(tokenType);
+        return new Token(tokenType, this.getAccText(0, -1));
     }
     
     makeGtOrGte = () => {
         let tokenType = TT.GT;
-        this.advance();
+        this.advance(true);
         if (this.currentChar === '=') {
             tokenType = TT.GTE;
-            this.advance();
+            this.advance(true);
         }
         return new Token(tokenType);
     }
 
     makeAndOrValueOf = () => {
-        this.advance();
+        this.advance(true);
         if (this.currentChar !== '&') {
-            return new Token(TT.VALUEOF);
+            return new Token(TT.VALUEOF, this.getAccText(0, -1));
         } else {
-            this.advance();
-            return new Token(TT.AND);
+            this.advance(true);
+            return new Token(TT.AND, this.getAccText(0, -1));
         }
     }
 
     makeOr = () => {
-        this.advance();
+        this.advance(true);
         if (this.currentChar !== '|')
             throw new LexerError(`Expected '|' after '|'`)
-        this.advance();
-        return new Token(TT.AND);
+        this.advance(true);
+        return new Token(TT.AND, this.getAccText(0, -1));
     }
 
 }
