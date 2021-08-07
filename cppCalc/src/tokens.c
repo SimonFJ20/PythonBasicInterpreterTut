@@ -1,6 +1,18 @@
 #include <stdio.h>
 #include "tokens.h"
 
+Token newToken(int type, double value)
+{
+    Token token;
+    token.type = type;
+    if (value != TOKEN_NULL) {
+        token.has_value = true;
+        token.value = value;
+    } else
+        token.has_value = false;
+    return token;
+}
+
 void print_tokens(Token tokens[], size_t len)
 {
 

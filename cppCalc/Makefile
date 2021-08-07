@@ -4,8 +4,8 @@ BIN=program
 
 CC=gcc
 
+LFLAGS=-lm
 CFLAGS=-g -Wall
-LFLAGS=
 
 SRC=src
 HDR=src
@@ -17,10 +17,10 @@ HDRS=$(wildcard $(HDR)/*.h)
 OBJS=$(patsubst $(SRC)/%.c, $(OBJ)/%.o, $(SRCS))
 
 $(BIN): $(OBJS) $(OBJ)
-	$(CC) $(CFLAGS) $(LFLAGS) $(OBJS) -o $@ -L$(LIB)
+	$(CC) $(OBJS) -o $@ -L$(LIB) $(CFLAGS) $(LFLAGS)
 
 $(OBJ)/%.o: $(SRC)/%.c $(OBJ) $(HDRS)
-	$(CC) $(CFLAGS) -c $< -o $@ -I$(HDR)
+	$(CC) -c $< -o $@ -I$(HDR) $(CFLAGS)
 
 $(OBJ):
 	mkdir -p $@
