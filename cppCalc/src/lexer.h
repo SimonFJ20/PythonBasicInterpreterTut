@@ -12,10 +12,10 @@ typedef struct
     int index;
 } Lexer;
 
-void lexer_init(Lexer this, char text[], size_t len);
-void lexer_advance(Lexer this);
-void lexer_generate_tokens(Lexer this, Token tokens[]);
-Token lexer_make_number(Lexer this);
+void lexer_init(Lexer *this, char *text, size_t len);
+void lexer_advance(Lexer *this);
+void lexer_generate_tokens(Lexer *this, Token *tokens);
+Token lexer_make_number(Lexer *this);
 
 
 #endif

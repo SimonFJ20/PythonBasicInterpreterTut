@@ -16,9 +16,9 @@ int main()
         fgets(str, 128, stdin);
         //printf("You wrote: %s\n", str);
         Lexer lexer;
-        lexer_init(lexer, str, 128);
+        lexer_init(&lexer, (char *) &str, 128);
         Token tokens[128];
-        lexer_generate_tokens(lexer, tokens);
+        lexer_generate_tokens(&lexer, (Token *) &tokens);
         print_tokens(tokens, 128);
     }
 

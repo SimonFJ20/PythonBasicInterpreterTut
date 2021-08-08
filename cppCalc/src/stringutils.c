@@ -1,4 +1,5 @@
 #include "stringutils.h"
+#include <stdio.h>
 #include <math.h>
 #include "tokens.h"
 
@@ -58,6 +59,7 @@ int parse_int(char str[], size_t len)
             double exp = num_str_len - i - 1;
             double num = num_str[i] - 48;
             result_long += (int) (num * pow(10, exp));
+            printf("semires: %ld\t%lf\n", result_long, exp);
         }
         start_i++;
     }
@@ -70,5 +72,7 @@ int parse_int(char str[], size_t len)
         result *= -1;
     }
     
+    printf("input: %s\toutput: %d\n", str, result);
+
     return result;
 }
