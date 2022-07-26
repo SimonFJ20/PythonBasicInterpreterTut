@@ -1,0 +1,198 @@
+From 34f3ba075fe406890a97130d3f6d37d6a38576db Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Mon, 6 Jun 2022 03:40:58 +0200
+Subject: [PATCH] declarations
+
+---
+ examples/test.morbius |   2 +-
+ main.ts               |   1 +
+ parser.ts             | 105 +++++++++++++++++++++++++++++++-----------
+ 3 files changed, 80 insertions(+), 28 deletions(-)
+
+diff --git a/examples/test.morbius b/examples/test.morbius
+index 29809e0..2770b13 100644
+--- a/examples/test.morbius
++++ b/examples/test.morbius
+@@ -1,5 +1,5 @@
+ 
+-let main = (args: array of string) {
++let main = (args: string[]) {
+     let this_is_const = 5
+     let my_string = "hello world\n"
+     print(this_is_const)
+diff --git a/main.ts b/main.ts
+index 6de8dcb..c7eb37d 100644
+--- a/main.ts
++++ b/main.ts
+@@ -47,6 +47,7 @@ const main = () => {
+         hexRule(TokenType.HexLiteral),
+         intRule(TokenType.IntLiteral),
+         charPatternRule(TokenType.LetKeyword, 'let'),
++        charPatternRule(TokenType.LetKeyword, 'mut'),
+         identifierRule(TokenType.Identifier),
+         ignoreSingleLineWhitespaceRule(),
+         ignoreSingleLineComment(),
+diff --git a/parser.ts b/parser.ts
+index ffdda38..58fbc11 100644
+--- a/parser.ts
++++ b/parser.ts
+@@ -18,6 +18,7 @@ export class ParserError extends Error {
+ 
+ export class Parser {
+     public index = 0;
++    private saves: number[] = [];
+ 
+     public constructor (
+         public tokens: Token<TokenType>[],
+@@ -38,14 +39,24 @@ export class Parser {
+         return this.tokens[this.index];
+     }
+ 
+-    public peekNext(): Token<TokenType> | null {
+-        if (this.index >= this.tokens.length)
+-            return null;
+-        return this.tokens[this.index + 1];
++    public save() {
++        this.saves.push(this.index);
+     }
++
++    public recover() {
++        const fail = () => { throw new ParserError('cant recover unsaved parser state'); }
++        this.index = this.saves.pop() ?? fail();
++    }
++}
++
++export enum TypeType {
++    TypeName,
+ }
+ 
+ export enum ExpressionType {
++    LetDeclaration,
++    MutDeclaration,
++    Function,
+     Assignment,
+     Addition,
+     Subtraction,
+@@ -57,13 +68,56 @@ export enum ExpressionType {
+     StringLiteral,
+ }
+ 
+-export abstract class ExpressionNode {
++export abstract class ParseNode {
+     protected constructor (
+-        public type: ExpressionType,
+         public span: Span,
+     ) {}
+ }
+ 
++export abstract class TypeNode extends ParseNode {
++    protected constructor (
++        public type: TypeType,
++        span: Span,
++    ) { super (span); }
++}
++
++export class TypeNameNode extends TypeNode {
++    public constructor (
++        public value: Token<TokenType>,
++    ) { super (TypeType.TypeName, value.span); }
++}
++
++export abstract class ExpressionNode extends ParseNode {
++    protected constructor (
++        public type: ExpressionType,
++        span: Span,
++    ) { super (span); }
++}
++
++export class LetDeclarationNode extends ExpressionNode {
++    public constructor (
++        public target: Token<TokenType>,
++        public value: ExpressionNode,
++        begin: Position,
++    ) { super (ExpressionType.LetDeclaration, new Span(begin, value.span.end)); }
++}
++
++export class MutDeclarationNode extends ExpressionNode {
++    public constructor (
++        public target: Token<TokenType>,
++        public value: ExpressionNode,
++        begin: Position,
++    ) { super (ExpressionType.MutDeclaration, new Span(begin, value.span.end)); }
++}
++
++export class Function extends ExpressionNode {
++    public constructor (
++        public args: Token<TokenType>,
++        public body: ExpressionNode,
++        span: Span,
++    ) { super (ExpressionType.Function, span); }
++}
++
+ export class AssignmentNode extends ExpressionNode {
+     public constructor (
+         public target: Token<TokenType>,
+@@ -128,42 +182,39 @@ export const parse = (tokens: Token<TokenType>[]): ExpressionNode[] => {
+     const self = new Parser(tokens);
+     const expressions: ExpressionNode[] = [];
+     while (self.index < self.tokens.length) {
+-        // if (expressions.length !== 0)
+-        //     assertNewline(self);
+         expressions.push(parseExpression(self));
+     }
+     return expressions;
+ }
+ 
+ export const parseExpression = (self: Parser): ExpressionNode => {
+-    return parseAssignment(self);
++    if (self.current()!.type === TokenType.LetKeyword)
++        return parseLetDeclaration(self);
++    else
++        return parseAssignment(self);
+ }
+ 
+-// export const assertNewline = (self: Parser) => {
+-//     const isLineBreak = (self: Parser) =>
+-//         self.current()?.type === TokenType.NewLine 
+-//         || self.current()?.type === TokenType.LineTerminator;
+-
+-//     if (!isLineBreak(self))
+-//         throw ParserError.fromPosition(self.current()!.span.end, `expected ';' or line break`);
+-//     while (self.index < self.tokens.length && isLineBreak(self))
+-//         self.step();
+-// }
+-
+-// export const skipNewlines = (self: Parser) => {
+-//     while (self.index < self.tokens.length && self.current()?.type === TokenType.NewLine)
+-//         self.step();
+-// }
++export const parseLetDeclaration = (self: Parser): ExpressionNode => {
++    const begin = self.current()!.span.begin;
++    self.step();
++    if (self.current()?.type !== TokenType.Identifier)
++        throw ParserError.fromSpan(self.current()!.span, 'expected identifier');
++    const {target, value} = parseAssignment(self) as AssignmentNode;
++    return new LetDeclarationNode(target, value, begin);
++}
+ 
+ export const parseAssignment = (self: Parser): ExpressionNode => {
+     const target = self.current()!;
+-    if (target.type !== TokenType.Identifier && self.peekNext()?.type === TokenType.Equal) {
+-        self.step();
++    self.save();
++    self.step();
++    if (target.type === TokenType.Identifier && self.current()?.type === TokenType.Equal) {
+         self.step();
+         const value = parseAssignment(self);
+         return new AssignmentNode(target, value);
+-    } else
++    } else {
++        self.recover();
+         return parseAdditionAndSubtraction(self);
++    }
+ }
+ 
+ export const parseAdditionAndSubtraction = (self: Parser): ExpressionNode => {
+-- 
+2.25.1
+

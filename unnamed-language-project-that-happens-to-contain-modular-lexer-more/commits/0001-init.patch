@@ -1,0 +1,258 @@
+From 942d3655e78bf91440a7b353d7285064d40f0b62 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Wed, 1 Jun 2022 19:42:32 +0200
+Subject: [PATCH] init
+
+---
+ .gitignore            |   1 +
+ examples/test.morbius |   5 ++
+ lexer.ts              | 165 ++++++++++++++++++++++++++++++++++++++++++
+ main.ts               |  44 +++++++++++
+ 4 files changed, 215 insertions(+)
+ create mode 100644 .gitignore
+ create mode 100644 examples/test.morbius
+ create mode 100644 lexer.ts
+ create mode 100644 main.ts
+
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..722d5e7
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1 @@
++.vscode
+diff --git a/examples/test.morbius b/examples/test.morbius
+new file mode 100644
+index 0000000..3d5e0d4
+--- /dev/null
++++ b/examples/test.morbius
+@@ -0,0 +1,5 @@
++
++let main = (args: array of string) {
++    let this_is_const = 5
++    print(this_is_const)
++}
+diff --git a/lexer.ts b/lexer.ts
+new file mode 100644
+index 0000000..9620651
+--- /dev/null
++++ b/lexer.ts
+@@ -0,0 +1,165 @@
++
++export class Position {
++    public constructor (
++        public row: number,
++        public column: number,
++    ) {}
++
++    public copy() {
++        return new Position(this.row, this.column);
++    }
++}
++
++export type Span = {
++    begin: Position,
++    end: Position,
++};
++
++export type Token<TokenType> = {
++    type: TokenType,
++    text: string,
++    value: string,
++    span: Span,
++};
++
++export type LexerRule<TokenType> = LexerBuiltinRule<TokenType> | LexerCustomRule<TokenType>;
++
++export type LexerBuiltinRule<TokenType> = {
++    tokentype: TokenType,
++    type: 'builtin',
++    builtin: 'int'
++        | 'hex'
++        | 'float'
++        | 'char'
++        | 'string'
++        | 'identifier'
++        | 'sl-comment'
++        | 'ml-comment'
++        | 'newline'
++        | 'semicolon-nl'
++        | 'whitespace',
++}
++
++export type LexerCustomRule<TokenType> = {
++    tokentype: TokenType,
++    type: 'custom',
++    regex: RegExp,
++    ignore: boolean,
++    multiline: boolean,
++}
++
++export class Lexer<TokenType> {
++
++    private text!: string;
++    private index!: number;
++    private pos!: Position;
++    
++    public constructor (
++        private rules: LexerRule<TokenType>[],
++    ) {}
++
++    public tokenize(text: string): Token<TokenType>[] {
++        this.text = text;
++        this.index = 0;
++        this.pos = new Position(1, 1);
++        const tokens: Token<TokenType>[] = [];
++
++        while (this.index < this.text.length) {
++            let hasMatched = false;
++            for (const rule of this.rules) {
++                const token = rule.type === 'builtin' ? this.matchBuiltinRule(rule) : this.matchCustomRule(rule);
++                if (token) {
++                    hasMatched = true;
++                    tokens.push(token);
++                    break;
++                }
++            }
++            if (!hasMatched)
++                throw new Error(`unexpected character '${this.text.slice(this.index, 3)}'`);
++        }
++
++        return tokens;
++    }
++
++    private matchBuiltinRule(rule: LexerBuiltinRule<TokenType>): Token<TokenType> | null {
++        switch (rule.builtin) {
++            case 'int':
++                return this.matchBuiltinInt(rule);
++            case 'hex':
++                return this.matchBuiltinHex(rule);
++            case 'float':
++            case 'char':
++            case 'string':
++            case 'identifier':
++            case 'sl-comment':
++            case 'ml-comment':
++            case 'newline':
++            case 'semicolon-nl':
++            case 'whitespace':
++            default:
++                throw new Error('not implemented');
++        }
++    }
++
++    private matchBuiltinInt(rule: LexerBuiltinRule<TokenType>): Token<TokenType> | null {
++        return /^[0-9]/.test(this.text.slice(this.index)) ? this.makeInt(rule.tokentype) : null;
++    }
++
++    private makeInt(type: TokenType): Token<TokenType> {
++        const begin = this.pos.copy();
++        const c = () => this.text[this.index];
++        const step = () => this.index++ && this.pos.column++;
++        let value = c();
++        step();
++        let end = this.pos.copy();
++        while (/[0-9]/.test(c())) {
++            value += c();
++            end = this.pos.copy();
++            step();
++        }
++        return { type, value, text: value, span: {begin, end}};
++    }
++
++    private matchBuiltinHex(rule: LexerBuiltinRule<TokenType>): Token<TokenType> | null {
++        return /^[0-9]x/.test(this.text.slice(this.index)) ? this.makeHex(rule.tokentype) : null;
++    }
++
++    private makeHex(type: TokenType): Token<TokenType> {
++        const begin = this.pos.copy();
++        const c = () => this.text[this.index];
++        const step = () => this.index++ && this.pos.column++;
++        let value = c();
++        step();
++        let end = this.pos.copy();
++        while (/[0-9a-fA-F]/.test(c())) {
++            value += c();
++            end = this.pos.copy();
++            step();
++        }
++        return { type, value, text: value, span: {begin, end}};
++    }
++
++    private matchCustomRule(rule: LexerCustomRule<TokenType>): Token<TokenType> | null {
++        const match = this.text.slice(this.index).match(rule.regex);
++        if (!match)
++            return null; 
++        const begin = this.pos.copy();
++        if (rule.multiline && match[0].includes('\n')) {
++            this.pos.row += match[0].split('\n').length - 1;
++            this.pos.column = match[0].slice(match[0].lastIndexOf('\n') + 1).length;
++        } else {
++            this.pos.column += match[0].length - 1;
++        }
++        const end = this.pos.copy();
++        this.pos.column += 1;
++        this.index += match[0].length;
++        return {
++            type: rule.tokentype,
++            text: match[0],
++            value: match[match.length - 1],
++            span: {begin, end},
++        };
++    }
++
++
++}
+diff --git a/main.ts b/main.ts
+new file mode 100644
+index 0000000..ab32397
+--- /dev/null
++++ b/main.ts
+@@ -0,0 +1,44 @@
++import { Lexer } from "./lexer.ts";
++
++enum TokenType {
++    A1,
++    B2,
++    NL,
++}
++
++const main = () => {
++    const filename = Deno.args[0];
++    console.log(filename);
++
++
++    const text = 'aabbc\nc'
++
++    const tokens = new Lexer([
++        {
++            type: 'custom',
++            tokentype: TokenType.A1,
++            regex: /^a/,
++            ignore: false,
++            multiline: false,
++        },
++        {
++            type: 'custom',
++            tokentype: TokenType.B2,
++            regex: /^bb/,
++            ignore: false,
++            multiline: false,
++        },
++        {
++            type: 'custom',
++            tokentype: TokenType.NL,
++            regex: /^c\nc/,
++            ignore: false,
++            multiline: true,
++        },
++    ]).tokenize(text);
++
++    console.log(tokens)
++
++}
++
++main()
+-- 
+2.25.1
+

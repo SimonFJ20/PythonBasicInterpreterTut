@@ -1,0 +1,257 @@
+From 9ccfdb0e20ef6801026c3fdaa02ba336c56c8542 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Wed, 27 Jul 2022 01:21:39 +0200
+Subject: [PATCH] more
+
+---
+ ast.ts    | 33 +++++++++++++++-----------------
+ parser.ts | 56 ++++++++++++++++++++++++++++++++++++++++++++++---------
+ result.ts | 33 ++++++++++++++++++++++++++++++++
+ 3 files changed, 95 insertions(+), 27 deletions(-)
+ create mode 100644 result.ts
+
+diff --git a/ast.ts b/ast.ts
+index d9dc4fb..87e4410 100644
+--- a/ast.ts
++++ b/ast.ts
+@@ -1,5 +1,4 @@
+-import { Span, Token, Position } from "./lexer.ts";
+-import { TokenType } from "./tokentypes.ts";
++import { Span, Position } from "./lexer.ts";
+ 
+ export enum TypeType {
+     TypeName,
+@@ -31,8 +30,8 @@ export abstract class TypeNode extends ParseNode {
+ }
+ 
+ export class TypeNameNode extends TypeNode {
+-    public constructor(public value: Token<TokenType>) {
+-        super(TypeType.TypeName, value.span);
++    public constructor(public name: string, span: Span) {
++        super(TypeType.TypeName, span);
+     }
+ }
+ 
+@@ -44,7 +43,7 @@ export abstract class ExpressionNode extends ParseNode {
+ 
+ export class LetDeclarationNode extends ExpressionNode {
+     public constructor(
+-        public target: Token<TokenType>,
++        public identifier: string,
+         public value: ExpressionNode,
+         begin: Position,
+     ) {
+@@ -54,7 +53,7 @@ export class LetDeclarationNode extends ExpressionNode {
+ 
+ export class MutDeclarationNode extends ExpressionNode {
+     public constructor(
+-        public target: Token<TokenType>,
++        public identifier: string,
+         public value: ExpressionNode,
+         begin: Position,
+     ) {
+@@ -64,7 +63,7 @@ export class MutDeclarationNode extends ExpressionNode {
+ 
+ export class Function extends ExpressionNode {
+     public constructor(
+-        public args: Token<TokenType>,
++        public args: { identifier: string; type: TypeNode }[],
+         public body: ExpressionNode,
+         span: Span,
+     ) {
+@@ -74,13 +73,11 @@ export class Function extends ExpressionNode {
+ 
+ export class AssignmentNode extends ExpressionNode {
+     public constructor(
+-        public target: Token<TokenType>,
++        public identifier: string,
+         public value: ExpressionNode,
++        begin: Position,
+     ) {
+-        super(
+-            ExpressionType.Assignment,
+-            new Span(target.span.begin, value.span.end),
+-        );
++        super(ExpressionType.Assignment, new Span(begin, value.span.end));
+     }
+ }
+ 
+@@ -145,19 +142,19 @@ export class RemainderNode extends ExpressionNode {
+ }
+ 
+ export class IntLiteralNode extends ExpressionNode {
+-    public constructor(public value: Token<TokenType>) {
+-        super(ExpressionType.IntLiteral, value.span);
++    public constructor(public value: string, span: Span) {
++        super(ExpressionType.IntLiteral, span);
+     }
+ }
+ 
+ export class CharLiteralNode extends ExpressionNode {
+-    public constructor(public value: Token<TokenType>) {
+-        super(ExpressionType.CharLiteral, value.span);
++    public constructor(public value: string, span: Span) {
++        super(ExpressionType.CharLiteral, span);
+     }
+ }
+ 
+ export class StringLiteralNode extends ExpressionNode {
+-    public constructor(public value: Token<TokenType>) {
+-        super(ExpressionType.StringLiteral, value.span);
++    public constructor(public value: string, span: Span) {
++        super(ExpressionType.StringLiteral, span);
+     }
+ }
+diff --git a/parser.ts b/parser.ts
+index 4365f18..d4bd980 100644
+--- a/parser.ts
++++ b/parser.ts
+@@ -10,8 +10,11 @@ import {
+     IntLiteralNode,
+     CharLiteralNode,
+     StringLiteralNode,
++    TypeNode,
++    TypeNameNode,
+ } from "./ast.ts";
+ import { Position, Span, Token } from "./lexer.ts";
++import { error, ok, Res } from "./result.ts";
+ import { TokenType } from "./tokentypes.ts";
+ 
+ export class ParserError extends Error {
+@@ -66,6 +69,20 @@ export const parse = (tokens: Token<TokenType>[]): ExpressionNode[] => {
+     return parseExpressions(self);
+ };
+ 
++export const parseType = (self: Parser): Res<TypeNode, ParserError> => {
++    if (self.current()?.type === TokenType.Identifier) {
++        const token = self.current()!;
++        self.step();
++        return ok(new TypeNameNode(token.value, token.span));
++    } else
++        return error(
++            ParserError.fromPosition(
++                self.current()!.span.begin,
++                "unexpected token",
++            ),
++        );
++};
++
+ export const parseExpressions = (self: Parser): ExpressionNode[] => {
+     const expressions: ExpressionNode[] = [];
+     while (self.index < self.tokens.length) {
+@@ -85,15 +102,36 @@ export const parseLetDeclaration = (self: Parser): ExpressionNode => {
+     self.step();
+     if (self.current()?.type !== TokenType.Identifier)
+         throw ParserError.fromSpan(self.current()!.span, "expected identifier");
+-    const { target, value } = parseAssignment(self) as AssignmentNode;
+-    return new LetDeclarationNode(target, value, begin);
++    const { identifier, value } = parseAssignment(self) as AssignmentNode;
++    return new LetDeclarationNode(identifier, value, begin);
+ };
+ 
+-export const parseFunctionDefinition = (self: Parser): ExpressionNode => {};
++export const parseFunctionDefinition = (
++    self: Parser,
++): Res<ExpressionNode, ParserError> => {
++    const fail = (e: ParserError) => {
++        self.recover();
++        error(e);
++    };
++    self.save();
++    const begin = self.current()!.span.begin;
++    self.step();
++    const args: { identifier: string; type: TypeNode } = [];
++    while (self.current()?.type === TokenType.Identifier) {
++        const identifier = self.current()!;
++        self.step();
++        if (self.current()?.type !== TokenType.Colon) return fail();
++        self.step();
++        const type = parseType(self).match(
++            (value) => value,
++            (e) => fail(e),
++        );
++    }
++};
+ 
+ export const parseAssignment = (self: Parser): ExpressionNode => {
+-    const target = self.current()!;
+     self.save();
++    const target = self.current()!;
+     self.step();
+     if (
+         target.type === TokenType.Identifier &&
+@@ -101,7 +139,7 @@ export const parseAssignment = (self: Parser): ExpressionNode => {
+     ) {
+         self.step();
+         const value = parseExpression(self);
+-        return new AssignmentNode(target, value);
++        return new AssignmentNode(target.value, value, target.span.begin);
+     } else {
+         self.recover();
+         return parseAdditionAndSubtraction(self);
+@@ -144,19 +182,19 @@ export const parseValue = (self: Parser): ExpressionNode => {
+     if (self.current()?.type === TokenType.IntLiteral) {
+         const value = self.current()!;
+         self.step();
+-        return new IntLiteralNode(value);
++        return new IntLiteralNode(value.value, value.span);
+     } else if (self.current()?.type === TokenType.HexLiteral) {
+         const value = self.current()!;
+         self.step();
+-        return new IntLiteralNode(value);
++        return new IntLiteralNode(value.value, value.span);
+     } else if (self.current()?.type === TokenType.CharLiteral) {
+         const value = self.current()!;
+         self.step();
+-        return new CharLiteralNode(value);
++        return new CharLiteralNode(value.value, value.span);
+     } else if (self.current()?.type === TokenType.StringLiteral) {
+         const value = self.current()!;
+         self.step();
+-        return new StringLiteralNode(value);
++        return new StringLiteralNode(value.value, value.span);
+     } else if (self.current()?.type === TokenType.LParen) {
+         self.step();
+         const value = parseExpression(self);
+diff --git a/result.ts b/result.ts
+new file mode 100644
+index 0000000..f709a89
+--- /dev/null
++++ b/result.ts
+@@ -0,0 +1,33 @@
++export class Res<T, E = Error> {
++    private constructor(
++        public readonly ok: boolean,
++        public readonly value: T | null,
++        public readonly error: E | null,
++    ) {}
++
++    public static ok<T, E = Error>(value: T): Res<T, E> {
++        return new Res<T, E>(true, value, null);
++    }
++
++    public static error<T, E = Error>(error: E): Res<T, E> {
++        return new Res<T, E>(false, null, error);
++    }
++
++    public transform<Y, N extends E>(): Res<Y, N> {
++        if (this.ok) throw new Error("cannot transform ok result");
++        return this as unknown as Res<Y, N>;
++    }
++
++    public unwrap(): T {
++        if (!this.ok) throw new Error("cannot unwrap non-ok result");
++        return this.value!;
++    }
++
++    public match<K>(ok: (value: T) => K, error: (error: E) => K): K {
++        if (this.ok) return ok(this.value!);
++        else return error(this.error!);
++    }
++}
++
++export const ok = <T, E = Error>(value: T) => Res.ok<T, E>(value);
++export const error = <T, E = Error>(error: E) => Res.error<T, E>(error);
+-- 
+2.25.1
+

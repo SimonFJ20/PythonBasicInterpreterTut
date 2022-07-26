@@ -1,0 +1,48 @@
+From f3e5ca3b58f65ae55565d16e08d8cf01d0b50f17 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Sun, 5 Jun 2022 18:11:14 +0200
+Subject: [PATCH] renamed context
+
+---
+ lexer.ts | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/lexer.ts b/lexer.ts
+index edc4610..c229dab 100644
+--- a/lexer.ts
++++ b/lexer.ts
+@@ -48,7 +48,7 @@ export class LexerError extends Error {
+     }
+ }
+ 
+-export class LexerContext {
++export class Lexer {
+     public index = 0;
+     public pos = new Position(1, 1,);
+     private _prevPos: Position | null = null;
+@@ -79,11 +79,11 @@ export class LexerContext {
+ 
+ export type LexerRule<TokenType> = {
+     pattern: RegExp,
+-    handler: (ctx: LexerContext) => Token<TokenType> | null,
++    handler: (ctx: Lexer) => Token<TokenType> | null,
+ };
+ 
+ export const tokenize = <TokenType>(text: string, rules: LexerRule<TokenType>[]): Token<TokenType>[] => {
+-    const ctx = new LexerContext(text);
++    const ctx = new Lexer(text);
+     const tokens: Token<TokenType>[] = [];
+     while (ctx.index < ctx.text.length) {
+         const indexBefore = ctx.index;
+@@ -211,7 +211,7 @@ export const ignoreMultiLineComment = <TokenType>(): LexerRule<TokenType> => {
+     };
+ } 
+ 
+-export const makeLiteralChar = (ctx: LexerContext): string => {
++export const makeLiteralChar = (ctx: Lexer): string => {
+     const char = ctx.text[ctx.index];
+     ctx.step();
+     if (char !== '\\') {
+-- 
+2.25.1
+
