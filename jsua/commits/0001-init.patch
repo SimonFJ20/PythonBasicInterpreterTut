@@ -1,0 +1,657 @@
+From 2019ec74464c7e432abc2e11245dc627b8edf58a Mon Sep 17 00:00:00 2001
+From: Simon From Jakobsen <sfja.skp@edu.mercantec.dk>
+Date: Mon, 6 Sep 2021 16:15:11 +0200
+Subject: [PATCH] init
+
+---
+ .gitignore    |   5 +
+ favicon.svg   |  15 +++
+ grammar.txt   |  59 +++++++++++
+ index.html    |  24 +++++
+ package.json  |  13 +++
+ src/jsua.ts   |   9 ++
+ src/lexer.ts  | 269 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ src/main.ts   |  16 +++
+ src/style.css |  33 +++++++
+ tsconfig.json |  18 ++++
+ yarn.lock     |  93 +++++++++++++++++
+ 11 files changed, 554 insertions(+)
+ create mode 100644 .gitignore
+ create mode 100644 favicon.svg
+ create mode 100644 grammar.txt
+ create mode 100644 index.html
+ create mode 100644 package.json
+ create mode 100644 src/jsua.ts
+ create mode 100644 src/lexer.ts
+ create mode 100644 src/main.ts
+ create mode 100644 src/style.css
+ create mode 100644 tsconfig.json
+ create mode 100644 yarn.lock
+
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..53f7466
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,5 @@
++node_modules
++.DS_Store
++dist
++dist-ssr
++*.local
+\ No newline at end of file
+diff --git a/favicon.svg b/favicon.svg
+new file mode 100644
+index 0000000..de4aedd
+--- /dev/null
++++ b/favicon.svg
+@@ -0,0 +1,15 @@
++<svg width="410" height="404" viewBox="0 0 410 404" fill="none" xmlns="http://www.w3.org/2000/svg">
++<path d="M399.641 59.5246L215.643 388.545C211.844 395.338 202.084 395.378 198.228 388.618L10.5817 59.5563C6.38087 52.1896 12.6802 43.2665 21.0281 44.7586L205.223 77.6824C206.398 77.8924 207.601 77.8904 208.776 77.6763L389.119 44.8058C397.439 43.2894 403.768 52.1434 399.641 59.5246Z" fill="url(#paint0_linear)"/>
++<path d="M292.965 1.5744L156.801 28.2552C154.563 28.6937 152.906 30.5903 152.771 32.8664L144.395 174.33C144.198 177.662 147.258 180.248 150.51 179.498L188.42 170.749C191.967 169.931 195.172 173.055 194.443 176.622L183.18 231.775C182.422 235.487 185.907 238.661 189.532 237.56L212.947 230.446C216.577 229.344 220.065 232.527 219.297 236.242L201.398 322.875C200.278 328.294 207.486 331.249 210.492 326.603L212.5 323.5L323.454 102.072C325.312 98.3645 322.108 94.137 318.036 94.9228L279.014 102.454C275.347 103.161 272.227 99.746 273.262 96.1583L298.731 7.86689C299.767 4.27314 296.636 0.855181 292.965 1.5744Z" fill="url(#paint1_linear)"/>
++<defs>
++<linearGradient id="paint0_linear" x1="6.00017" y1="32.9999" x2="235" y2="344" gradientUnits="userSpaceOnUse">
++<stop stop-color="#41D1FF"/>
++<stop offset="1" stop-color="#BD34FE"/>
++</linearGradient>
++<linearGradient id="paint1_linear" x1="194.651" y1="8.81818" x2="236.076" y2="292.989" gradientUnits="userSpaceOnUse">
++<stop stop-color="#FFEA83"/>
++<stop offset="0.0833333" stop-color="#FFDD35"/>
++<stop offset="1" stop-color="#FFA800"/>
++</linearGradient>
++</defs>
++</svg>
+diff --git a/grammar.txt b/grammar.txt
+new file mode 100644
+index 0000000..7cb304d
+--- /dev/null
++++ b/grammar.txt
+@@ -0,0 +1,59 @@
++statements      : NEWLINE* statement (NEWLINE+ statement)* NEWLINE*
++
++statement       : KEYWORD:RETURN expr?
++                : KEYWORD:CONTINUE
++                : KEYWORD:BREAK
++                : expr
++
++expr            : KEYWORD:VAR IDENTIFIER EQ expr
++                : comp-expr ((KEYWORD:AND|KEYWORD:OR) comp-expr)*
++
++comp-expr       : NOT comp-expr
++                : arith-expr ((EE|LT|GT|LTE|GTE) arith-expr)*
++
++arith-expr      : term ((PLUS|MINUS) term)*
++
++term            : factor ((MUL|DIV) factor)*
++
++factor          : (PLUS|MINUS) factor
++                : power
++
++power           : call (POW factor)*
++
++call            : atom (LPAREN (expr (COMMA expr)*)? RPAREN)?
++
++atom            : INT|FLOAT|STRING|IDENTIFIER
++                : LPAREN expr RPAREN
++                : list-expr
++                : if-expr
++                : for-expr
++                : while-expr
++                : func-def
++
++list-expr       : LSQUARE (COMMA expr)*)? RSQUARE
++
++if-expr         : KEYWORD:IF expr KEYWORD:THEN
++                  (statement if-expr-b|if-expr-c?)
++                | (NEWLINE statements KEYWORD:END|if-expr-b|if-expr-c)
++
++if-expr-b       : KEYWORD:ELIF expr KEYWORD:THEN
++                  (statement if-expr-b|if-expr-c?)
++                | (NEWLINE statements KEYWORD:END|if-expr-b|if-expr-c)
++
++if-expr-c       : KEYWORD:ELSE
++                  statement
++                | (NEWLINE statements KEYWORD:END)
++
++for-expr        : KEYWORD:FOR IDENTIFIER EQ expr KEYWORD:TO expr
++                  (KEYWORD:STEP expr)? KEYWORD:DO
++                  statement
++                | (NEWLINE statements KEYWORD:END)
++
++while-expr      : KEYWORD:WHILE expr KEYWORD:DO
++                  statement
++                | (NEWLINE statements KEYWORD:END)
++
++func-def        : KEYWORD:FUN IDENTIFIER?
++                  LPAREN (IDENTIFIER (COMMA IDENTIFIER)*)? RPAREN
++                  (ARROW expr)
++                | (NEWLINE statements KEYWORD:END)
+\ No newline at end of file
+diff --git a/index.html b/index.html
+new file mode 100644
+index 0000000..6fccd40
+--- /dev/null
++++ b/index.html
+@@ -0,0 +1,24 @@
++<!DOCTYPE html>
++<html lang="en">
++<head>
++    <meta charset="UTF-8">
++    <meta http-equiv="X-UA-Compatible" content="IE=edge">
++    <meta name="viewport" content="width=device-width, initial-scale=1.0">
++    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
++    <title>Jsua</title>
++</head>
++<body>
++
++    <textarea id="input"></textarea>
++
++    <br>
++
++    <textarea id="output" readonly></textarea>
++
++    <br>
++
++    <button id="run">Run</button>
++    
++    <script type="module" src="/src/main.ts"></script>
++</body>
++</html>
+\ No newline at end of file
+diff --git a/package.json b/package.json
+new file mode 100644
+index 0000000..7b76969
+--- /dev/null
++++ b/package.json
+@@ -0,0 +1,13 @@
++{
++  "name": "jsua",
++  "version": "0.0.0",
++  "scripts": {
++    "dev": "vite",
++    "build": "tsc && vite build",
++    "serve": "vite preview"
++  },
++  "devDependencies": {
++    "typescript": "^4.3.2",
++    "vite": "^2.5.2"
++  }
++}
+\ No newline at end of file
+diff --git a/src/jsua.ts b/src/jsua.ts
+new file mode 100644
+index 0000000..eda9429
+--- /dev/null
++++ b/src/jsua.ts
+@@ -0,0 +1,9 @@
++import { Lexer } from './lexer'
++
++
++export const interpret = (text: string) => {
++
++    const lexer = new Lexer();
++    return lexer.lex(text);
++
++}
+diff --git a/src/lexer.ts b/src/lexer.ts
+new file mode 100644
+index 0000000..e0adf48
+--- /dev/null
++++ b/src/lexer.ts
+@@ -0,0 +1,269 @@
++
++export enum TokenType {
++    Int = 'Int',
++    Float = 'Float',
++    String = 'String',
++    Plus = 'Plus',
++    Minus = 'Minus',
++    Multiply = 'Multiply',
++    Divide = 'Divide',
++    PlusAssign = 'PlusAssign',
++    MinusAssign = 'MinusAssign',
++    MultiplyAssign = 'MultiplyAssign',
++    DivideAssign = 'DivideAssign',
++    EqualAssign = 'EqualAssign',
++    Increment = 'Increment',
++    Decrement = 'Decrement',
++    LParen = 'LParen',
++    RParen = 'RParen',
++    LBrace = 'LBrace',
++    RBrace = 'RBrace',
++    LSquare = 'LSquare',
++    RSquare = 'RSquare',
++    EqualCompare = 'EqualCompare',
++    NotEqual = 'NotEqual',
++    LessThan = 'LessThan',
++    GreaterThan = 'GreaterThan',
++    LessThanOrEqual = 'LessThanOrEqual',
++    GreaterThanOrEqual = 'GreaterThanOrEqual',
++    Identifier = 'Identifier',
++    Keyword = 'Keyword',
++    Comma = 'Comma',
++    Colon = 'Colon',
++    Newline = 'Newline',
++    EndOfFile = 'EndOfFile',
++}
++
++export const Keywords: string[] = [
++    'int',
++    'float',
++    'string',
++    'bool',
++    'func',
++    'if',
++    'while',
++    'for',
++    'continue',
++    'break',
++    'return',
++    'require',
++]
++
++export class Token {
++    constructor (public type: TokenType, public value?: any) {}
++}
++
++export class Consts {
++    public static digits = '0123456789';
++    public static lowerCaseLetters = 'abcdefghijklmnopqrstuvwxyz';
++    public static upperCaseLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
++    public static letters = Consts.lowerCaseLetters + Consts.upperCaseLetters;
++    public static lettersDigits = Consts.digits + Consts.letters;
++    public static escapedChars: {[key: string]: string} = {
++        'n': '\n',
++        't': '\t',
++    };
++}
++
++export class Lexer {
++    private text: string = '';
++    private textIndex: number = 0;
++    private currentChar: string | null = null;
++
++    private advance = () => {
++        this.textIndex++;
++        const c = this.text.charAt(this.textIndex);
++        this.currentChar = c !== '' ? c : null;
++    }
++
++    private makeNumber = (): Token => {
++        let value = this.currentChar!;
++        this.advance();
++
++        let decimalPoints = 0;
++        while (this.currentChar !== null && (Consts.digits + '.').includes(this.currentChar)) {
++            if (this.currentChar === '.')
++                decimalPoints++;
++            if (decimalPoints > 1)
++                break;
++            value += this.currentChar;
++            this.advance();
++        }
++
++        if (decimalPoints)
++            return new Token(TokenType.Float, parseFloat(value));
++        else
++            return new Token(TokenType.Int, parseInt(value));
++    }
++
++    private makeIdentifierOrKeyword = (): Token => {
++        let value = this.currentChar!;
++        this.advance();
++
++        while (this.currentChar !== null && Consts.lettersDigits.includes(this.currentChar!)) {
++            value += this.currentChar;
++            this.advance();
++        }
++
++        if (Keywords.includes(value))
++            return new Token(TokenType.Keyword, value);
++        else
++            return new Token(TokenType.Identifier, value);
++    }
++
++    private makeString = (): Token => {
++        let value = '';
++        const stringChar = this.currentChar;
++        this.advance();
++
++        let escaped = false;
++        while (this.currentChar !== null && (this.currentChar !== stringChar || escaped)) {
++            if (escaped) {
++                const escapedChar = Consts.escapedChars[this.currentChar];
++                value += escapedChar ? escapedChar : this.currentChar;
++                escaped = false;
++            } else {
++                if (this.currentChar == '\\')
++                    escaped = true;
++                else
++                    value += this.currentChar;
++            }
++            this.advance();
++        }
++
++        if (this.currentChar === null)
++            throw new Error(`Expected '${stringChar}' got NULL`);
++        else if (this.currentChar !== stringChar)
++            throw new Error(`Expected '${stringChar}' got '${this.currentChar}'`);
++        
++        this.advance();
++        return new Token(TokenType.String, value)
++    }
++
++    private makePlus = () => {
++        this.advance();
++        if (this.currentChar === '=') {
++            this.advance();
++            return new Token(TokenType.PlusAssign);
++        } else if (this.currentChar === '+') {
++            this.advance();
++            return new Token(TokenType.Increment);
++        }
++        return new Token(TokenType.Plus);
++    }
++
++    private makeMinus = () => {
++        this.advance();
++        if (this.currentChar === '=') {
++            this.advance();
++            return new Token(TokenType.MinusAssign);
++        } else if (this.currentChar === '-') {
++            this.advance();
++            return new Token(TokenType.Decrement);
++        }
++        return new Token(TokenType.Minus);
++    }
++
++    private makeMultiply = () => {
++        this.advance();
++        if (this.currentChar === '=') {
++            this.advance();
++            return new Token(TokenType.MultiplyAssign);
++        }
++        return new Token(TokenType.Multiply);
++    }
++
++    private makeDivide = () => {
++        this.advance();
++        if (this.currentChar === '=') {
++            this.advance();
++            return new Token(TokenType.DivideAssign);
++        }
++        return new Token(TokenType.Divide);
++    }
++
++    private makeNot = (): Token => {
++        this.advance();
++        if (this.currentChar === '=') {
++            this.advance();
++            return new Token(TokenType.NotEqual);
++        }
++        return new Token(TokenType.NotEqual);
++    }
++
++    private makeEqual = (): Token => {
++        this.advance();
++        if (this.currentChar === '=') {
++            this.advance();
++            return new Token(TokenType.EqualCompare);
++        }
++        return new Token(TokenType.EqualAssign);
++    }
++
++    private makeLessThan = (): Token => {
++        this.advance();
++        if (this.currentChar === '=') {
++            this.advance();
++            return new Token(TokenType.LessThanOrEqual);
++        }
++        return new Token(TokenType.LessThan);
++    }
++
++    private makeGreaterThan = (): Token => {
++        this.advance();
++        if (this.currentChar === '=') {
++            this.advance();
++            return new Token(TokenType.GreaterThanOrEqual);
++        }
++        return new Token(TokenType.GreaterThan);
++    }
++
++    private addTokenAndAdvance = (tokens: Token[], type: TokenType) => {
++        tokens.push(new Token(type));
++        this.advance();
++    }
++
++    public lex = (text: string): Token[] => {
++        this.text = text;
++        this.textIndex = -1;
++        this.advance();
++
++        const tokens: Token[] = [];
++        while (this.currentChar !== null) {
++            if (Consts.digits.includes(this.currentChar)) {
++                tokens.push(this.makeNumber());
++            } else if (Consts.letters.includes(this.currentChar)) {
++                tokens.push(this.makeIdentifierOrKeyword());
++            } else {
++                switch (this.currentChar) {
++                    case '"':
++                    case "'": tokens.push(this.makeString()); break;
++                    case ' ':
++                    case '\t': this.advance(); break;
++                    case ';':
++                    case '\n': this.addTokenAndAdvance(tokens, TokenType.Newline); break;
++                    case '+': tokens.push(this.makePlus()); break;
++                    case '-': tokens.push(this.makeMinus()); break;
++                    case '*': tokens.push(this.makeMultiply()); break;
++                    case '/': tokens.push(this.makeDivide()); break;
++                    case '(': this.addTokenAndAdvance(tokens, TokenType.LParen); break;
++                    case ')': this.addTokenAndAdvance(tokens, TokenType.RParen); break;
++                    case '{': this.addTokenAndAdvance(tokens, TokenType.LBrace); break;
++                    case '}': this.addTokenAndAdvance(tokens, TokenType.RBrace); break;
++                    case '[': this.addTokenAndAdvance(tokens, TokenType.LSquare); break;
++                    case ']': this.addTokenAndAdvance(tokens, TokenType.RSquare); break;
++                    case '=': tokens.push(this.makeNot()); break;
++                    case '!': tokens.push(this.makeEqual()); break;
++                    case '<': tokens.push(this.makeLessThan()); break;
++                    case '>': tokens.push(this.makeGreaterThan()); break;
++                    case ',': this.addTokenAndAdvance(tokens, TokenType.Comma); break;
++                    case ':': this.addTokenAndAdvance(tokens, TokenType.Colon); break;
++                    default: throw new Error(`Illegal Character: '${this.currentChar}'`);
++                }
++            }
++        }
++        tokens.push(new Token(TokenType.EndOfFile));
++        return tokens;
++    }
++
++}
+diff --git a/src/main.ts b/src/main.ts
+new file mode 100644
+index 0000000..240f5ff
+--- /dev/null
++++ b/src/main.ts
+@@ -0,0 +1,16 @@
++import { interpret } from './jsua';
++import './style.css'
++
++const input = document.getElementById('input') as HTMLTextAreaElement;
++const output = document.getElementById('output') as HTMLTextAreaElement;
++const run = document.getElementById('run') as HTMLTextAreaElement;
++
++run.addEventListener('click', () => {
++    const text = input.value;
++    const tokens = interpret(text);
++    let out = '';
++    for (let i in tokens) {
++        out += tokens[i].value ? `[${tokens[i].type}: ${tokens[i].value}]\n` : `[${tokens[i].type}]\n`;
++    }
++    output.value = out;
++});
+diff --git a/src/style.css b/src/style.css
+new file mode 100644
+index 0000000..74994d8
+--- /dev/null
++++ b/src/style.css
+@@ -0,0 +1,33 @@
++
++* {
++    box-sizing: border-box;
++}
++
++body {
++    margin: 0;
++    padding: 0;
++    width: 100%;
++    height: 100vh;
++    background-color: #141414;
++    text-align: center;
++}
++
++textarea {
++    width: 50%;
++    height: 40%;
++    background-color: #282828;
++    color: rgb(200, 200, 200);
++    font-family: Consolas, monospace;
++    border: 0;
++    font-size: 18px;
++    border: 2px solid #525252;
++    white-space: pre;
++}
++
++button {
++    width: 15%;
++    height: 5%;
++}
++button:hover {
++    cursor: pointer;
++}
+diff --git a/tsconfig.json b/tsconfig.json
+new file mode 100644
+index 0000000..8cdbb2a
+--- /dev/null
++++ b/tsconfig.json
+@@ -0,0 +1,18 @@
++{
++  "compilerOptions": {
++    "target": "ESNext",
++    "useDefineForClassFields": true,
++    "module": "ESNext",
++    "lib": ["ESNext", "DOM"],
++    "moduleResolution": "Node",
++    "strict": true,
++    "sourceMap": true,
++    "resolveJsonModule": true,
++    "esModuleInterop": true,
++    "noEmit": true,
++    "noUnusedLocals": true,
++    "noUnusedParameters": true,
++    "noImplicitReturns": true
++  },
++  "include": ["./src"]
++}
+diff --git a/yarn.lock b/yarn.lock
+new file mode 100644
+index 0000000..3f94c83
+--- /dev/null
++++ b/yarn.lock
+@@ -0,0 +1,93 @@
++# THIS IS AN AUTOGENERATED FILE. DO NOT EDIT THIS FILE DIRECTLY.
++# yarn lockfile v1
++
++
++colorette@^1.2.2:
++  version "1.3.0"
++  resolved "https://registry.yarnpkg.com/colorette/-/colorette-1.3.0.tgz#ff45d2f0edb244069d3b772adeb04fed38d0a0af"
++  integrity sha512-ecORCqbSFP7Wm8Y6lyqMJjexBQqXSF7SSeaTyGGphogUjBlFP9m9o08wy86HL2uB7fMTxtOUzLMk7ogKcxMg1w==
++
++esbuild@^0.12.17:
++  version "0.12.25"
++  resolved "https://registry.yarnpkg.com/esbuild/-/esbuild-0.12.25.tgz#c2131cef022cf9fe94aaa5e00110b27fc976221a"
++  integrity sha512-woie0PosbRSoN8gQytrdCzUbS2ByKgO8nD1xCZkEup3D9q92miCze4PqEI9TZDYAuwn6CruEnQpJxgTRWdooAg==
++
++fsevents@~2.3.2:
++  version "2.3.2"
++  resolved "https://registry.yarnpkg.com/fsevents/-/fsevents-2.3.2.tgz#8a526f78b8fdf4623b709e0b975c52c24c02fd1a"
++  integrity sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==
++
++function-bind@^1.1.1:
++  version "1.1.1"
++  resolved "https://registry.yarnpkg.com/function-bind/-/function-bind-1.1.1.tgz#a56899d3ea3c9bab874bb9773b7c5ede92f4895d"
++  integrity sha512-yIovAzMX49sF8Yl58fSCWJ5svSLuaibPxXQJFLmBObTuCr0Mf1KiPopGM9NiFjiYBCbfaa2Fh6breQ6ANVTI0A==
++
++has@^1.0.3:
++  version "1.0.3"
++  resolved "https://registry.yarnpkg.com/has/-/has-1.0.3.tgz#722d7cbfc1f6aa8241f16dd814e011e1f41e8796"
++  integrity sha512-f2dvO0VU6Oej7RkWJGrehjbzMAjFp5/VKPp5tTpWIV4JHHZK1/BxbFRtf/siA2SWTe09caDmVtYYzWEIbBS4zw==
++  dependencies:
++    function-bind "^1.1.1"
++
++is-core-module@^2.2.0:
++  version "2.6.0"
++  resolved "https://registry.yarnpkg.com/is-core-module/-/is-core-module-2.6.0.tgz#d7553b2526fe59b92ba3e40c8df757ec8a709e19"
++  integrity sha512-wShG8vs60jKfPWpF2KZRaAtvt3a20OAn7+IJ6hLPECpSABLcKtFKTTI4ZtH5QcBruBHlq+WsdHWyz0BCZW7svQ==
++  dependencies:
++    has "^1.0.3"
++
++nanoid@^3.1.23:
++  version "3.1.25"
++  resolved "https://registry.yarnpkg.com/nanoid/-/nanoid-3.1.25.tgz#09ca32747c0e543f0e1814b7d3793477f9c8e152"
++  integrity sha512-rdwtIXaXCLFAQbnfqDRnI6jaRHp9fTcYBjtFKE8eezcZ7LuLjhUaQGNeMXf1HmRoCH32CLz6XwX0TtxEOS/A3Q==
++
++path-parse@^1.0.6:
++  version "1.0.7"
++  resolved "https://registry.yarnpkg.com/path-parse/-/path-parse-1.0.7.tgz#fbc114b60ca42b30d9daf5858e4bd68bbedb6735"
++  integrity sha512-LDJzPVEEEPR+y48z93A0Ed0yXb8pAByGWo/k5YYdYgpY2/2EsOsksJrq7lOHxryrVOn1ejG6oAp8ahvOIQD8sw==
++
++postcss@^8.3.6:
++  version "8.3.6"
++  resolved "https://registry.yarnpkg.com/postcss/-/postcss-8.3.6.tgz#2730dd76a97969f37f53b9a6096197be311cc4ea"
++  integrity sha512-wG1cc/JhRgdqB6WHEuyLTedf3KIRuD0hG6ldkFEZNCjRxiC+3i6kkWUUbiJQayP28iwG35cEmAbe98585BYV0A==
++  dependencies:
++    colorette "^1.2.2"
++    nanoid "^3.1.23"
++    source-map-js "^0.6.2"
++
++resolve@^1.20.0:
++  version "1.20.0"
++  resolved "https://registry.yarnpkg.com/resolve/-/resolve-1.20.0.tgz#629a013fb3f70755d6f0b7935cc1c2c5378b1975"
++  integrity sha512-wENBPt4ySzg4ybFQW2TT1zMQucPK95HSh/nq2CFTZVOGut2+pQvSsgtda4d26YrYcr067wjbmzOG8byDPBX63A==
++  dependencies:
++    is-core-module "^2.2.0"
++    path-parse "^1.0.6"
++
++rollup@^2.38.5:
++  version "2.56.3"
++  resolved "https://registry.yarnpkg.com/rollup/-/rollup-2.56.3.tgz#b63edadd9851b0d618a6d0e6af8201955a77aeff"
++  integrity sha512-Au92NuznFklgQCUcV96iXlxUbHuB1vQMaH76DHl5M11TotjOHwqk9CwcrT78+Tnv4FN9uTBxq6p4EJoYkpyekg==
++  optionalDependencies:
++    fsevents "~2.3.2"
++
++source-map-js@^0.6.2:
++  version "0.6.2"
++  resolved "https://registry.yarnpkg.com/source-map-js/-/source-map-js-0.6.2.tgz#0bb5de631b41cfbda6cfba8bd05a80efdfd2385e"
++  integrity sha512-/3GptzWzu0+0MBQFrDKzw/DvvMTUORvgY6k6jd/VS6iCR4RDTKWH6v6WPwQoUO8667uQEf9Oe38DxAYWY5F/Ug==
++
++typescript@^4.3.2:
++  version "4.4.2"
++  resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.4.2.tgz#6d618640d430e3569a1dfb44f7d7e600ced3ee86"
++  integrity sha512-gzP+t5W4hdy4c+68bfcv0t400HVJMMd2+H9B7gae1nQlBzCqvrXX+6GL/b3GAgyTH966pzrZ70/fRjwAtZksSQ==
++
++vite@^2.5.2:
++  version "2.5.3"
++  resolved "https://registry.yarnpkg.com/vite/-/vite-2.5.3.tgz#88d40a9efb9bec66bd87a7676c5689f35ff63742"
++  integrity sha512-1wMDnjflvtTTkMov8O/Xb5+w1/VW/Gw8oCf8f6dqgHn8lMOEqq0SaPtFEQeikFcOKCfSbiU0nEi0LDIx6DNsaQ==
++  dependencies:
++    esbuild "^0.12.17"
++    postcss "^8.3.6"
++    resolve "^1.20.0"
++    rollup "^2.38.5"
++  optionalDependencies:
++    fsevents "~2.3.2"
+-- 
+2.25.1
+

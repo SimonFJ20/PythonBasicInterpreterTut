@@ -1,0 +1,21 @@
+From b81833b7341469ca6ae5626401dde9877b685599 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Tue, 22 Jun 2021 03:40:36 +0200
+Subject: [PATCH] Initial commit
+
+---
+ .gitattributes | 2 ++
+ 1 file changed, 2 insertions(+)
+ create mode 100644 .gitattributes
+
+diff --git a/.gitattributes b/.gitattributes
+new file mode 100644
+index 0000000..dfe0770
+--- /dev/null
++++ b/.gitattributes
+@@ -0,0 +1,2 @@
++# Auto detect text files and perform LF normalization
++* text=auto
+-- 
+2.25.1
+

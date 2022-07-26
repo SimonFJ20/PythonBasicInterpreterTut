@@ -1,0 +1,34 @@
+From ea5955fd9a71b6bd3809d08cce313ae74661cdd1 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Sat, 30 Apr 2022 22:07:06 +0200
+Subject: [PATCH] added gitignore
+
+---
+ .gitignore        | 3 +++
+ compile_flags.txt | 3 ---
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+ create mode 100644 .gitignore
+ delete mode 100644 compile_flags.txt
+
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..1b19380
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,3 @@
++neocc
++*.o
++compile_flags.txt
+\ No newline at end of file
+diff --git a/compile_flags.txt b/compile_flags.txt
+deleted file mode 100644
+index e90fcd4..0000000
+--- a/compile_flags.txt
++++ /dev/null
+@@ -1,3 +0,0 @@
+--std=c17
+--Wall
+--Werror
+-- 
+2.25.1
+

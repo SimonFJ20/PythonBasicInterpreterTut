@@ -1,0 +1,30 @@
+
+func split(source, seperator)
+    let elements = []
+    let buffer = ""
+    for i = 0 to stringLength(source) do
+        let char = charAt(source, i)
+        if char == seperator and buffer != "" then
+            append(elements, buffer)
+            let buffer = ""
+        else
+            let buffer = buffer + char
+        end
+    end
+    if buffer != "" then
+        append(elements, buffer)
+    end
+    return elements
+end
+
+func test()
+
+    let s = split("hello world !", " ")
+    println(length(s))
+    for i = 0 to length(s) do
+        println(s/i)
+    end
+
+end
+
+test()

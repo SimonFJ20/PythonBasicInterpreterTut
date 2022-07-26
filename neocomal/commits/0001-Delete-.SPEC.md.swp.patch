@@ -1,0 +1,47 @@
+From 945d9d0903c8cb39915afce96a45c66b92c8bd76 Mon Sep 17 00:00:00 2001
+From: Simon From <simonfromjakobsen@gmail.com>
+Date: Thu, 4 Nov 2021 00:59:21 +0100
+Subject: [PATCH] Delete .SPEC.md.swp
+
+---
+ .SPEC.md.swp | Bin 12288 -> 0 bytes
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+ delete mode 100644 .SPEC.md.swp
+
+diff --git a/.SPEC.md.swp b/.SPEC.md.swp
+deleted file mode 100644
+index efdfdac8f8e09e62c0ee58e041372972bb324884..0000000000000000000000000000000000000000
+GIT binary patch
+literal 0
+HcmV?d00001
+
+literal 12288
+zcmeI2&x;&I6vr!~VAM^-;6Xw2oIu=NcCtURZuYXml1(J$Cv1M8i7?gOH9O5#SG8T$
+zyNrS!^q`(RDEJpBn1g2zihJ}V#2-=cqTsJTK!}1rzOQ<AHrX7Kqmdf;(A`z9UcL9N
+zSH%p|$<+B{Cu#n`w7};<A?EkKCO_XhF82Q|gv$$SxcwHNGHn;R@wc!N;+5cV@`9~a
+zT`5yF>6CN1HSL+Hnd$cQbo=0>Q8u-O)RW6+jvPKvWViGg4Wa^3f!k1^_TBdU$hm_v
+z(^G7{uk{4&dFb4242&jGfv7-KASw_Qhzdjnq5@HYsKEb40blMAuOgYd1_@mlTz71{
+z4j$trDi9Tj3Pc5>0#SjeKvW<q5EY0DL<OP(QGq*90g1oZpTAd#D?1T9{{P?n{r}Hy
+zA$|rwf$zY#;A8L}SOurSDX;_%gF|2rJPIBG4}(2mH`od80e6Exb_sC}Tm|2NE8q*T
+z0WO0N!294W@FsW}yab*E`@yFpLVN;_gJ;3j2jB<%c|UxE-@*4_1AGK7gAc(Qpad7e
+z(_jn`*a7~!4`abK@EiCQ`~rRiKY*{nS6~Bt2HpklfVaWxAO{La&;cjFaqu{J4D13U
+z;7e#6biM=YB!(Onhzdjnq5@HYsK9?(fi`u@%BECScqwz#d0bX#P3l^Wb?6K?lBA2v
+zq5Xx?G4hs{&n}%lcNTAj?c-ZIktda``a&#fO|D-gRy)d6s%51z*q5Z$n$m<v%8R1*
+zGEtgG@1tk5O{Av7)_7^W!xy4XM<|mC!e??4LD`i`7UaCFyrZ6~lnBulGB=}R!CV|!
+zQ&oSvsr2M~icZ1~S=dx%HO7WXZ*HTbN_zAo0FDal#h2l*ZE<mIm4dyYR$-Bp?@2>`
+z-L?dGDeY9a;fGDT8+s}4lBtVCRkW}`GaRV7X@oVZ@ppsqbYnbNrpC#lYgT8J*Q#k6
+z!&l6Kih~F;TPM1Si_MxxTA<vNwWo2K5!}3@{8BIszCzzX<niZhO|EBaonbYqd<|(^
+zD&(r7zO5_j)+Y6MJJ(UGgpym&tqCfWG+b54vrpFOKB}Wce7NT}DkaufdB_oFoFIw5
+z%qmC5dg6ldiY)iSMy8(DbKeUiZOx-xYD?9Og1bs3ebRZ6d!EzfnIhHgsucCZeo;#B
+z)&!tT+CMOk!X1W-*&GU9ugkvMTs+xqhv5X|`=x3O6JC5p4&jq@;eMcZu(93Hw5bhd
+z?dC?YOg!gS+B$cBf>Nl58%G$HD8H_hA*@5HYX`Z<Xo?k|-5Ta5wssjN?}RB0Lg`G9
+zgTNIM%?M)P9qB@%h>s4}h__-BOxB1gH<M*2$duR*UpX`mXc#PJbr$KSHXCS;;^)N-
+z!WN3(>|W&gv8X)1gYrn2eejU2>AF}clfnnK4_BTE0VDg`b4e!BVKfGYnrL?9Fads~
+z;Zs=G?Yp&Q%_Xxb!zH63ylaV8Pibvw-BvooQ>!^ajy0!}#!9LeYmO>}+d~Q|3T$vJ
+zG`p-hqh_C)J2WraGY7>~<6>^Mo#Y<nwqg)ASLzBXGn}JM?8lm>5czpNUf~sIFO=)h
+z5#9@3s2vnav`tsJk59S|EpgGHm?1?t1{=$Z!+dclvvG4Ibgn<D!|b72*#I%2cMt}j
+f<kxkxoX1rkvSgerof^DYPs^oB^KPEXrfB~Kquyb_
+
+-- 
+2.25.1
+

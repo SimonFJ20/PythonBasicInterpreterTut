@@ -1,0 +1,177 @@
+From 3fc705ee0877964ce47a69a53f81d8be588d4343 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Mon, 2 May 2022 01:22:12 +0200
+Subject: [PATCH] parsing
+
+---
+ Makefile |  6 ++++-
+ nodes.c  | 28 -----------------------
+ parser.c | 69 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ parser.h | 12 ++++++++++
+ 4 files changed, 86 insertions(+), 29 deletions(-)
+ create mode 100644 parser.c
+
+diff --git a/Makefile b/Makefile
+index f2eb9aa..78a696b 100644
+--- a/Makefile
++++ b/Makefile
+@@ -19,10 +19,14 @@ $(EXECUTABLE): $(OFILES)
+ %.o: %.c $(HEADERS)
+ 	$(CC) -c -o $@ $(CFLAGS) $<
+ 
+-.PHONY: clean compile_flags
++.PHONY: clean compile_flags todos
+ 
+ clean:
+ 	$(RM) $(OFILES) $(EXECUTABLE)
+ 
+ compile_flags:
+ 	printf "%s\n" $(CFLAGS) > compile_flags.txt
++
++todos:
++	grep FIXME * -r
++	grep TODO * -r
+diff --git a/nodes.c b/nodes.c
+index 7741125..98b598e 100644
+--- a/nodes.c
++++ b/nodes.c
+@@ -155,31 +155,3 @@ char* int_node_to_string(IntNode* self)
+     buffer = realloc(buffer, strlen(buffer) * sizeof(char));
+     return buffer;
+ }
+-
+-Parser* new_parser(List* tokens)
+-{
+-    Parser* self = calloc(1, sizeof(Parser));
+-    *self = (Parser) {
+-        .tokens = tokens,
+-        .index = 0,
+-        .t = tokens->get(tokens, 0),
+-        .done = false,
+-    };
+-    return self;
+-}
+-
+-void delete_parser(Parser* self)
+-{
+-    free(self);
+-}
+-
+-List* parser_parse(Parser* self)
+-{
+-    return (List*) new_array_list();
+-}
+-
+-List* parse(List* tokens)
+-{
+-    Parser* parser = new_parser(tokens);
+-    return parser_parse(parser);
+-}
+diff --git a/parser.c b/parser.c
+new file mode 100644
+index 0000000..ab88265
+--- /dev/null
++++ b/parser.c
+@@ -0,0 +1,69 @@
++#include "parser.h"
++#include "utils.h"
++#include <assert.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++Parser* new_parser(List* tokens)
++{
++    Parser* self = calloc(1, sizeof(Parser));
++    *self = (Parser) {
++        .tokens = tokens,
++        .index = 0,
++        .t = tokens->get(tokens, 0),
++        .done = false,
++    };
++    return self;
++}
++
++void delete_parser(Parser* self)
++{
++    free(self);
++}
++
++// FIXME forward declarations, please move to parser.h
++void parser_next(Parser* self);
++List* parser_make_statements(Parser* self);
++StatementNode* parser_make_statement(Parser* self);
++
++
++List* parser_parse(Parser* self)
++{
++    return parser_make_statements(self);
++}
++
++List* parser_make_statements(Parser* self)
++{
++    List* statements = (List*) new_array_list();
++
++    while (!self->done && self->t->type != TT_RBRACE) {
++        statements->add(statements, parser_make_statement(self));
++    }
++
++    return statements;
++}
++
++StatementNode* parser_make_statement(Parser* self)
++{
++    assert(false);
++}
++
++void parser_skip_newline(Parser* self)
++{
++    while (self->t->type == TT_EOL)
++        parser_next(self);
++}
++
++void parser_next(Parser* self)
++{
++    self->index++;
++    self->done = self->index < self->tokens->length(self->tokens) || self->t->type == TT_EOF;
++    self->t = self->done ? NULL : self->tokens->get(self->tokens, self->index);
++}
++
++List* parse(List* tokens)
++{
++    Parser* parser = new_parser(tokens);
++    return parser_parse(parser);
++}
+diff --git a/parser.h b/parser.h
+index 67a955f..80d49da 100644
+--- a/parser.h
++++ b/parser.h
+@@ -59,6 +59,7 @@ typedef struct NodeStruct {
+ typedef enum StatementNodeTypeEnum {
+     ST_FUNC_DEF,
+     ST_RETURN,
++    ST_EXPRESSION,
+     StatementNodeType_LAST,
+ } StatementNodeType;
+ 
+@@ -124,6 +125,17 @@ ReturnNode* new_return_node(ExpressionNode* value);
+ void delete_return_node(ReturnNode* self);
+ char* return_node_to_string(ReturnNode* self);
+ 
++typedef struct ExprStmtNodeStruct {
++    void (*delete)(struct ExprStmtNodeStruct* self);
++    char* (*to_string)(struct ExprStmtNodeStruct* self);
++    StatementNodeType type;
++    ExpressionNode* value;
++} ExprStmtNode;
++
++ExprStmtNode* new_expression_statement_node(ExpressionNode* value);
++void delete_expression_statement_node(ExprStmtNode* self);
++char* expression_statment_to_string(ExprStmtNode* self);
++
+ typedef struct IntNodeStruct {
+     void (*delete)(struct IntNodeStruct* self);
+     char* (*to_string)(struct IntNodeStruct* self);
+-- 
+2.25.1
+

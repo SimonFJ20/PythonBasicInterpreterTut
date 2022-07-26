@@ -1,0 +1,563 @@
+From 55f15dd01b511a4148fd9fad2c553114eabd6a42 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Thu, 2 Jun 2022 00:24:55 +0200
+Subject: [PATCH] modularized lexer
+
+---
+ examples/test.morbius |   1 +
+ lexer.ts              | 403 ++++++++++++++++++++++++++++--------------
+ main.ts               |  86 +++++----
+ 3 files changed, 330 insertions(+), 160 deletions(-)
+
+diff --git a/examples/test.morbius b/examples/test.morbius
+index 3d5e0d4..29809e0 100644
+--- a/examples/test.morbius
++++ b/examples/test.morbius
+@@ -1,5 +1,6 @@
+ 
+ let main = (args: array of string) {
+     let this_is_const = 5
++    let my_string = "hello world\n"
+     print(this_is_const)
+ }
+diff --git a/lexer.ts b/lexer.ts
+index 9620651..edc4610 100644
+--- a/lexer.ts
++++ b/lexer.ts
+@@ -8,158 +8,303 @@ export class Position {
+     public copy() {
+         return new Position(this.row, this.column);
+     }
++
++    public toString(): string {
++        return `{ row: ${this.row}, column: ${this.column} }`
++    }
+ }
+ 
+-export type Span = {
+-    begin: Position,
+-    end: Position,
+-};
++export class Span {
++    public constructor (
++        public begin: Position,
++        public end: Position,
++    ) {}
+ 
+-export type Token<TokenType> = {
+-    type: TokenType,
+-    text: string,
+-    value: string,
+-    span: Span,
+-};
++    public toString(): string {
++        return `{ begin: ${this.begin}, end: ${this.end} }`
++    }
++}
+ 
+-export type LexerRule<TokenType> = LexerBuiltinRule<TokenType> | LexerCustomRule<TokenType>;
+-
+-export type LexerBuiltinRule<TokenType> = {
+-    tokentype: TokenType,
+-    type: 'builtin',
+-    builtin: 'int'
+-        | 'hex'
+-        | 'float'
+-        | 'char'
+-        | 'string'
+-        | 'identifier'
+-        | 'sl-comment'
+-        | 'ml-comment'
+-        | 'newline'
+-        | 'semicolon-nl'
+-        | 'whitespace',
+-}
+-
+-export type LexerCustomRule<TokenType> = {
+-    tokentype: TokenType,
+-    type: 'custom',
+-    regex: RegExp,
+-    ignore: boolean,
+-    multiline: boolean,
+-}
+-
+-export class Lexer<TokenType> {
+-
+-    private text!: string;
+-    private index!: number;
+-    private pos!: Position;
+-    
++export class Token<TokenType> {
+     public constructor (
+-        private rules: LexerRule<TokenType>[],
++        public type: TokenType,
++        public span: Span,
++        public text: string,
++        public value: string = text,
+     ) {}
++}
+ 
+-    public tokenize(text: string): Token<TokenType>[] {
+-        this.text = text;
+-        this.index = 0;
+-        this.pos = new Position(1, 1);
+-        const tokens: Token<TokenType>[] = [];
+-
+-        while (this.index < this.text.length) {
+-            let hasMatched = false;
+-            for (const rule of this.rules) {
+-                const token = rule.type === 'builtin' ? this.matchBuiltinRule(rule) : this.matchCustomRule(rule);
+-                if (token) {
+-                    hasMatched = true;
+-                    tokens.push(token);
+-                    break;
+-                }
+-            }
+-            if (!hasMatched)
+-                throw new Error(`unexpected character '${this.text.slice(this.index, 3)}'`);
+-        }
+-
+-        return tokens;
++export class LexerError extends Error {
++    public constructor (message: string) {
++        super (message);
+     }
+ 
+-    private matchBuiltinRule(rule: LexerBuiltinRule<TokenType>): Token<TokenType> | null {
+-        switch (rule.builtin) {
+-            case 'int':
+-                return this.matchBuiltinInt(rule);
+-            case 'hex':
+-                return this.matchBuiltinHex(rule);
+-            case 'float':
+-            case 'char':
+-            case 'string':
+-            case 'identifier':
+-            case 'sl-comment':
+-            case 'ml-comment':
+-            case 'newline':
+-            case 'semicolon-nl':
+-            case 'whitespace':
+-            default:
+-                throw new Error('not implemented');
+-        }
++    public static fromPosition(pos: Position, message: string) {
++        return new LexerError(`${message}, at ${pos}`)
+     }
+ 
+-    private matchBuiltinInt(rule: LexerBuiltinRule<TokenType>): Token<TokenType> | null {
+-        return /^[0-9]/.test(this.text.slice(this.index)) ? this.makeInt(rule.tokentype) : null;
++    public static fromSpan(span: Span, message: string) {
++        return new LexerError(`${message}, at ${span}`)
+     }
++}
++
++export class LexerContext {
++    public index = 0;
++    public pos = new Position(1, 1,);
++    private _prevPos: Position | null = null;
+ 
+-    private makeInt(type: TokenType): Token<TokenType> {
+-        const begin = this.pos.copy();
+-        const c = () => this.text[this.index];
+-        const step = () => this.index++ && this.pos.column++;
+-        let value = c();
+-        step();
+-        let end = this.pos.copy();
+-        while (/[0-9]/.test(c())) {
+-            value += c();
+-            end = this.pos.copy();
+-            step();
++    public constructor (
++        public text: string,
++    ) {}
++
++    public step() {
++        if (this.index >= this.text.length)
++            throw LexerError.fromPosition(this.pos, 'unexpected end of file');
++        this.index++;
++        this._prevPos = this.pos.copy();
++        if (this.text[this.index - 1] === '\n') {
++            this.pos.row++;
++            this.pos.column = 1;
++        } else {
++            this.pos.column++;
+         }
+-        return { type, value, text: value, span: {begin, end}};
+     }
+ 
+-    private matchBuiltinHex(rule: LexerBuiltinRule<TokenType>): Token<TokenType> | null {
+-        return /^[0-9]x/.test(this.text.slice(this.index)) ? this.makeHex(rule.tokentype) : null;
++    public prevPos(): Position {
++        if (!this._prevPos)
++            throw LexerError.fromPosition(this.pos, 'no previus position');
++        return this._prevPos;
+     }
++}
+ 
+-    private makeHex(type: TokenType): Token<TokenType> {
+-        const begin = this.pos.copy();
+-        const c = () => this.text[this.index];
+-        const step = () => this.index++ && this.pos.column++;
+-        let value = c();
+-        step();
+-        let end = this.pos.copy();
+-        while (/[0-9a-fA-F]/.test(c())) {
+-            value += c();
+-            end = this.pos.copy();
+-            step();
+-        }
+-        return { type, value, text: value, span: {begin, end}};
++export type LexerRule<TokenType> = {
++    pattern: RegExp,
++    handler: (ctx: LexerContext) => Token<TokenType> | null,
++};
++
++export const tokenize = <TokenType>(text: string, rules: LexerRule<TokenType>[]): Token<TokenType>[] => {
++    const ctx = new LexerContext(text);
++    const tokens: Token<TokenType>[] = [];
++    while (ctx.index < ctx.text.length) {
++        const indexBefore = ctx.index;
++        const rule = rules.find((rule) => rule.pattern.test(ctx.text.slice(ctx.index)));
++        if (!rule)
++            throw LexerError.fromPosition(
++                ctx.pos,
++                `unhandled character '${ctx.text.slice(
++                    ctx.index,
++                    ctx.index + Math.min(10, ctx.text.length - ctx.index, ctx.text.slice(ctx.index).indexOf('\n'))
++                )}'`
++            );
++        const maybeToken = rule.handler(ctx);
++        if (maybeToken)
++            tokens.push(maybeToken);
++        if (ctx.index === indexBefore)
++            throw LexerError.fromSpan(
++                new Span(ctx.prevPos(), ctx.pos),
++                `rule with pattern '${rule.pattern.toString()}' doesn't step lexer forward`
++            );
+     }
++    return tokens;
++}
++
++
+ 
+-    private matchCustomRule(rule: LexerCustomRule<TokenType>): Token<TokenType> | null {
+-        const match = this.text.slice(this.index).match(rule.regex);
+-        if (!match)
+-            return null; 
+-        const begin = this.pos.copy();
+-        if (rule.multiline && match[0].includes('\n')) {
+-            this.pos.row += match[0].split('\n').length - 1;
+-            this.pos.column = match[0].slice(match[0].lastIndexOf('\n') + 1).length;
++export const hexRule = <TokenType>(tokenType: TokenType): LexerRule<TokenType> => {
++    return {
++        pattern: /^0x/,
++        handler: (ctx) => {
++            const begin = ctx.pos.copy();
++            let text = ctx.text[ctx.index];
++            ctx.step();
++            text += ctx.text[ctx.index];
++            ctx.step();
++            while (/^[0-9a-fA-F]/.test(ctx.text[ctx.index])) {
++                text += ctx.text[ctx.index];
++                ctx.step();
++            }
++            const end = ctx.prevPos().copy();
++            return new Token(tokenType, new Span(begin, end), text);
++        }, 
++    };
++}
++
++export const intRule = <TokenType>(tokenType: TokenType): LexerRule<TokenType> => {
++    return {
++        pattern: /^[0-9]/,
++        handler: (ctx) => {
++            const begin = ctx.pos.copy();
++            let text = '';
++            while (/[0-9]/.test(ctx.text[ctx.index])) {
++                text += ctx.text[ctx.index];
++                ctx.step();
++            }
++            const end = ctx.prevPos().copy();
++            return new Token(tokenType, new Span(begin, end), text);
++        }, 
++    };
++}
++
++export const identifierRule = <TokenType>(tokenType: TokenType): LexerRule<TokenType> => {
++    return {
++        pattern: /^[a-zA-Z_]/,
++        handler: (ctx) => {
++            const begin = ctx.pos.copy();
++            let text = '';
++            while (/[a-zA-Z_]/.test(ctx.text[ctx.index])) {
++                text += ctx.text[ctx.index];
++                ctx.step();
++            }
++            const end = ctx.prevPos().copy();
++            return new Token(tokenType, new Span(begin, end), text);
++        }
++    };
++}
++
++export const ignoreSingleLineWhitespaceRule = <TokenType>(): LexerRule<TokenType> => {
++    return {
++        pattern: /^[ \t]/,
++        handler: (ctx) => {
++            while (/[ \t]/.test(ctx.text[ctx.index]))
++                ctx.step();
++            return null;
++        },
++    };
++}
++
++export const singleLineWhitespaceRule = <TokenType>(tokenType: TokenType): LexerRule<TokenType> => {
++    return {
++        pattern: /^[ \t]/,
++        handler: (ctx) => {
++            const begin = ctx.pos.copy();
++            let text = '';
++            while (/[ \t]/.test(ctx.text[ctx.index])) {
++                text += ctx.text[ctx.index];
++                ctx.step();
++            }
++            const end = ctx.prevPos().copy();
++            return new Token(tokenType, new Span(begin, end), text);
++        },
++    };
++}
++
++export const ignoreSingleLineComment = <TokenType>(): LexerRule<TokenType> => {
++    return {
++        pattern: /^\/\//,
++        handler: (ctx) => {
++            while (ctx.index < ctx.text.length && ctx.text[ctx.index] !== '\n')
++                ctx.step();
++            return null;
++        }
++    };
++}
++
++export const ignoreMultiLineComment = <TokenType>(): LexerRule<TokenType> => {
++    return {
++        pattern: /^\/\*/,
++        handler: (ctx) => {
++            while (ctx.index < ctx.text.length && (ctx.text[ctx.index - 1] !== '*' || ctx.text[ctx.index] !== '/'))
++                ctx.step();
++            ctx.step();
++            return null;
++        }
++    };
++} 
++
++export const makeLiteralChar = (ctx: LexerContext): string => {
++    const char = ctx.text[ctx.index];
++    ctx.step();
++    if (char !== '\\') {
++        return char;
++    } else {
++        const identifier = ctx.text[ctx.index];
++        ctx.step();
++        if (identifier === '0') {
++            let value = ctx.text[ctx.index];
++            ctx.step();
++            for (let i = 0; i < 3 && /[0-7]/.test(ctx.text[ctx.index]); i++)
++                value += ctx.text[ctx.index];
++            return String.fromCharCode(parseInt(value, 8));
++        } else if (identifier === 'x') {
++            let value = '';
++            ctx.step();
++            for (let i = 0; i < 2 && /[0-9a-zA-Z]/.test(ctx.text[ctx.index]); i++)
++                value += ctx.text[ctx.index];
++            return String.fromCharCode(parseInt(value, 16));
++        } else if (/[1-9]/.test(identifier)) {
++            let value = ctx.text[ctx.index];
++            ctx.step();
++            for (let i = 0; i < 3 && /[0-9]/.test(ctx.text[ctx.index]); i++)
++                value += ctx.text[ctx.index];
++            return String.fromCharCode(parseInt(value, 10));
+         } else {
+-            this.pos.column += match[0].length - 1;
++            switch (identifier) {
++                case 'b': return '\b';
++                case 'f': return '\f';
++                case 'n': return '\n';
++                case 'r': return '\r';
++                case 't': return '\t';
++                case 'v': return '\v';
++                default: return identifier;
++            }
+         }
+-        const end = this.pos.copy();
+-        this.pos.column += 1;
+-        this.index += match[0].length;
+-        return {
+-            type: rule.tokentype,
+-            text: match[0],
+-            value: match[match.length - 1],
+-            span: {begin, end},
+-        };
++        
+     }
++}
++
++export const charLiteralRule = <TokenType>(tokenType: TokenType): LexerRule<TokenType> => {
++    return {
++        pattern: /^'/,
++        handler: (ctx) => {
++            const begin = ctx.pos.copy();
++            let text = ctx.text[ctx.index];
++            ctx.step();
++            if (ctx.text[ctx.index] === '\'')
++                throw LexerError.fromSpan(new Span(begin, ctx.pos), 'char literal cannot be empty');
++            const value = makeLiteralChar(ctx);
++            text += value;
++            text += ctx.text[ctx.index];
++            if (ctx.text[ctx.index] !== '\'')
++                throw LexerError.fromSpan(new Span(begin, ctx.pos), 'char literal can only contain 1 char');
++            ctx.step();
++            const end = ctx.prevPos().copy();
++            return new Token(tokenType, new Span(begin, end), text, value);
++        },
++    };
++}
+ 
++export const stringLiteralRule = <TokenType>(tokenType: TokenType): LexerRule<TokenType> => {
++    return {
++        pattern: /^"/,
++        handler: (ctx) => {
++            const begin = ctx.pos.copy();
++            let text = ctx.text[ctx.index];
++            let value = '';
++            ctx.step();
++            while (ctx.index < ctx.text.length && ctx.text[ctx.index] !== '\"') {
++                const literalChar = makeLiteralChar(ctx);
++                value += literalChar;
++                text += literalChar;
++            }
++            text += ctx.text[ctx.index];
++            if (ctx.text[ctx.index] !== '\"')
++                throw LexerError.fromSpan(new Span(begin, ctx.pos), 'unterminated string literal');
++            ctx.step();
++            const end = ctx.prevPos().copy();
++            return new Token(tokenType, new Span(begin, end), text, value);
++        },
++    };
++}
+ 
++export const charPatternRule = <TokenType>(tokenType: TokenType, pattern: string): LexerRule<TokenType> => {
++    const safePattern = pattern.replaceAll(/([\b\n\f\r\t\v\(\)\{\}\[\]\.\\\^\-\?\+\|\*])/g, '\\$1');
++    return {
++        pattern: new RegExp(`^${safePattern}`),
++        handler: (ctx) => {
++            const begin = ctx.pos.copy();
++            pattern.split('').forEach(() => ctx.step());
++            const end = ctx.prevPos().copy();
++            return new Token(tokenType, new Span(begin, end), pattern);
++        },
++    };
+ }
+diff --git a/main.ts b/main.ts
+index ab32397..6a3e11e 100644
+--- a/main.ts
++++ b/main.ts
+@@ -1,41 +1,65 @@
+-import { Lexer } from "./lexer.ts";
++import {
++    ignoreSingleLineWhitespaceRule,
++    Span,
++    charPatternRule,
++    Token,
++    tokenize,
++    intRule,
++    hexRule,
++    identifierRule,
++    ignoreMultiLineComment,
++    ignoreSingleLineComment,
++    charLiteralRule,
++    stringLiteralRule
++} from "./lexer.ts";
+ 
+ enum TokenType {
+-    A1,
+-    B2,
+-    NL,
++    IntLiteral,
++    HexLiteral,
++    CharLiteral,
++    StringLiteral,
++    LetKeyword,
++    Identifier,
++    LParen,
++    RParen,
++    LBrace,
++    RBrace,
++    LBracket,
++    RBracket,
++    Equal,
++    Colon,
++    NewLine,
++    LineTerminator,
+ }
+ 
+ const main = () => {
++    if (Deno.args.length <= 0)
++        throw new Error('no input file');
+     const filename = Deno.args[0];
+-    console.log(filename);
++    const text = Deno.readTextFileSync(filename);
+ 
+-
+-    const text = 'aabbc\nc'
+-
+-    const tokens = new Lexer([
+-        {
+-            type: 'custom',
+-            tokentype: TokenType.A1,
+-            regex: /^a/,
+-            ignore: false,
+-            multiline: false,
+-        },
+-        {
+-            type: 'custom',
+-            tokentype: TokenType.B2,
+-            regex: /^bb/,
+-            ignore: false,
+-            multiline: false,
+-        },
+-        {
+-            type: 'custom',
+-            tokentype: TokenType.NL,
+-            regex: /^c\nc/,
+-            ignore: false,
+-            multiline: true,
+-        },
+-    ]).tokenize(text);
++    const tokens = tokenize<TokenType>(text, [
++        hexRule(TokenType.HexLiteral),
++        intRule(TokenType.IntLiteral),
++        charPatternRule(TokenType.LetKeyword, 'let'),
++        identifierRule(TokenType.Identifier),
++        ignoreSingleLineWhitespaceRule(),
++        ignoreSingleLineComment(),
++        ignoreMultiLineComment(),
++        charLiteralRule(TokenType.CharLiteral),
++        stringLiteralRule(TokenType.StringLiteral),
++        charPatternRule(TokenType.LParen, '('),
++        charPatternRule(TokenType.RParen, ')'),
++        charPatternRule(TokenType.LBrace, '{'),
++        charPatternRule(TokenType.RBrace, '}'),
++        charPatternRule(TokenType.LBracket, '['),
++        charPatternRule(TokenType.RBracket, ']'),
++        charPatternRule(TokenType.Equal, '='),
++        charPatternRule(TokenType.Colon, ':'),
++        charPatternRule(TokenType.NewLine, '\r\n'),
++        charPatternRule(TokenType.NewLine, '\n'),
++        charPatternRule(TokenType.LineTerminator, ';'),
++    ]);
+ 
+     console.log(tokens)
+ 
+-- 
+2.25.1
+

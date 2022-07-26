@@ -1,0 +1,190 @@
+From e1e9c2fe37ac27e540a620b13b5e046a4ae7b279 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Wed, 20 Apr 2022 01:42:15 +0200
+Subject: [PATCH] lexer start
+
+---
+ Makefile |  4 +++-
+ lexer.c  | 60 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ lexer.h  | 21 ++++++++++++++++++++
+ reader.c | 24 +++++++++++++++++++++++
+ utils.h  | 16 +++++++++++++++
+ 5 files changed, 124 insertions(+), 1 deletion(-)
+ create mode 100644 reader.c
+
+diff --git a/Makefile b/Makefile
+index cbc91ac..c2c314b 100644
+--- a/Makefile
++++ b/Makefile
+@@ -10,7 +10,9 @@ LD = gcc
+ OFILES = \
+ 	main.o \
+ 	list.o \
+-	linked_list.o
++	linked_list.o \
++	reader.o \
++	lexer.o 
+ 
+ HEADERS = $(wildcard *.h)
+ 
+diff --git a/lexer.c b/lexer.c
+index e69de29..1d93b8c 100644
+--- a/lexer.c
++++ b/lexer.c
+@@ -0,0 +1,60 @@
++#include <stdlib.h>
++#include "lexer.h"
++
++Token* new_token(TokenType type, const char* value, size_t length) 
++{
++    Token* self = calloc(1, sizeof (Token));
++    *self = (Token) {
++        .type = type,
++        .value = value,
++        .length = length,
++    };
++    return self;
++}
++
++void delete_token(Token* self)
++{
++    free(self);
++}
++
++LexerIteration* new_lexer_iteration(bool done, Token* value)
++{
++    LexerIteration* self = calloc(1, sizeof(LexerIteration));
++    *self = (LexerIteration) {
++        .done = done,
++        .value = value,
++    };
++    return self;
++}
++
++void delete_lexer_iteration(LexerIteration* self)
++{
++    free(self);
++}
++
++Token* lexer_iteration_unwrap(LexerIteration* self)
++{
++    Token* value = self->value;
++    delete_lexer_iteration(self);
++    return value;
++}
++
++Lexer* new_lexer(Reader reader)
++{
++    Lexer* self = calloc(1, sizeof (Lexer));
++    *self = (Lexer) {
++        .index = 0,
++        .reader = reader,
++    };
++    return self;
++}
++
++void delete_lexer(Lexer* self)
++{
++    free(self);
++}
++
++LexerIteration* lexer_next(Lexer* self)
++{
++    return NULL;
++}
+diff --git a/lexer.h b/lexer.h
+index cfee607..79f98ca 100644
+--- a/lexer.h
++++ b/lexer.h
+@@ -1,6 +1,8 @@
+ #ifndef LEXER_H
+ #define LEXER_H
+ 
++#include "utils.h"
++#include <stdbool.h>
+ #include <stdlib.h>
+ 
+ typedef enum {
+@@ -25,4 +27,23 @@ typedef struct {
+ Token* new_token(TokenType type, const char* value, size_t length);
+ void delete_token(Token* self);
+ 
++typedef struct {
++    bool done;
++    Token* value;
++} LexerIteration;
++
++LexerIteration* new_lexer_iteration(bool done, Token* value);
++void delete_lexer_iteration(LexerIteration* self);
++Token* lexer_iteration_unwrap(LexerIteration* self);
++
++typedef struct {
++    size_t index;
++    Reader reader;
++} Lexer;
++
++Lexer* new_lexer();
++void delete_lexer(Lexer* self);
++
++LexerIteration* lexer_next(Lexer* self);
++
+ #endif
+\ No newline at end of file
+diff --git a/reader.c b/reader.c
+new file mode 100644
+index 0000000..1efacd4
+--- /dev/null
++++ b/reader.c
+@@ -0,0 +1,24 @@
++#include <stdio.h>
++#include <stdlib.h>
++#include "utils.h"
++
++FileReader* new_file_reader(FILE* fp)
++{
++    FileReader* self = calloc(1, sizeof (FileReader));
++    *self = (FileReader) {
++        .getc = file_reader_getc,
++        .delete = delete_file_reader,
++        .fp = fp,
++    };
++    return self;
++}
++
++void delete_file_reader(FileReader* self)
++{
++    free(self);
++}
++
++char file_reader_getc(FileReader* self)
++{
++    return getc(self->fp);
++}
+diff --git a/utils.h b/utils.h
+index 50e588a..35a2868 100644
+--- a/utils.h
++++ b/utils.h
+@@ -48,4 +48,20 @@ int linked_list_remove(LinkedList* self, void* value);
+ size_t linked_list_length(LinkedList* self);
+ void** linked_list_to_array(LinkedList* self);
+ 
++typedef struct ReaderStruct {
++    char (*getc)();
++    void (*delete)(struct ReaderStruct* self);
++} Reader;
++
++typedef struct FileReaderStruct {
++    char (*getc)();
++    void (*delete)(struct FileReaderStruct* self);
++    FILE* fp;
++} FileReader;
++
++FileReader* new_file_reader(FILE* fp);
++void delete_file_reader(FileReader* self);
++
++char file_reader_getc(FileReader* self);
++
+ #endif
+-- 
+2.25.1
+

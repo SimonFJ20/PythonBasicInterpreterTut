@@ -1,0 +1,414 @@
+From c1fa5c24c37886515778949909c01af589cfb309 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Sun, 1 May 2022 01:56:46 +0200
+Subject: [PATCH] lexer works
+
+---
+ .clang-format   |   3 +
+ .gitignore      |   2 +-
+ Makefile        |   7 +--
+ README.md       |   1 +
+ arraylist.c     |  21 +++++--
+ examples/main.c |   5 ++
+ lexer.c         | 150 +++++++++++++++++++++++++++++++++++++++++++++++-
+ lexer.h         |  29 +++++-----
+ neocc.c         |  24 +++++++-
+ utils.h         |   5 +-
+ 10 files changed, 218 insertions(+), 29 deletions(-)
+ create mode 100644 examples/main.c
+
+diff --git a/.clang-format b/.clang-format
+index 22b2419..b0ed321 100644
+--- a/.clang-format
++++ b/.clang-format
+@@ -1,3 +1,6 @@
+ Language:        Cpp
+ BasedOnStyle:  WebKit
+ IndentWidth: 4
++SpaceAfterCStyleCast: true
++
++
+diff --git a/.gitignore b/.gitignore
+index 1b19380..212e12e 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,3 +1,3 @@
+ neocc
+ *.o
+-compile_flags.txt
+\ No newline at end of file
++compile_flags.txt
+diff --git a/Makefile b/Makefile
+index 75338c6..f2eb9aa 100644
+--- a/Makefile
++++ b/Makefile
+@@ -7,11 +7,8 @@ LD = gcc
+ CFLAGS = -std=c17 -Wall -Werror
+ LFLAGS = 
+ 
+-OFILES = \
+-	neocc.o \
+-	lexer.o \
+-	arralist.o
+-
++CFILES = $(wildcard *.c)
++OFILES = $(patsubst %.c, %.o, $(CFILES))
+ HEADERS = $(wildcard *.h)
+ 
+ all: $(EXECUTABLE)
+diff --git a/README.md b/README.md
+index 8700214..11b9ace 100644
+--- a/README.md
++++ b/README.md
+@@ -1 +1,2 @@
++
+ # neocc
+diff --git a/arraylist.c b/arraylist.c
+index 378d75c..86c60be 100644
+--- a/arraylist.c
++++ b/arraylist.c
+@@ -1,15 +1,19 @@
++#include "lexer.h"
+ #include "utils.h"
++#include <stdio.h>
++#include <stdlib.h>
+ 
+ ArrayList* new_array_list()
+ {
+-    static_assert(sizeof(List) == 24, "incomplete implementation");
++    static_assert(sizeof(List) == 32, "incomplete implementation");
+     ArrayList* self = calloc(1, sizeof(ArrayList));
+     *self = (ArrayList) {
+         .delete = delete_array_list,
++        .length = array_list_length,
+         .get = array_list_get,
+         .add = array_list_add,
+         .m_length = 0,
+-        .m_elememts = NULL,
++        .m_elements = NULL,
+     };
+     return self;
+ }
+@@ -19,16 +23,25 @@ void delete_array_list(ArrayList* self)
+     free(self);
+ }
+ 
++size_t array_list_length(ArrayList* self)
++{
++    return self->m_length;
++}
++
+ void* array_list_get(ArrayList* self, int index)
+ {
+     if (index < 0)
+         return array_list_get(self, self->m_length - index);
+     assert(index < self->m_length && "index out of range");
+-    return self->m_elememts[index];
++    return self->m_elements[index];
+ }
+ 
+ void array_list_add(ArrayList* self, void* element)
+ {
+     self->m_length++;
+-    self->m_elememts = realloc(self->m_elememts, sizeof(void*) * self->m_length);
++    if (!self->m_elements)
++        self->m_elements = calloc(1, sizeof(void*));
++    else
++        self->m_elements = realloc(self->m_elements, sizeof(void*) * self->m_length);
++    self->m_elements[self->m_length - 1] = element;
+ }
+diff --git a/examples/main.c b/examples/main.c
+new file mode 100644
+index 0000000..31a1337
+--- /dev/null
++++ b/examples/main.c
+@@ -0,0 +1,5 @@
++
++int main()
++{
++    return 0;
++}
+diff --git a/lexer.c b/lexer.c
+index c1b52db..5b55850 100644
+--- a/lexer.c
++++ b/lexer.c
+@@ -1,6 +1,10 @@
++#include "lexer.h"
++#include "utils.h"
+ #include <assert.h>
++#include <stdbool.h>
++#include <stdio.h>
+ #include <stdlib.h>
+-#include "lexer.h"
++#include <string.h>
+ 
+ const char* token_type_to_string(TokenType type)
+ {
+@@ -52,3 +56,147 @@ void delete_token(Token* self)
+ {
+     free(self);
+ }
++
++const char* token_to_string(Token* self)
++{
++
++    char value_str[64] = { 0 };
++    strncpy(value_str, self->value, self->length);
++
++    char* buffer = calloc(64, sizeof(char));
++    sprintf(buffer, "Token(%s, '%s', %ld)", token_type_to_string(self->type), value_str, self->length);
++    return buffer;
++}
++
++Lexer* new_lexer()
++{
++    Lexer* self = calloc(1, sizeof(Lexer));
++    *self = (Lexer) {
++        .text = NULL,
++        .index = 0,
++        .c = '\n',
++        .done = false,
++    };
++    return self;
++}
++
++void delete_lexer(Lexer* self)
++{
++    free(self);
++}
++
++static inline bool is_whitespace(const char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
++static inline bool is_digit(const char c) { return c >= '0' && c <= '9'; }
++static inline bool is_letter(const char c) { return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_'; }
++
++List* lexer_tokenize(Lexer* self, const char* text)
++{
++    self->text = text;
++    self->index = 0;
++    self->c = self->text[self->index];
++    self->done = false;
++    List* tokens = (List*) new_array_list();
++
++    while (!self->done) {
++        if (is_whitespace(self->c)) {
++            lexer_next(self);
++        } else if (is_digit(self->c)) {
++            tokens->add(tokens, lexer_make_number(self));
++        } else if (is_letter(self->c)) {
++            tokens->add(tokens, lexer_make_name(self));
++        } else {
++            tokens->add(tokens, lexer_match_char(self));
++        }
++    }
++
++    Token* t = new_token(TT_EOF, self->text + self->index, 1);
++    tokens->add(tokens, t);
++    return tokens;
++}
++
++static inline Token* call_next_after(Lexer* self, Token* token)
++{
++    lexer_next(self);
++    return token;
++}
++
++static inline Token* make_single_char_token_and_call_next_after(Lexer* self, TokenType type)
++{
++    return call_next_after(self, new_token(type, &self->text[self->index], 1));
++}
++
++Token* lexer_match_char(Lexer* self)
++{
++    switch (self->c) {
++    case '(':
++        return make_single_char_token_and_call_next_after(self, TT_LPAREN);
++    case ')':
++        return make_single_char_token_and_call_next_after(self, TT_RPAREN);
++    case '{':
++        return make_single_char_token_and_call_next_after(self, TT_LBRACE);
++    case '}':
++        return make_single_char_token_and_call_next_after(self, TT_RBRACE);
++    case '[':
++        return make_single_char_token_and_call_next_after(self, TT_LBRACKET);
++    case ']':
++        return make_single_char_token_and_call_next_after(self, TT_RBRACKET);
++    case ';':
++        return make_single_char_token_and_call_next_after(self, TT_EOL);
++    default:
++        printf("unexpected char %d == '%c'\n", self->c, self->c);
++        assert(!"unexpected char");
++    }
++}
++
++Token* lexer_make_number(Lexer* self)
++{
++    const char* value = &self->text[self->index];
++    size_t value_length = 1;
++    lexer_next(self);
++    while (!self->done && is_digit(self->c)) {
++        value_length++;
++        lexer_next(self);
++    }
++    return new_token(TT_INT, value, value_length);
++}
++
++#define CHECK_KEYWORD(identifier, length, keyword)    \
++    ({                                                \
++        if (strncmp(identifer, keyword, length) == 0) \
++            return true;                              \
++    })
++
++static bool is_keyword(const char* identifer, size_t length)
++{
++    CHECK_KEYWORD(identifer, length, "void");
++    CHECK_KEYWORD(identifer, length, "int");
++    CHECK_KEYWORD(identifer, length, "if");
++    CHECK_KEYWORD(identifer, length, "else");
++    CHECK_KEYWORD(identifer, length, "for");
++    CHECK_KEYWORD(identifer, length, "while");
++    CHECK_KEYWORD(identifer, length, "switch");
++    CHECK_KEYWORD(identifer, length, "case");
++    CHECK_KEYWORD(identifer, length, "return");
++    CHECK_KEYWORD(identifer, length, "continue");
++    CHECK_KEYWORD(identifer, length, "break");
++    return false;
++}
++
++Token* lexer_make_name(Lexer* self)
++{
++    const char* value = &self->text[self->index];
++    size_t value_length = 1;
++    lexer_next(self);
++    while (!self->done && (is_digit(self->c) || is_letter(self->c))) {
++        value_length++;
++        lexer_next(self);
++    }
++    TokenType type = is_keyword(value, value_length) ? TT_KEYWORD : TT_IDENTIFIER;
++    return new_token(type, value, value_length);
++}
++
++void lexer_next(Lexer* self)
++{
++    self->c = self->text[++self->index];
++    self->done = self->c == '\0';
++}
+diff --git a/lexer.h b/lexer.h
+index 5269ba2..865aabf 100644
+--- a/lexer.h
++++ b/lexer.h
+@@ -2,6 +2,7 @@
+ 
+ #include "utils.h"
+ #include <stdlib.h>
++#include <stdbool.h>
+ 
+ typedef enum TokenTypeEnum {
+     TT_KEYWORD,
+@@ -18,6 +19,8 @@ typedef enum TokenTypeEnum {
+     TokenType_LAST,
+ } TokenType;
+ 
++const char* token_type_to_string(TokenType type);
++
+ typedef struct TokenStruct {
+     TokenType type;
+     const char* value;
+@@ -29,21 +32,19 @@ Token* new_token(
+     const char* value,
+     const size_t length);
+ void delete_token(Token* self);
++const char* token_to_string(Token* self);
+ 
+ typedef struct LexerStruct {
+-
++    const char* text;
++    int index;
++    char c;
++    bool done;
+ } Lexer;
+ 
+-Lexer* new_lexer()
+-{
+-    Lexer* self = calloc(1, sizeof(Lexer));
+-    *self = (Lexer) {};
+-    return self;
+-}
+-
+-void delete_lexer(Lexer* self)
+-{
+-    free(self);
+-}
+-
+-List* tokenize(Lexer* self, const char* text);
++Lexer* new_lexer();
++void delete_lexer(Lexer* self);
++List* lexer_tokenize(Lexer* self, const char* text);
++Token* lexer_match_char(Lexer* self);
++Token* lexer_make_number(Lexer* self);
++Token* lexer_make_name(Lexer* self);
++void lexer_next(Lexer* self);
+diff --git a/neocc.c b/neocc.c
+index 0282b5e..b5b8f68 100644
+--- a/neocc.c
++++ b/neocc.c
+@@ -1,8 +1,26 @@
+ #include "lexer.h"
++#include <stdio.h>
++#include <stdlib.h>
+ 
+ int main()
+ {
+-    Token* token = new_token(TT_INT, "123", 3);
+-    
+-    delete_token(token);
++    FILE* fp = fopen("examples/main.c", "r");
++    assert(fp && "could not open file");
++    fseek(fp, 0, SEEK_END);
++    size_t length = ftell(fp);
++    fseek(fp, 0, SEEK_SET);
++    char* content = calloc(length, sizeof(char));
++    fread(content, length, length, fp);
++    fclose(fp);
++    for (int i = 0; i < length + 1; i++)
++        if (content[i] == EOF)
++            content[i] = '\0';
++
++    Lexer* lexer = new_lexer();
++    List* tokens = lexer_tokenize(lexer, content);
++    delete_lexer(lexer);
++    for (int i = 0; i < tokens->length(tokens); i++)
++        printf("%s\n", token_to_string(tokens->get(tokens, i)));
++    tokens->delete(tokens);
++    free(content);
+ }
+diff --git a/utils.h b/utils.h
+index e4fb036..ee65d06 100644
+--- a/utils.h
++++ b/utils.h
+@@ -5,19 +5,22 @@
+ 
+ typedef struct ListStruct {
+     void (*delete)(struct ListStruct* self);
++    size_t (*length)(struct ListStruct* self);
+     void* (*get)(struct ListStruct* self, int index);
+     void (*add)(struct ListStruct* self, void* element);
+ } List;
+ 
+ typedef struct ArrayListStruct {
+     void (*delete)(struct ArrayListStruct* self);
++    size_t (*length)(struct ArrayListStruct* self);
+     void* (*get)(struct ArrayListStruct* self, int index);
+     void (*add)(struct ArrayListStruct* self, void* element);
+     size_t m_length;
+-    void** m_elememts;
++    void** m_elements;
+ } ArrayList;
+ 
+ ArrayList* new_array_list();
+ void delete_array_list(ArrayList* self);
++size_t array_list_length(ArrayList* self);
+ void* array_list_get(ArrayList* self, int index);
+ void array_list_add(ArrayList* self, void* element);
+-- 
+2.25.1
+

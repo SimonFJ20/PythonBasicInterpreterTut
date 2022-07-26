@@ -1,0 +1,28 @@
+From 0d4108205e2d18c0621d1bd750c3dd4069b3a1aa Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Thu, 5 May 2022 01:57:40 +0200
+Subject: [PATCH] added valgrind make option
+
+---
+ Makefile | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/Makefile b/Makefile
+index 2251764..067ef25 100644
+--- a/Makefile
++++ b/Makefile
+@@ -17,6 +17,11 @@ run: $(EXECUTABLE)
+ 	./neocc examples/main.c
+ 	$(RM) temp.o temp.s
+ 
++# CFLAGS += -g # compile debug symbols
++valgrind: $(EXECUTABLE)
++	valgrind --tool=memcheck --track-origins=yes ./neocc examples/main.c
++	$(RM) temp.o temp.s
++
+ $(EXECUTABLE): $(OFILES)
+ 	$(LD) -o $@ $(CFLAGS) $(LFLAGS) $^
+ 
+-- 
+2.25.1
+

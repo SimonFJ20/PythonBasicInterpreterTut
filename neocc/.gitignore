@@ -1,0 +1,5 @@
+neocc
+*.o
+*.out
+compile_flags.txt
+temp.*

@@ -1,0 +1,52 @@
+From a1db6dabc151a64d807b6597527260d0a92af93a Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Tue, 10 May 2022 02:14:24 +0200
+Subject: [PATCH] removed commented out code
+
+---
+ utils.h | 15 ---------------
+ 1 file changed, 15 deletions(-)
+
+diff --git a/utils.h b/utils.h
+index 943ba93..0af64ae 100644
+--- a/utils.h
++++ b/utils.h
+@@ -42,11 +42,6 @@ typedef struct Map {
+     void* (*get)(struct Map* self, const char* string);
+     void (*set)(struct Map* self, const char* string, void* value);
+     bool (*contains_key)(struct Map* self, const char* string);
+-    // bool (*contains_value)(struct Map* self, void* value);
+-    // void (*remove_key)(struct Map* self, const char* string);
+-    // void (*remove_value)(struct Map* self, void* value);
+-    // List* (*keys)(struct Map* self);
+-    // List* (*values)(struct Map* self);
+ } Map;
+ 
+ uint64_t hash_string(const char* value);
+@@ -66,11 +61,6 @@ typedef struct StringHashMap {
+     void* (*get)(struct StringHashMap* self, const char* string);
+     void (*set)(struct StringHashMap* self, const char* string, void* value);
+     bool (*contains_key)(struct StringHashMap* self, const char* string);
+-    // bool (*contains_value)(struct StringHashMap* self, void* value);
+-    // void (*remove_key)(struct StringHashMap* self, const char* string);
+-    // void (*remove_value)(struct StringHashMap* self, void* value);
+-    // List* (*keys)(struct StringHashMap* self);
+-    // List* (*values)(struct StringHashMap* self);
+     size_t m_length;
+     List* m_elements;
+ } StringHashMap;
+@@ -81,11 +71,6 @@ size_t string_hash_map_length(StringHashMap* self);
+ void* string_hash_map_get(StringHashMap* self, const char* string);
+ void string_hash_map_set(StringHashMap* self, const char* string, void* value);
+ bool string_hash_map_contains_key(StringHashMap* self, const char* string);
+-// bool string_hash_map_contains_value(StringHashMap* self, void* value);
+-// void string_hash_map_remove_key(StringHashMap* self, const char* string);
+-// void string_hash_map_remove_value(StringHashMap* self, void* value);
+-// List* string_hash_map_keys(StringHashMap* self);
+-// List* string_hash_map_values(StringHashMap* self);
+ 
+ typedef struct FileReader {
+     FILE* fp;
+-- 
+2.25.1
+

@@ -1,0 +1,23 @@
+From 3b6758cd1e135c42e251206c192b8047eaa96eff Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Tue, 30 Nov 2021 00:03:09 +0100
+Subject: [PATCH] removed comment
+
+---
+ core/shell.py | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/core/shell.py b/core/shell.py
+index eb04bf5..0ab6c52 100644
+--- a/core/shell.py
++++ b/core/shell.py
+@@ -36,6 +36,4 @@ if __name__ == '__main__':
+         if text.strip() == '':
+             print(f"Empty file '{filepath}'")
+             exit(1)
+-        # filename = filepath[filepath.rfind('/')+1:]
+-        # print(filename)
+         run_text(text, filepath, False)
+-- 
+2.25.1
+

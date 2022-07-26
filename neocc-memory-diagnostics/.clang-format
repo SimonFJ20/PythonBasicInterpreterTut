@@ -1,0 +1,12 @@
+Language:        Cpp
+BasedOnStyle:  WebKit
+IndentWidth: 4
+SpaceAfterCStyleCast: true
+
+# can be used with clang-format version >=14
+# SpaceBeforeParens: Custom
+# SpaceBeforeParensOptions:
+#   AfterControlStatements: true
+#   AfterFunctionDeclarationName: false
+#   AfterFunctionDefinitionName: false
+#   BeforeNonEmptyParentheses: false

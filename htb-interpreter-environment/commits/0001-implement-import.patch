@@ -1,0 +1,35 @@
+From 061b7c882691a33e401a140722a3dd43bf8c2121 Mon Sep 17 00:00:00 2001
+From: Simon From Jakobsen <sfja.skp@edu.mercantec.dk>
+Date: Tue, 30 Nov 2021 10:05:42 +0100
+Subject: [PATCH] implement import
+
+---
+ core/htb_interpreter.py | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/core/htb_interpreter.py b/core/htb_interpreter.py
+index 69c72d9..a0f65fb 100644
+--- a/core/htb_interpreter.py
++++ b/core/htb_interpreter.py
+@@ -592,7 +592,7 @@ class BuiltInFunction(BaseFunction):
+                 exec_ctx
+             ))
+         
+-        _, error = evaluate(fn, script)
++        result, error = evaluate(fn, script)
+ 
+         if error:
+             return RTResult().failure(RTError(
+@@ -601,6 +601,9 @@ class BuiltInFunction(BaseFunction):
+                 exec_ctx
+             ))
+ 
++        for v in result.elements[:-1]:
++            exec_ctx.parent.symbol_table.set(v.name, v)
++
+         return RTResult().success(Number.null)
+     execute_run.arg_names = ['fn']
+ 
+-- 
+2.25.1
+

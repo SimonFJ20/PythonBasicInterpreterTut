@@ -1,0 +1,368 @@
+From 28af47ce84942d1444004087514e2b3726c430d2 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Tue, 19 Apr 2022 14:48:49 +0200
+Subject: [PATCH] init
+
+---
+ Makefile         |  27 ++++++++++++++++
+ examples/main.bl |   6 ++++
+ lexer.h          |   4 +++
+ linked_list.c    |  80 +++++++++++++++++++++++++++++++++++++++++++++++
+ list.c           |  68 ++++++++++++++++++++++++++++++++++++++++
+ list.o           | Bin 0 -> 3320 bytes
+ main.c           |   8 +++++
+ main.o           | Bin 0 -> 1488 bytes
+ utils.h          |  51 ++++++++++++++++++++++++++++++
+ 9 files changed, 244 insertions(+)
+ create mode 100644 Makefile
+ create mode 100644 examples/main.bl
+ create mode 100644 lexer.h
+ create mode 100644 linked_list.c
+ create mode 100644 list.c
+ create mode 100644 list.o
+ create mode 100644 main.c
+ create mode 100644 main.o
+ create mode 100644 utils.h
+
+diff --git a/Makefile b/Makefile
+new file mode 100644
+index 0000000..dd645fd
+--- /dev/null
++++ b/Makefile
+@@ -0,0 +1,27 @@
++
++OUT = bl
++
++CFLAGS = -std=c17 -Wall -Werror
++LFLAGS = 
++
++CC = gcc
++LD = gcc
++
++OFILES = \
++	main.o \
++	list.o \
++	linked_list.o
++
++HEADERS = $(wildcard *.h)
++
++$(OUT): $(OFILES)
++	$(LD) -o $@ $^ $(LFLAGS) $(CFLAGS)
++
++%.o: %.c $(HEADERS)
++	$(CC) -o $@ -c $< $(CFLAGS)
++
++.PHONY: clean
++clean:
++	$(RM) $(OFILES)
++	$(RM) $(OUT)
++
+diff --git a/examples/main.bl b/examples/main.bl
+new file mode 100644
+index 0000000..3429093
+--- /dev/null
++++ b/examples/main.bl
+@@ -0,0 +1,6 @@
++
++u32 main()
++{
++    return 1;
++}
++
+diff --git a/lexer.h b/lexer.h
+new file mode 100644
+index 0000000..aec926c
+--- /dev/null
++++ b/lexer.h
+@@ -0,0 +1,4 @@
++#ifndef LEXER_H
++#define LEXER_H
++
++#endif
+diff --git a/linked_list.c b/linked_list.c
+new file mode 100644
+index 0000000..9ff56f0
+--- /dev/null
++++ b/linked_list.c
+@@ -0,0 +1,80 @@
++#include <stdlib.h>
++#include "utils.h"
++
++LinkedListNode* new_linked_list_node(LinkedListNode* prev, LinkedListNode* next, void* value)
++{
++    LinkedListNode* self = calloc(1, sizeof (LinkedListNode));
++    *self = (LinkedListNode) {
++        .prev = prev,
++        .next = next,
++        .value = value,
++    };
++    return self;
++}
++
++void delete_linked_list_node(LinkedListNode* self)
++{
++    free(self);
++}
++
++LinkedList* new_linked_list()
++{
++    LinkedList* self = calloc(1, sizeof (LinkedList));
++    *self = (LinkedList) {
++        .head = NULL,
++        .length = 0,
++    };
++    return self;
++}
++
++void linked_list_add(LinkedList* self, void* value)
++{
++    self->length = 0;
++    if (!self->head) {
++        self->head = new_linked_list_node(NULL, NULL, value);
++    } else {
++        LinkedListNode* node = self->head;
++        while (node->next)
++            node = node->next;
++        node->next = new_linked_list_node(node, NULL, value);
++    }
++}
++
++LinkedListNode* linked_list_node_at(LinkedList* self, int index)
++{
++    if (index >= 0) {
++        ASSERT(index < self->length, "index out of bounds");
++        LinkedListNode* node = self->head;
++        for (int i = 0; i < index; i++)
++            node = node->next;
++        return node;
++    } else {
++        return linked_list_get(self, self->length - index);
++    }
++}
++
++void* linked_list_at(LinkedList* self, int index)
++{
++    return linked_list_node_at(self, index);
++}
++
++void* linked_list_remove_at(LinkedList* self, int index)
++{
++    return NULL;
++}
++
++void* linked_list_remove(LinkedList* self, void* value)
++{
++    return NULL;
++}
++
++size_t linked_list_length(LinkedList* self)
++{
++    return 0;
++}
++
++void** linked_list_to_array(LinkedList* self)
++{
++    return NULL;
++}
++
+diff --git a/list.c b/list.c
+new file mode 100644
+index 0000000..0b7fa53
+--- /dev/null
++++ b/list.c
+@@ -0,0 +1,68 @@
++#include <stdlib.h>
++#include "utils.h"
++
++List* new_list()
++{
++    List* self = calloc(1, sizeof (List));
++    *self = (List) {
++        .values = NULL,
++        .length = 0,
++    };
++    return self;
++}
++
++void delete_list(List* self)
++{
++    free(self->values);
++    free(self);
++}
++
++void list_add(List* self, void* value)
++{
++    self->length++;
++    if (self->length == 0) {
++        self->values = calloc(1, sizeof (void*));
++        self->values[0] = value;
++    } else {
++        self->length++;
++        self->values = realloc(self->values, sizeof (void*) * self->length);
++        self->values[self->length - 1] = value;
++    }
++}
++
++void* list_at(List* self, int index)
++{
++    if (index >= 0) {
++        ASSERT(index < self->length, "index out of bounds");
++        return self->values[index];
++    } else {
++        return list_at(self, self->length - index);
++    }
++}
++
++void* list_remove(List* self, int index)
++{
++    self->length--;
++    if (index >= 0) {
++        ASSERT(index < self->length, "index out of bounds");
++        return self->values[index];
++    } else {
++        return list_at(self, self->length - index);
++    }
++}
++
++size_t list_length(List* self)
++{
++    return self->length;
++}
++
++void** list_to_array(List* self)
++{
++    void** array = calloc(self->length, sizeof (void*));
++    for (int i = 0; i < self->length; i++)
++        array[i] = self->values[i];
++    return array;
++}
++
++
++
+diff --git a/list.o b/list.o
+new file mode 100644
+index 0000000000000000000000000000000000000000..452aa1c4a9387dfb21d3c848329323f32c564438
+GIT binary patch
+literal 3320
+zcmcgtU1%It6uz^m=^E3r);<*4!XQ?S*fq(EG^p%0ZaaY*OMXBkbvwH|n?!ea;_R$$
+z#9(1n973Rd5g&XIL?}KLA0$$#F-1dtDuO=w&=(;Pg^K%-heABx{h7VFZcq?BaPOS^
+zo%5Z0=A3(H-pQRildvqN#A45}&Pt(-HSh1}8Lnp7L3V&mJJGL`PV2WLH&TRt1L`Ks
+zPL$hpmT7EY#e|wk#`^Mw?OQiNCT_}!mbS@*2JtooA4{oUHaw%oUE!TcIxFWbu1DvS
+zG4|eCW8en1($iTNZYkkK2~FR1qSV$aF{@jomBZi3j74rgtCWaN=_LeN#-wb%z0>2g
+zHj|Ep-6(#-NIhz_TT5-$EG*~RPVsiU_o?;Z>8~C^omTGS8%FD~_I<2vtis02qrDlg
+zTM7X`;`>_^mTetZv6rXY1Ggz0xkYjMy9-KLDQ~Lh4%exkduRI8|DI`lKr+b->e$$H
+zY{VH`&Lnxi<L*Sc?TuU;)!G`S*CDT61)`cb#UGuO{-5B&dujc^4_~5{Yg=)1h(}GO
+z=3GZjZrvp3%6vUc7ukHR<TY)-5!!y)F8GaFsg6*LWhW<d6I0o#u@}efGug3ox#vgh
+z6ZJkfq<Q2-sgJR<qoX7C<7daG2kfDt^l*BR^Y+nf(?I*l#uCh01E$21YjrmdOM~^+
+z1hbkc>uCS}<Yh7*BOC+rET-(i)cc9i1HHLcPn~>Vdj>ek6PT3UBO@(gp8-yC9h0&r
+zzT^(DzYUz^Lrk&#N^JiaILYUjV*6*Y{cGSPhcGGo3!VLc0Zy`rN!b&jZ~)dtP?vq|
+zkDV?i*3<Qi#t7$^Z5IVKIHdXW8WQ#(4SeBDIYI#Zl^?GuVYtlQ{0F4}EIlE-#`GMf
+z(anE^aKwLDHlEj<u+w|^kL`hv%Q&kt4(|<NFH5|TAcgDVS?0RMLW%QUz$7m~&3iKs
+zl@;Ae#V@jwSMfqmK;^*mxL@8al~~{j4|wO@kSzrBwXn>*=6ooe0<Y@7Aqf?)HXF_f
+zJoNK!5V&Gzb>49&(6xIzLZ*-t3Gn?i6n>F(h>3qHV2<l?{?u^%>QtNwSud2KN5f|f
+z95zVVz>f)-)g_L69-yJ(FKKwchJT^qeHwnxh_B-G%08()RX!;LSNR;5xS7vm8m{Lv
+zqv3i!S2SF&r%gFSV3sa?o#Ar_SNG<kfvfv*$-vb;_{6}~xn47Hb*}FixH{J?U0<w*
+zZh@X*Af9td3%rV(4!vf`(j_-^S-McKvvlB#MbWQTy&BnSe(0s?n|-n#y2aPzdbZX`
+zF9iOA7lez%K_qW3Uk===Co}nP51Z&X3cW^{j9mY&7o9M9Y+~=Dq@nkj7!k@<8St7U
+z;H*N$cM*c`9pq6Oz|}be203X00{+|nPZExpru)C;4-psp8?VU*Wxy=ibW!;$>=Y^B
+zi@&cz8GBvwAL>9{gD*rqPis0i$mw14g(R+c%6Ebke6P&>KahMgFEjsFiHn#fe^v6g
+z$)=0R$0_XA|CglWRY^ww@jX<0)&FjLgK`Z)NiNA3#y13z$w$m?r5cpyFC@DzX8rI#
+N?#AcIlI@@Pe*yHZJ?H=c
+
+literal 0
+HcmV?d00001
+
+diff --git a/main.c b/main.c
+new file mode 100644
+index 0000000..797527b
+--- /dev/null
++++ b/main.c
+@@ -0,0 +1,8 @@
++#include <stdio.h>
++
++int main()
++{
++    printf("hello world\n");
++}
++
++
+diff --git a/main.o b/main.o
+new file mode 100644
+index 0000000000000000000000000000000000000000..7d6881fefdc9a48b3da4fb356da44ea18c674a2d
+GIT binary patch
+literal 1488
+zcmbtSPiqrV5T8wItJu`EdJyYjPokg?<Ei#gQiE*{B2vgj5ZR_%qh_;V_Z1T_dJ=jl
+z^rQ6HW5Gkef?q)B)w@vVmz`-}9_vL1W@qL%e|P46dH!Of5(K0a&>CG@iW0r5T<Xn<
+z+N1@lQK!BCvwd&{NPGYE4DuMCH{W}4zn_Mm(yYHjwApH{hW9sLb{>R{hIwKhBL+0X
+z95SN<yQxCK2{5HVY@O+rID*ex6pZS@^8DP@Lw4R}91OaH&-z0BTcuT-?Qj6>zYyxq
+z(693{ceQjAMAgZ((;4Wo<it;AV64VmpAIdoBziwEU4o$Dp3Nm@P9)Y{W&V9$&<(+{
+z8|+H)P;kUMCn7TWII+<-OPdw4r&<>GBV*%{C9@ORh|G4LlgZM;=%z^$57;+IZEW}^
+zk8&GzKZ^ZsuxEx@I*c<r<{VUtdvABMD2Zi~{}Umn<0i9SnWosfS9R;VP<xpb?5L@L
+zNW2k{KD_I!1Jbu~8&0Ns%)qgGmtMPuqx=0IvJW-?HNU~Rs5x~@wzdB}>n{2IpRyB}
+z{-?(7igHr{k(#ga8RM$Ep<~x@bU${BeR#wE{9h%<pG)^IZu-CqYWn#{60o9yBK>^4
+z!m|6H$e?;>-2WQ0<||&-8?DapVLB`X;ST8I=cA^7d!&q{{}K#`1inBPSu4x`A%XTH
+IvQYf|KkFD}6#xJL
+
+literal 0
+HcmV?d00001
+
+diff --git a/utils.h b/utils.h
+new file mode 100644
+index 0000000..de89d7d
+--- /dev/null
++++ b/utils.h
+@@ -0,0 +1,51 @@
++#ifndef UTILS_H
++#define UTILS_H
++
++#include <stdlib.h>
++#include <stdio.h>
++
++#define ASSERT(v, msg) \
++    if (!(v)) { \
++        printf("ASSERTATION FAILED: %s\nat %s:%d\n", msg, __FILE__, __LINE__); \
++        exit(1); \
++    }
++
++typedef struct {
++    void** values;
++    size_t length;
++} List;
++
++List* new_list();
++void delete_list(List* self);
++
++void list_add(List* self, void* value);
++void* list_at(List* self, int index);
++void* list_remove(List* self, int index);
++void* list_remove_at(List* self, void* value);
++size_t list_length(List* self);
++void** list_to_array(List* self);
++
++typedef struct LinkedListNodeStruct {
++    struct LinkedListNodeStruct* prev, * next;
++    void* value;
++} LinkedListNode;
++
++LinkedListNode* new_linked_list_node(LinkedListNode* prev, LinkedListNode* next, void* value);
++void delete_linked_list_node(LinkedListNode* self);
++
++typedef struct {
++    LinkedListNode head;
++    size_t length;
++} LinkedList;
++
++LinkedList* new_linked_list();
++void delete_linked_list();
++
++void linked_list_add(LinkedList* self, void* value);
++void* linked_list_at(LinkedList* self, int index);
++void* linked_list_remove_at(LinkedList* self, int index);
++void* linked_list_remove(LinkedList* self, void* value);
++size_t linked_list_length(LinkedList* self);
++void** linked_list_to_array(LinkedList* self);
++
++#endif
+-- 
+2.25.1
+

@@ -1,0 +1,47 @@
+From 73908bfc28e7485490c6315651d2855edee6331d Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Sat, 7 May 2022 20:50:22 +0200
+Subject: [PATCH] added examples
+
+---
+ examples/addition.c  |  8 ++++++++
+ examples/factorial.c | 12 ++++++++++++
+ 2 files changed, 20 insertions(+)
+ create mode 100644 examples/addition.c
+ create mode 100644 examples/factorial.c
+
+diff --git a/examples/addition.c b/examples/addition.c
+new file mode 100644
+index 0000000..cf6c1b5
+--- /dev/null
++++ b/examples/addition.c
+@@ -0,0 +1,8 @@
++
++int main()
++{
++    int a = 5;
++    int b = 3;
++    int c = a + b;
++    return c;
++}
+diff --git a/examples/factorial.c b/examples/factorial.c
+new file mode 100644
+index 0000000..eef22c8
+--- /dev/null
++++ b/examples/factorial.c
+@@ -0,0 +1,12 @@
++
++int factorial(int n)
++{
++    if (n > 0)
++        return n * factorial(n - 1);
++    return 1;
++}
++
++int main()
++{
++    return factorial(5);
++}
+-- 
+2.25.1
+

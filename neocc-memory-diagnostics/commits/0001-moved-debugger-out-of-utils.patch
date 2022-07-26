@@ -1,0 +1,400 @@
+From f218829e438b6774b05a4a04a6e4a0ba865fcf56 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Thu, 5 May 2022 00:11:24 +0200
+Subject: [PATCH] moved debugger out of utils
+
+---
+ debugger.c | 135 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+ debugger.h |  42 +++++++++++++++++
+ utils.c    | 131 ---------------------------------------------------
+ utils.h    |  40 +---------------
+ 4 files changed, 179 insertions(+), 169 deletions(-)
+ create mode 100644 debugger.c
+ create mode 100644 debugger.h
+
+diff --git a/debugger.c b/debugger.c
+new file mode 100644
+index 0000000..2b18008
+--- /dev/null
++++ b/debugger.c
+@@ -0,0 +1,135 @@
++#include "debugger.h"
++#include <stdbool.h>
++#include <stdio.h>
++#include <stdlib.h>
++
++const char* SPACES_FOR_INDENTATION = 
++    "                                "
++    "                                "
++    "                                "
++    "                                "
++    "                                "
++    "                                "
++    "                                "
++    "                                ";
++
++static inline const char* indent_spaces(int n)
++{
++    return SPACES_FOR_INDENTATION + (252 - n * 4);
++}
++
++int function_log_indentation = 0;
++
++void log_enter(const char* function, const char* file, const int line)
++{
++    printf("%sEntering %s in ./%s:%d:\n", indent_spaces(function_log_indentation), function, file, line);
++    function_log_indentation++;
++}
++
++void log_leave(const char* function, const char* file, const int line)
++{
++    function_log_indentation--;
++    printf("%sLeaving %s in ./%s:%d:\n", indent_spaces(function_log_indentation), function, file, line);
++}
++
++struct allocation allocations[8192];
++int allocations_index = 0;
++
++void* logging_calloc(size_t amount, size_t size, const char* func, const char* file, const int line)
++{
++    void* ptr = calloc(amount, size);
++    allocations[allocations_index].func = func;
++    allocations[allocations_index].file = file;
++    allocations[allocations_index].line = line;
++    allocations[allocations_index].size = size * amount;
++    allocations[allocations_index].ptr = ptr;
++    allocations[allocations_index].deallocated = false;
++    allocations_index++;
++#ifdef ENABLE_LOGGING
++    printf(
++        "%sAllocated\t%p\tof %ld bytes\tin %s\tin ./%s:%d:\n",
++        indent_spaces(function_log_indentation),
++        ptr,
++        amount * size,
++        func,
++        file,
++        line);
++#endif
++    return ptr;
++}
++
++void* logging_realloc(void* old_ptr, size_t new_size, const char* func, const char* file, const int line)
++{
++    void* new_ptr = realloc(old_ptr, new_size);
++    for (int i = 0; i < allocations_index; i++) {
++        if (allocations[i].ptr == old_ptr) {
++            allocations[i].ptr = new_ptr;
++            allocations[i].size = new_size;
++            printf(
++                "%sReallocated\t%p\tto %p\tin %s\tin ./%s:%d:\n",
++                indent_spaces(function_log_indentation),
++                old_ptr,
++                new_ptr,
++                func,
++                file,
++                line);
++        }
++    }
++    return new_ptr;
++}
++
++void logging_free(void* ptr, const char* func, const char* file, const int line)
++{
++    free(ptr);
++    for (int i = 0; i < allocations_index; i++) {
++        if (allocations[i].ptr == ptr && !allocations[i].deallocated) {
++            allocations[i].deallocated = true;
++#ifdef ENABLE_LOGGING
++            printf(
++                "%sDeallocated\t%p\tof %ld bytes\tin %s\tin ./%s:%d:\n",
++                indent_spaces(function_log_indentation),
++                ptr,
++                allocations[i].size,
++                func,
++                file,
++                line);
++#endif
++            return;
++        }
++    }
++#ifdef ENABLE_LOGGING
++    printf(
++        "%sDeallocated unallocated\t%p\tin %s\tin ./%s:%d:\n",
++        indent_spaces(function_log_indentation),
++        ptr,
++        func,
++        file,
++        line);
++#endif
++}
++
++void print_allocation_report()
++{
++    size_t allocated_bytes_total = 0;
++    size_t allocated_bytes_end = 0;
++    printf("address\tsize\tdeallocated\tlocation\tfunction\n");
++    for (int i = 0; i < allocations_index; i++) {
++        allocated_bytes_total += allocations[i].size;
++        if (!allocations[i].deallocated)
++            allocated_bytes_end += allocations[i].size;
++        printf("%p\t%ld\t%s\t./%s:%d:\t%s\n", 
++            allocations[i].ptr,
++            allocations[i].size,
++            allocations[i].deallocated ? "true" : "false",
++            allocations[i].file,
++            allocations[i].line,
++            allocations[i].func
++            );
++    }
++    printf(
++        "bytes allocated: %ld, bytes leaked: %ld, leaked %2.2lf%%\n",
++        allocated_bytes_total,
++        allocated_bytes_end,
++        (double) allocated_bytes_end / allocated_bytes_total
++    );
++}
+diff --git a/debugger.h b/debugger.h
+new file mode 100644
+index 0000000..07ce6ca
+--- /dev/null
++++ b/debugger.h
+@@ -0,0 +1,42 @@
++#pragma once
++
++#include <stdlib.h>
++#include <stdbool.h>
++
++struct allocation {
++    const char* func;
++    const char* file;
++    int line;
++    size_t size;
++    void* ptr;
++    bool deallocated;
++};
++
++#define ENABLE_LOGGING
++
++#define LOG_ENTER() (log_enter(__FUNCTION__, __FILE__, __LINE__))
++#define LOG_LEAVE() (log_leave(__FUNCTION__, __FILE__, __LINE__))
++#define LOG_RETURN(t, v)                             \
++    ({                                               \
++        t _value = v;                                \
++        log_leave(__FUNCTION__, __FILE__, __LINE__); \
++        return _value;                               \
++    })
++#define LOG_RETURN_VOID(v)                           \
++    ({                                               \
++        v;                                           \
++        log_leave(__FUNCTION__, __FILE__, __LINE__); \
++        return;                                      \
++    })
++
++void log_enter(const char* function, const char* file, const int line);
++void log_leave(const char* function, const char* file, const int line);
++
++#define _calloc(amount, size) logging_calloc(amount, size, __FUNCTION__, __FILE__, __LINE__)
++#define _realloc(ptr, new_size) logging_realloc(ptr, new_size, __FUNCTION__, __FILE__, __LINE__)
++#define _free(ptr) logging_free(ptr, __FUNCTION__, __FILE__, __LINE__)
++
++void* logging_calloc(size_t amount, size_t size, const char* func, const char* file, const int line);
++void* logging_realloc(void* ptr, size_t new_size, const char* func, const char* file, const int line);
++void logging_free(void* ptr, const char* func, const char* file, const int line);
++void print_allocation_report();
+diff --git a/utils.c b/utils.c
+index 991c66f..29c79df 100644
+--- a/utils.c
++++ b/utils.c
+@@ -26,134 +26,3 @@ void list_delete_all_and_self(List* list, void (*deletor)(void *))
+     list->delete (list);
+ 	LOG_LEAVE();
+ }
+-
+-const char* SPACES_FOR_INDENTATION = 
+-    "                                "
+-    "                                "
+-    "                                "
+-    "                                "
+-    "                                "
+-    "                                "
+-    "                                "
+-    "                                ";
+-
+-static inline const char* indent_spaces(int n)
+-{
+-    return SPACES_FOR_INDENTATION + (252 - n * 4);
+-}
+-
+-int function_log_indentation = 0;
+-
+-void log_enter(const char* function, const char* file, const int line)
+-{
+-    printf("%sEntering %s in ./%s:%d:\n", indent_spaces(function_log_indentation), function, file, line);
+-    function_log_indentation++;
+-}
+-
+-void log_leave(const char* function, const char* file, const int line)
+-{
+-    function_log_indentation--;
+-    printf("%sLeaving %s in ./%s:%d:\n", indent_spaces(function_log_indentation), function, file, line);
+-}
+-
+-struct allocation allocations[8192];
+-int allocations_index = 0;
+-
+-void* logging_calloc(size_t amount, size_t size, const char* func, const char* file, const int line)
+-{
+-    void* ptr = calloc(amount, size);
+-    allocations[allocations_index].func = func;
+-    allocations[allocations_index].file = file;
+-    allocations[allocations_index].line = line;
+-    allocations[allocations_index].size = size * amount;
+-    allocations[allocations_index].ptr = ptr;
+-    allocations[allocations_index].deallocated = false;
+-    allocations_index++;
+-#ifdef ENABLE_LOGGING
+-    printf(
+-        "%sAllocated\t%p\tof %ld bytes\tin %s\tin ./%s:%d:\n",
+-        indent_spaces(function_log_indentation),
+-        ptr,
+-        amount * size,
+-        func,
+-        file,
+-        line);
+-#endif
+-    return ptr;
+-}
+-
+-void* logging_realloc(void* old_ptr, size_t new_size, const char* func, const char* file, const int line)
+-{
+-    void* new_ptr = realloc(old_ptr, new_size);
+-    for (int i = 0; i < allocations_index; i++) {
+-        if (allocations[i].ptr == old_ptr) {
+-            allocations[i].ptr = new_ptr;
+-            allocations[i].size = new_size;
+-            printf(
+-                "%sReallocated\t%p\tto %p\tin %s\tin ./%s:%d:\n",
+-                indent_spaces(function_log_indentation),
+-                old_ptr,
+-                new_ptr,
+-                func,
+-                file,
+-                line);
+-        }
+-    }
+-    return new_ptr;
+-}
+-
+-void logging_free(void* ptr, const char* func, const char* file, const int line)
+-{
+-    free(ptr);
+-    for (int i = 0; i < allocations_index; i++) {
+-        if (allocations[i].ptr == ptr && !allocations[i].deallocated) {
+-            allocations[i].deallocated = true;
+-#ifdef ENABLE_LOGGING
+-            printf(
+-                "%sDeallocated\t%p\tof %ld bytes\tin %s\tin ./%s:%d:\n",
+-                indent_spaces(function_log_indentation),
+-                ptr,
+-                allocations[i].size,
+-                func,
+-                file,
+-                line);
+-#endif
+-            return;
+-        }
+-    }
+-#ifdef ENABLE_LOGGING
+-    printf(
+-        "%sDeallocated unallocated\t%p\tin %s\tin ./%s:%d:\n",
+-        indent_spaces(function_log_indentation),
+-        ptr,
+-        func,
+-        file,
+-        line);
+-#endif
+-}
+-
+-void print_allocation_report()
+-{
+-    size_t allocated_bytes_total = 0;
+-    size_t allocated_bytes_end = 0;
+-    printf("address\tsize\tdeallocated\tlocation\tfunction\n");
+-    for (int i = 0; i < allocations_index; i++) {
+-        allocated_bytes_total += allocations[i].size;
+-        if (!allocations[i].deallocated)
+-            allocated_bytes_end += allocations[i].size;
+-        printf("%p\t%ld\t%s\t./%s:%d:\t%s\n", 
+-            allocations[i].ptr,
+-            allocations[i].size,
+-            allocations[i].deallocated ? "true" : "false",
+-            allocations[i].file,
+-            allocations[i].line,
+-            allocations[i].func
+-            );
+-    }
+-    printf(
+-        "bytes allocated: %ld, bytes leaked: %ld, leaked %2.2lf%%\n",
+-        allocated_bytes_total,
+-        allocated_bytes_end,
+-        (double) allocated_bytes_end / allocated_bytes_total
+-    );
+-}
+diff --git a/utils.h b/utils.h
+index 1702854..7df4a2e 100644
+--- a/utils.h
++++ b/utils.h
+@@ -5,6 +5,8 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ 
++#include "debugger.h"
++
+ typedef struct ListStruct {
+     void (*delete)(struct ListStruct* self);
+     size_t (*length)(struct ListStruct* self);
+@@ -70,41 +72,3 @@ void println_and_free(char* string);
+ void list_delete_all_and_self(List* list, void (*)(void*));
+ char* read_file(const char* path);
+ void write_file(const char* path, char* string);
+-
+-struct allocation {
+-    const char* func;
+-    const char* file;
+-    int line;
+-    size_t size;
+-    void* ptr;
+-    bool deallocated;
+-};
+-
+-#define ENABLE_LOGGING
+-
+-#define LOG_ENTER() (log_enter(__FUNCTION__, __FILE__, __LINE__))
+-#define LOG_LEAVE() (log_leave(__FUNCTION__, __FILE__, __LINE__))
+-#define LOG_RETURN(t, v)                             \
+-    ({                                               \
+-        t _value = v;                                \
+-        log_leave(__FUNCTION__, __FILE__, __LINE__); \
+-        return _value;                               \
+-    })
+-#define LOG_RETURN_VOID(v)                           \
+-    ({                                               \
+-        v;                                           \
+-        log_leave(__FUNCTION__, __FILE__, __LINE__); \
+-        return;                                      \
+-    })
+-
+-void log_enter(const char* function, const char* file, const int line);
+-void log_leave(const char* function, const char* file, const int line);
+-
+-#define _calloc(amount, size) logging_calloc(amount, size, __FUNCTION__, __FILE__, __LINE__)
+-#define _realloc(ptr, new_size) logging_realloc(ptr, new_size, __FUNCTION__, __FILE__, __LINE__)
+-#define _free(ptr) logging_free(ptr, __FUNCTION__, __FILE__, __LINE__)
+-
+-void* logging_calloc(size_t amount, size_t size, const char* func, const char* file, const int line);
+-void* logging_realloc(void* ptr, size_t new_size, const char* func, const char* file, const int line);
+-void logging_free(void* ptr, const char* func, const char* file, const int line);
+-void print_allocation_report();
+-- 
+2.25.1
+

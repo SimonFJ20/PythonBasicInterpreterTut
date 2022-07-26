@@ -1,0 +1,72 @@
+From 504621c3ee98ecf75390cdb79551047c8dce058b Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Tue, 30 Nov 2021 00:01:23 +0100
+Subject: [PATCH] file and repl
+
+---
+ core/shell.py | 47 +++++++++++++++++++++++++++++++++--------------
+ 1 file changed, 33 insertions(+), 14 deletions(-)
+
+diff --git a/core/shell.py b/core/shell.py
+index d0d5d08..eb04bf5 100644
+--- a/core/shell.py
++++ b/core/shell.py
+@@ -1,22 +1,41 @@
++from sys import argv
+ import basic
+ 
+-while True:
+-    
+-    try:
+-        try:
+-            text = input('❱❱❱ ')
+-        except UnicodeEncodeError:
+-            text = input('>>> ').replace('\n', '', -1)
+-    except KeyboardInterrupt:
+-        exit()
+-
+-    if text.strip() == '': continue
+-
+-    result, error = basic.run('<stdin>', text)
++def run_text(text: str, filename: str, print_res: bool = True):
++    result, error = basic.run(filename, text)
+ 
+     if error: print(error.as_string())
+-    elif result:
++    elif result and print_res:
+         if len(result.elements) == 1:
+             print(repr(result.elements[0]))
+         else:
+             print(repr(result))
++
++def repl():
++    while True:
++        try:
++            try:
++                text = input('❱❱❱ ')
++            except UnicodeEncodeError:
++                text = input('>>> ').replace('\n', '', -1)
++        except KeyboardInterrupt:
++            exit()
++
++        if text.strip() == '': continue
++
++        run_text(text, '<stdin>')
++
++if __name__ == '__main__':
++    if len(argv) < 2:
++        repl()
++    else:
++        filepath = argv[1]
++        with open(filepath, 'r') as file:
++            text = file.read()
++            file.close()
++        if text.strip() == '':
++            print(f"Empty file '{filepath}'")
++            exit(1)
++        # filename = filepath[filepath.rfind('/')+1:]
++        # print(filename)
++        run_text(text, filepath, False)
+-- 
+2.25.1
+

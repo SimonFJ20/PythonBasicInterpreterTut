@@ -1,0 +1,114 @@
+From 05e35704bf09ba046b040526d53bb00122ce9168 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Wed, 20 Apr 2022 02:01:20 +0200
+Subject: [PATCH] some lexer
+
+---
+ lexer.c | 31 +++++++++++++++++++++++++++++--
+ lexer.h |  7 +++++--
+ utils.h |  4 ++--
+ 3 files changed, 36 insertions(+), 6 deletions(-)
+
+diff --git a/lexer.c b/lexer.c
+index 1d93b8c..ccd67fd 100644
+--- a/lexer.c
++++ b/lexer.c
+@@ -1,3 +1,4 @@
++#include <stdio.h>
+ #include <stdlib.h>
+ #include "lexer.h"
+ 
+@@ -39,12 +40,12 @@ Token* lexer_iteration_unwrap(LexerIteration* self)
+     return value;
+ }
+ 
+-Lexer* new_lexer(Reader reader)
++Lexer* new_lexer(Reader* reader)
+ {
+     Lexer* self = calloc(1, sizeof (Lexer));
+     *self = (Lexer) {
+-        .index = 0,
+         .reader = reader,
++        .c = '\0',
+     };
+     return self;
+ }
+@@ -55,6 +56,32 @@ void delete_lexer(Lexer* self)
+ }
+ 
+ LexerIteration* lexer_next(Lexer* self)
++{
++    lexer_next_char(self);
++    if (self->c >= 48 && self->c <= 57) {
++        return lexer_make_int(self);
++    } else {
++        switch (self->c) {
++        case 1:
++        default:
++            lexer_fail_unexpected_char(self);
++            exit(1);
++        }
++    }
++}
++
++LexerIteration* lexer_make_int(Lexer* self)
+ {
+     return NULL;
+ }
++
++void lexer_fail_unexpected_char(Lexer* self)
++{
++    printf("fatal: unexpected character '%c'\n", self->c);
++    exit(1);
++}
++
++void lexer_next_char(Lexer* self)
++{
++    self->c = self->reader->getc(self->reader);
++}
+diff --git a/lexer.h b/lexer.h
+index 79f98ca..51babd1 100644
+--- a/lexer.h
++++ b/lexer.h
+@@ -37,13 +37,16 @@ void delete_lexer_iteration(LexerIteration* self);
+ Token* lexer_iteration_unwrap(LexerIteration* self);
+ 
+ typedef struct {
+-    size_t index;
+-    Reader reader;
++    Reader* reader;
++    char c;
+ } Lexer;
+ 
+ Lexer* new_lexer();
+ void delete_lexer(Lexer* self);
+ 
+ LexerIteration* lexer_next(Lexer* self);
++LexerIteration* lexer_make_int(Lexer* self);
++void lexer_fail_unexpected_char(Lexer* self);
++void lexer_next_char(Lexer* self);
+ 
+ #endif
+\ No newline at end of file
+diff --git a/utils.h b/utils.h
+index 35a2868..6a5b75f 100644
+--- a/utils.h
++++ b/utils.h
+@@ -49,12 +49,12 @@ size_t linked_list_length(LinkedList* self);
+ void** linked_list_to_array(LinkedList* self);
+ 
+ typedef struct ReaderStruct {
+-    char (*getc)();
++    char (*getc)(struct ReaderStruct* self);
+     void (*delete)(struct ReaderStruct* self);
+ } Reader;
+ 
+ typedef struct FileReaderStruct {
+-    char (*getc)();
++    char (*getc)(struct FileReaderStruct* self);
+     void (*delete)(struct FileReaderStruct* self);
+     FILE* fp;
+ } FileReader;
+-- 
+2.25.1
+

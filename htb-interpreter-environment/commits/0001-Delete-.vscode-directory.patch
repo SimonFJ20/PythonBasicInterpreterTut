@@ -1,0 +1,36 @@
+From 82c8659a03db2bcce0e558d0d0465252db2f7f0a Mon Sep 17 00:00:00 2001
+From: Simon From <simonfromjakobsen@gmail.com>
+Date: Mon, 29 Nov 2021 17:28:09 +0100
+Subject: [PATCH] Delete .vscode directory
+
+---
+ .vscode/settings.json | 16 ----------------
+ 1 file changed, 16 deletions(-)
+ delete mode 100644 .vscode/settings.json
+
+diff --git a/.vscode/settings.json b/.vscode/settings.json
+deleted file mode 100644
+index cf8fcbb..0000000
+--- a/.vscode/settings.json
++++ /dev/null
+@@ -1,16 +0,0 @@
+-{
+-    "editor.fontLigatures": false,
+-    "files.associations": {
+-        "*.hb": "vb"
+-    },
+-    "files.exclude": {
+-        "**/.git": true,
+-        "**/.svn": true,
+-        "**/.hg": true,
+-        "**/CVS": true,
+-        "**/.DS_Store": true,
+-        "**/Thumbs.db": true,
+-        "**/.vscode": true,
+-        "**/__pycache__": true,
+-    }
+-}
+\ No newline at end of file
+-- 
+2.25.1
+

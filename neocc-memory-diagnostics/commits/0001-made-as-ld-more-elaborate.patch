@@ -1,0 +1,29 @@
+From d77914c27a4f8315e9045ef589ca27b53309d476 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Thu, 5 May 2022 00:24:30 +0200
+Subject: [PATCH] made as+ld more elaborate
+
+---
+ neocc.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/neocc.c b/neocc.c
+index 0487b2b..796f7a2 100644
+--- a/neocc.c
++++ b/neocc.c
+@@ -29,8 +29,10 @@ int main(int argc, char** argv)
+ 
+     write_file("temp.s", assembly);
+ 
+-    int assemble_link_result = system("as temp.s -o temp.o && ld temp.o");
+-    assert(assemble_link_result == 0 && "failed to assemble or link");
++    int assembler_exit_code = system("as temp.s -o temp.o --warn --fatal-warnings");
++    assert(assembler_exit_code == 0);
++    int linker_exit_code = system("ld temp.o -o a.out");
++    assert(linker_exit_code == 0);
+ 
+     free(assembly);
+     list_delete_all_and_self(ast, (void (*)(void*)) delete_node_inheriter);
+-- 
+2.25.1
+

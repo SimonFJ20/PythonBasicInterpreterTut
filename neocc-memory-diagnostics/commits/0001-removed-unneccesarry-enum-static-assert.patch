@@ -1,0 +1,47 @@
+From f9a29d83530bccb1d239b69a30f3c57c8196b55e Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Mon, 2 May 2022 10:17:00 +0200
+Subject: [PATCH] removed unneccesarry enum static assert
+
+---
+ nodes.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/nodes.c b/nodes.c
+index 98b598e..9d1d439 100644
+--- a/nodes.c
++++ b/nodes.c
+@@ -6,12 +6,13 @@
+ 
+ const char* statement_node_type_to_string(StatementNodeType type)
+ {
+-    static_assert(StatementNodeType_LAST == 2, "unexhaustive");
+     switch (type) {
+     case ST_FUNC_DEF:
+         return "ST_FUNC_DEF";
+     case ST_RETURN:
+         return "ST_RETURN";
++    case ST_EXPRESSION:
++        return "ST_EXPRESSION";
+     case StatementNodeType_LAST:
+         return "StatementNodeType_LAST";
+     }
+@@ -20,7 +21,6 @@ const char* statement_node_type_to_string(StatementNodeType type)
+ 
+ const char* expression_node_type_to_string(ExpressionNodeType type)
+ {
+-    static_assert(ExpressionNodeType_LAST == 1, "unexhaustive");
+     switch (type) {
+     case ET_INT:
+         return "ET_INT";
+@@ -32,7 +32,6 @@ const char* expression_node_type_to_string(ExpressionNodeType type)
+ 
+ const char* type_node_type_to_string(TypeNodeType type)
+ {
+-    static_assert(TypeNodeType_LAST == 0, "unexhaustive");
+     switch (type) {
+     case TypeNodeType_LAST:
+         return "TypeNodeType_LAST";
+-- 
+2.25.1
+

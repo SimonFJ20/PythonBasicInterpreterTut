@@ -1,0 +1,503 @@
+From 6e9932e2c823c5bb930d5d3c848ab1fc26813df9 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Sun, 1 May 2022 04:39:01 +0200
+Subject: [PATCH] funcs and nodes
+
+---
+ arraylist.c |   2 +-
+ file.c      |  37 ++++++++++++++
+ lexer.c     |  22 +++++----
+ lexer.h     |  50 -------------------
+ neocc.c     |  20 ++------
+ parser.c    | 104 ++++++++++++++++++++++++++++++++++++++
+ parser.h    | 140 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+ utils.h     |  10 ++++
+ 8 files changed, 310 insertions(+), 75 deletions(-)
+ create mode 100644 file.c
+ delete mode 100644 lexer.h
+ create mode 100644 parser.c
+ create mode 100644 parser.h
+
+diff --git a/arraylist.c b/arraylist.c
+index 86c60be..ffecaba 100644
+--- a/arraylist.c
++++ b/arraylist.c
+@@ -1,4 +1,4 @@
+-#include "lexer.h"
++#include "parser.h"
+ #include "utils.h"
+ #include <stdio.h>
+ #include <stdlib.h>
+diff --git a/file.c b/file.c
+new file mode 100644
+index 0000000..a78f629
+--- /dev/null
++++ b/file.c
+@@ -0,0 +1,37 @@
++#include "utils.h"
++#include <stdio.h>
++#include <stdlib.h>
++
++FileReader* new_file_reader(const char* path)
++{
++    FileReader* self = calloc(1, sizeof(FileReader));
++    *self = (FileReader) {
++        .fp = fopen(path, "r"),
++    };
++    assert(self->fp && "could not open file");
++    return self;
++}
++
++void delete_file_reader(FileReader* self)
++{
++    fclose(self->fp);
++    free(self);
++}
++
++size_t file_reader_length(FileReader* self)
++{
++    fseek(self->fp, 0, SEEK_END);
++    return ftell(self->fp);
++}
++
++char* file_reader_read(FileReader* self)
++{
++    size_t length = file_reader_length(self);
++    fseek(self->fp, 0, SEEK_SET);
++    char* content = calloc(length, sizeof(char));
++    fread(content, length, length, self->fp);
++    for (int i = 0; i < length + 1; i++)
++        if (content[i] == EOF)
++            content[i] = '\0';
++    return content;
++}
+diff --git a/lexer.c b/lexer.c
+index 5b55850..894f1e3 100644
+--- a/lexer.c
++++ b/lexer.c
+@@ -1,4 +1,4 @@
+-#include "lexer.h"
++#include "parser.h"
+ #include "utils.h"
+ #include <assert.h>
+ #include <stdbool.h>
+@@ -6,6 +6,14 @@
+ #include <stdlib.h>
+ #include <string.h>
+ 
++List* tokenize(const char* text)
++{
++    Lexer* lexer = new_lexer(text);
++    List* result = lexer_tokenize(lexer);
++    delete_lexer(lexer);
++    return result;
++}
++
+ const char* token_type_to_string(TokenType type)
+ {
+     static_assert(TokenType_LAST == 11, "unexhaustive");
+@@ -68,13 +76,13 @@ const char* token_to_string(Token* self)
+     return buffer;
+ }
+ 
+-Lexer* new_lexer()
++Lexer* new_lexer(const char* text)
+ {
+     Lexer* self = calloc(1, sizeof(Lexer));
+     *self = (Lexer) {
+-        .text = NULL,
++        .text = text,
+         .index = 0,
+-        .c = '\n',
++        .c = text[0],
+         .done = false,
+     };
+     return self;
+@@ -89,12 +97,8 @@ static inline bool is_whitespace(const char c) { return c == ' ' || c == '\t' ||
+ static inline bool is_digit(const char c) { return c >= '0' && c <= '9'; }
+ static inline bool is_letter(const char c) { return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_'; }
+ 
+-List* lexer_tokenize(Lexer* self, const char* text)
++List* lexer_tokenize(Lexer* self)
+ {
+-    self->text = text;
+-    self->index = 0;
+-    self->c = self->text[self->index];
+-    self->done = false;
+     List* tokens = (List*) new_array_list();
+ 
+     while (!self->done) {
+diff --git a/lexer.h b/lexer.h
+deleted file mode 100644
+index 865aabf..0000000
+--- a/lexer.h
++++ /dev/null
+@@ -1,50 +0,0 @@
+-#pragma once
+-
+-#include "utils.h"
+-#include <stdlib.h>
+-#include <stdbool.h>
+-
+-typedef enum TokenTypeEnum {
+-    TT_KEYWORD,
+-    TT_IDENTIFIER,
+-    TT_INT,
+-    TT_LPAREN,
+-    TT_RPAREN,
+-    TT_LBRACE,
+-    TT_RBRACE,
+-    TT_LBRACKET,
+-    TT_RBRACKET,
+-    TT_EOL,
+-    TT_EOF,
+-    TokenType_LAST,
+-} TokenType;
+-
+-const char* token_type_to_string(TokenType type);
+-
+-typedef struct TokenStruct {
+-    TokenType type;
+-    const char* value;
+-    size_t length;
+-} Token;
+-
+-Token* new_token(
+-    const TokenType type,
+-    const char* value,
+-    const size_t length);
+-void delete_token(Token* self);
+-const char* token_to_string(Token* self);
+-
+-typedef struct LexerStruct {
+-    const char* text;
+-    int index;
+-    char c;
+-    bool done;
+-} Lexer;
+-
+-Lexer* new_lexer();
+-void delete_lexer(Lexer* self);
+-List* lexer_tokenize(Lexer* self, const char* text);
+-Token* lexer_match_char(Lexer* self);
+-Token* lexer_make_number(Lexer* self);
+-Token* lexer_make_name(Lexer* self);
+-void lexer_next(Lexer* self);
+diff --git a/neocc.c b/neocc.c
+index b5b8f68..a7e8b00 100644
+--- a/neocc.c
++++ b/neocc.c
+@@ -1,24 +1,14 @@
+-#include "lexer.h"
++#include "parser.h"
++#include "utils.h"
+ #include <stdio.h>
+ #include <stdlib.h>
+ 
+ int main()
+ {
+-    FILE* fp = fopen("examples/main.c", "r");
+-    assert(fp && "could not open file");
+-    fseek(fp, 0, SEEK_END);
+-    size_t length = ftell(fp);
+-    fseek(fp, 0, SEEK_SET);
+-    char* content = calloc(length, sizeof(char));
+-    fread(content, length, length, fp);
+-    fclose(fp);
+-    for (int i = 0; i < length + 1; i++)
+-        if (content[i] == EOF)
+-            content[i] = '\0';
++    FileReader* file = new_file_reader("examples/main.c");
++    char* content = file_reader_read(file);
+ 
+-    Lexer* lexer = new_lexer();
+-    List* tokens = lexer_tokenize(lexer, content);
+-    delete_lexer(lexer);
++    List* tokens = tokenize(content);
+     for (int i = 0; i < tokens->length(tokens); i++)
+         printf("%s\n", token_to_string(tokens->get(tokens, i)));
+     tokens->delete(tokens);
+diff --git a/parser.c b/parser.c
+new file mode 100644
+index 0000000..1805b15
+--- /dev/null
++++ b/parser.c
+@@ -0,0 +1,104 @@
++#include "parser.h"
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++const char* statement_node_type_to_string(StatementNodeType type)
++{
++    static_assert(StatementNodeType_LAST == 1, "unexhaustive");
++    switch (type) {
++    case ST_FUNC_DEF:
++        return "ST_FUNC_DEF";
++    case StatementNodeType_LAST:
++        return "StatementNodeType_LAST";
++    }
++    assert(0 && "unreachable");
++}
++
++const char* expression_node_type_to_string(ExpressionNodeType type)
++{
++    static_assert(ExpressionNodeType_LAST == 0, "unexhaustive");
++    switch (type) {
++    case ExpressionNodeType_LAST:
++        return "ExpressionNodeType_LAST";
++    }
++    assert(0 && "unreachable");
++}
++
++const char* type_node_type_to_string(TypeNodeType type)
++{
++    static_assert(TypeNodeType_LAST == 0, "unexhaustive");
++    switch (type) {
++    case TypeNodeType_LAST:
++        return "TypeNodeType_LAST";
++    }
++    assert(0 && "unreachable");
++}
++
++FuncDefNode* new_func_def_node(
++    Token* target,
++    TypeNode* return_type,
++    List* params,
++    List* body)
++{
++    FuncDefNode* self = calloc(1, sizeof(FuncDefNode));
++    *self = (FuncDefNode) {
++        .to_string = func_def_node_to_string,
++        .type = ST_FUNC_DEF,
++        .target = target,
++        .return_type = return_type,
++        .params = params,
++        .body = body,
++    };
++    return self;
++}
++
++void delete_func_def_node(FuncDefNode* self)
++{
++    free(self);
++}
++
++char* func_def_node_to_string(FuncDefNode* self)
++{
++    const char* type = statement_node_type_to_string(self->type);
++    const char* target = token_to_string(self->target);
++    char* return_type = self->return_type->to_string(self->return_type);
++    char* params = "<unimplemented>";
++
++    char* body = calloc(8192, sizeof(char));
++    bool first = true;
++    for (int i = 0; i < self->body->length(self->body); i++) {
++        StatementNode* statement = self->body->get(self->body, i);
++        char* str = statement->to_string(statement);
++        if (!first)
++            strcat(body, ", ");
++        else
++            first = false;
++        strcat(body, str);
++    }
++
++    char* buffer = calloc(8192, sizeof(char));
++    sprintf(buffer, "%s {target: %s, return_type: %s, params: [%s], body: [%s]}", type, target, return_type, params, body);
++    
++    char* result = calloc(strlen(buffer), sizeof(char));
++    strcpy(result, buffer);
++
++    free(body);
++    free(buffer);
++    
++    return result;
++}
++
++ReturnNode* new_return_node(ExpressionNode* value);
++void delete_return_node(ReturnNode* self);
++char* return_node_to_string(ReturnNode* self);
++
++IntNode* new_int_node(Token* token);
++void delete_int_node(IntNode* self);
++char* int_node_to_string(IntNode* self);
++
++Parser* new_parser(List* tokens);
++void delete_parser(Parser* self);
++List* parser_parse();
++
++List* parse(List* tokens);
+diff --git a/parser.h b/parser.h
+new file mode 100644
+index 0000000..ce3fd8f
+--- /dev/null
++++ b/parser.h
+@@ -0,0 +1,140 @@
++#pragma once
++
++#include "utils.h"
++#include <stdbool.h>
++#include <stdlib.h>
++
++typedef enum TokenTypeEnum {
++    TT_KEYWORD,
++    TT_IDENTIFIER,
++    TT_INT,
++    TT_LPAREN,
++    TT_RPAREN,
++    TT_LBRACE,
++    TT_RBRACE,
++    TT_LBRACKET,
++    TT_RBRACKET,
++    TT_EOL,
++    TT_EOF,
++    TokenType_LAST,
++} TokenType;
++
++const char* token_type_to_string(TokenType type);
++
++typedef struct TokenStruct {
++    TokenType type;
++    const char* value;
++    size_t length;
++} Token;
++
++Token* new_token(
++    const TokenType type,
++    const char* value,
++    const size_t length);
++void delete_token(Token* self);
++const char* token_to_string(Token* self);
++
++typedef struct LexerStruct {
++    const char* text;
++    int index;
++    char c;
++    bool done;
++} Lexer;
++
++Lexer* new_lexer(const char* text);
++void delete_lexer(Lexer* self);
++List* lexer_tokenize(Lexer* self);
++Token* lexer_match_char(Lexer* self);
++Token* lexer_make_number(Lexer* self);
++Token* lexer_make_name(Lexer* self);
++void lexer_next(Lexer* self);
++
++List* tokenize(const char* text);
++
++typedef struct NodeStruct {
++    char* (*to_string)(struct NodeStruct* self);
++} Node;
++
++typedef enum StatementNodeTypeEnum {
++    ST_FUNC_DEF,
++    StatementNodeType_LAST,
++} StatementNodeType;
++
++const char* statement_node_type_to_string(StatementNodeType type);
++
++typedef struct StatementNodeStruct {
++    char* (*to_string)(struct StatementNodeStruct* self);
++    StatementNodeType type;
++} StatementNode;
++
++typedef enum ExpressionNodeTypeEnum {
++    ExpressionNodeType_LAST,
++} ExpressionNodeType;
++
++const char* expression_node_type_to_string(ExpressionNodeType type);
++
++typedef struct ExpressionNodeStruct {
++    char* (*to_string)(struct ExpressionNodeStruct* self);
++    ExpressionNodeType type;
++} ExpressionNode;
++
++typedef enum TypeNodeTypeEnum {
++    TypeNodeType_LAST,
++} TypeNodeType;
++
++const char* type_node_type_to_string(TypeNodeType type);
++
++typedef struct TypeNodeStruct {
++    char* (*to_string)(struct TypeNodeStruct* self);
++    ExpressionNodeType type;
++} TypeNode;
++
++typedef struct FuncDefNodeStruct {
++    char* (*to_string)(struct FuncDefNodeStruct* self);
++    StatementNodeType type;
++    Token* target;
++    TypeNode* return_type;
++    List* params;
++    List* body;
++} FuncDefNode;
++
++FuncDefNode* new_func_def_node(
++    Token* target,
++    TypeNode* return_type,
++    List* params,
++    List* body);
++void delete_func_def_node(FuncDefNode* self);
++char* func_def_node_to_string(FuncDefNode* self);
++
++typedef struct ReturnNodeStruct {
++    char* (*to_string)(struct ReturnNodeStruct* self);
++    StatementNodeType type;
++    ExpressionNode* value;
++} ReturnNode;
++
++ReturnNode* new_return_node(ExpressionNode* value);
++void delete_return_node(ReturnNode* self);
++char* return_node_to_string(ReturnNode* self);
++
++typedef struct IntNodeStruct {
++    char* (*to_string)(struct IntNodeStruct* self);
++    ExpressionNodeType type;
++    Token* token;
++} IntNode;
++
++IntNode* new_int_node(Token* token);
++void delete_int_node(IntNode* self);
++char* int_node_to_string(IntNode* self);
++
++typedef struct ParserStruct {
++    List* tokens;
++    int index;
++    Token* t;
++    bool done;
++} Parser;
++
++Parser* new_parser(List* tokens);
++void delete_parser(Parser* self);
++List* parser_parse();
++
++List* parse(List* tokens);
+diff --git a/utils.h b/utils.h
+index ee65d06..8d96cea 100644
+--- a/utils.h
++++ b/utils.h
+@@ -1,6 +1,7 @@
+ #pragma once
+ 
+ #include <assert.h>
++#include <stdio.h>
+ #include <stdlib.h>
+ 
+ typedef struct ListStruct {
+@@ -24,3 +25,12 @@ void delete_array_list(ArrayList* self);
+ size_t array_list_length(ArrayList* self);
+ void* array_list_get(ArrayList* self, int index);
+ void array_list_add(ArrayList* self, void* element);
++
++typedef struct FileReaderStruct {
++    FILE* fp;
++} FileReader;
++
++FileReader* new_file_reader(const char* path);
++void delete_file_reader(FileReader* self);
++size_t file_reader_length(FileReader* self);
++char* file_reader_read(FileReader* self);
+-- 
+2.25.1
+

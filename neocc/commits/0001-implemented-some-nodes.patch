@@ -1,0 +1,416 @@
+From 0e4cb7f2d165493327fadebd6de409eaba9956dd Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Sun, 1 May 2022 22:33:26 +0200
+Subject: [PATCH] implemented some nodes
+
+---
+ lexer.c  |   2 +-
+ nodes.c  | 185 +++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ parser.c | 104 -------------------------------
+ parser.h |  13 +++-
+ 4 files changed, 197 insertions(+), 107 deletions(-)
+ create mode 100644 nodes.c
+ delete mode 100644 parser.c
+
+diff --git a/lexer.c b/lexer.c
+index 894f1e3..0b33436 100644
+--- a/lexer.c
++++ b/lexer.c
+@@ -65,7 +65,7 @@ void delete_token(Token* self)
+     free(self);
+ }
+ 
+-const char* token_to_string(Token* self)
++char* token_to_string(Token* self)
+ {
+ 
+     char value_str[64] = { 0 };
+diff --git a/nodes.c b/nodes.c
+new file mode 100644
+index 0000000..7741125
+--- /dev/null
++++ b/nodes.c
+@@ -0,0 +1,185 @@
++#include "parser.h"
++#include "utils.h"
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++const char* statement_node_type_to_string(StatementNodeType type)
++{
++    static_assert(StatementNodeType_LAST == 2, "unexhaustive");
++    switch (type) {
++    case ST_FUNC_DEF:
++        return "ST_FUNC_DEF";
++    case ST_RETURN:
++        return "ST_RETURN";
++    case StatementNodeType_LAST:
++        return "StatementNodeType_LAST";
++    }
++    assert(0 && "unreachable");
++}
++
++const char* expression_node_type_to_string(ExpressionNodeType type)
++{
++    static_assert(ExpressionNodeType_LAST == 1, "unexhaustive");
++    switch (type) {
++    case ET_INT:
++        return "ET_INT";
++    case ExpressionNodeType_LAST:
++        return "ExpressionNodeType_LAST";
++    }
++    assert(0 && "unreachable");
++}
++
++const char* type_node_type_to_string(TypeNodeType type)
++{
++    static_assert(TypeNodeType_LAST == 0, "unexhaustive");
++    switch (type) {
++    case TypeNodeType_LAST:
++        return "TypeNodeType_LAST";
++    }
++    assert(0 && "unreachable");
++}
++
++FuncDefNode* new_func_def_node(
++    Token* target,
++    TypeNode* return_type,
++    List* params,
++    List* body)
++{
++    static_assert(sizeof(Node) == 16, "incomplete implementation of Node");
++    static_assert(sizeof(StatementNode) == 24, "incomplete implementation of StatementNode");
++    static_assert(sizeof(FuncDefNode) == 56, "incomplete construction of FuncDefNode");
++    FuncDefNode* self = calloc(1, sizeof(FuncDefNode));
++    *self = (FuncDefNode) {
++        .delete = delete_func_def_node,
++        .to_string = func_def_node_to_string,
++        .type = ST_FUNC_DEF,
++        .target = target,
++        .return_type = return_type,
++        .params = params,
++        .body = body,
++    };
++    return self;
++}
++
++void delete_func_def_node(FuncDefNode* self)
++{
++    free(self);
++}
++
++char* func_def_node_to_string(FuncDefNode* self)
++{
++    const char* type = statement_node_type_to_string(self->type);
++    char* target = token_to_string(self->target);
++    char* return_type = self->return_type->to_string(self->return_type);
++    char* params = "<unimplemented>";
++
++    char* body = calloc(8192, sizeof(char));
++    bool first = true;
++    for (int i = 0; i < self->body->length(self->body); i++) {
++        StatementNode* statement = self->body->get(self->body, i);
++        char* str = statement->to_string(statement);
++        if (!first)
++            strcat(body, ", ");
++        else
++            first = false;
++        strcat(body, str);
++    }
++
++    char* buffer = calloc(8192, sizeof(char));
++    sprintf(buffer, "%s {target: %s, return_type: %s, params: [%s], body: [%s]}", type, target, return_type, params, body);
++    buffer = realloc(buffer, strlen(buffer) * sizeof(char));
++    free(body);
++    return buffer;
++}
++
++ReturnNode* new_return_node(ExpressionNode* value)
++{
++    static_assert(sizeof(Node) == 16, "incomplete implementation of Node");
++    static_assert(sizeof(StatementNode) == 24, "incomplete implementation of StatementNode");
++    static_assert(sizeof(ReturnNode) == 32, "incomplete construction of ReturnNode");
++    ReturnNode* self = calloc(1, sizeof(ReturnNode));
++    *self = (ReturnNode) {
++        .delete = delete_return_node,
++        .to_string = return_node_to_string,
++        .type = ST_RETURN,
++        .value = value,
++    };
++    return self;
++}
++
++void delete_return_node(ReturnNode* self)
++{
++    free(self);
++}
++
++char* return_node_to_string(ReturnNode* self)
++{
++    const char* type = statement_node_type_to_string(self->type);
++    char* value = self->value->to_string(self->value);
++
++    char* buffer = calloc(8192, sizeof(char));
++    sprintf(buffer, "%s {value: %s}", type, value);
++    buffer = realloc(buffer, strlen(buffer) * sizeof(char));
++    return buffer;
++}
++
++IntNode* new_int_node(Token* token)
++{
++    static_assert(sizeof(Node) == 16, "incomplete implementation of Node");
++    static_assert(sizeof(ExpressionNode) == 24, "incomplete implementation of ExpressionNode");
++    static_assert(sizeof(IntNode) == 32, "incomplete construction of IntNode");
++    IntNode* self = calloc(1, sizeof(IntNode));
++    *self = (IntNode) {
++        .delete = delete_int_node,
++        .to_string = int_node_to_string,
++        .type = ET_INT,
++        .token = token,
++    };
++    return self;
++}
++
++void delete_int_node(IntNode* self)
++{
++    free(self);
++}
++
++char* int_node_to_string(IntNode* self)
++{
++    static_assert(sizeof(Node) == 16, "incomplete implementation of Node");
++    const char* type = expression_node_type_to_string(self->type);
++    char* token = token_to_string(self->token);
++
++    char* buffer = calloc(8192, sizeof(char));
++    sprintf(buffer, "%s {token: %s}", type, token);
++    buffer = realloc(buffer, strlen(buffer) * sizeof(char));
++    return buffer;
++}
++
++Parser* new_parser(List* tokens)
++{
++    Parser* self = calloc(1, sizeof(Parser));
++    *self = (Parser) {
++        .tokens = tokens,
++        .index = 0,
++        .t = tokens->get(tokens, 0),
++        .done = false,
++    };
++    return self;
++}
++
++void delete_parser(Parser* self)
++{
++    free(self);
++}
++
++List* parser_parse(Parser* self)
++{
++    return (List*) new_array_list();
++}
++
++List* parse(List* tokens)
++{
++    Parser* parser = new_parser(tokens);
++    return parser_parse(parser);
++}
+diff --git a/parser.c b/parser.c
+deleted file mode 100644
+index 1805b15..0000000
+--- a/parser.c
++++ /dev/null
+@@ -1,104 +0,0 @@
+-#include "parser.h"
+-#include <stdio.h>
+-#include <stdlib.h>
+-#include <string.h>
+-
+-const char* statement_node_type_to_string(StatementNodeType type)
+-{
+-    static_assert(StatementNodeType_LAST == 1, "unexhaustive");
+-    switch (type) {
+-    case ST_FUNC_DEF:
+-        return "ST_FUNC_DEF";
+-    case StatementNodeType_LAST:
+-        return "StatementNodeType_LAST";
+-    }
+-    assert(0 && "unreachable");
+-}
+-
+-const char* expression_node_type_to_string(ExpressionNodeType type)
+-{
+-    static_assert(ExpressionNodeType_LAST == 0, "unexhaustive");
+-    switch (type) {
+-    case ExpressionNodeType_LAST:
+-        return "ExpressionNodeType_LAST";
+-    }
+-    assert(0 && "unreachable");
+-}
+-
+-const char* type_node_type_to_string(TypeNodeType type)
+-{
+-    static_assert(TypeNodeType_LAST == 0, "unexhaustive");
+-    switch (type) {
+-    case TypeNodeType_LAST:
+-        return "TypeNodeType_LAST";
+-    }
+-    assert(0 && "unreachable");
+-}
+-
+-FuncDefNode* new_func_def_node(
+-    Token* target,
+-    TypeNode* return_type,
+-    List* params,
+-    List* body)
+-{
+-    FuncDefNode* self = calloc(1, sizeof(FuncDefNode));
+-    *self = (FuncDefNode) {
+-        .to_string = func_def_node_to_string,
+-        .type = ST_FUNC_DEF,
+-        .target = target,
+-        .return_type = return_type,
+-        .params = params,
+-        .body = body,
+-    };
+-    return self;
+-}
+-
+-void delete_func_def_node(FuncDefNode* self)
+-{
+-    free(self);
+-}
+-
+-char* func_def_node_to_string(FuncDefNode* self)
+-{
+-    const char* type = statement_node_type_to_string(self->type);
+-    const char* target = token_to_string(self->target);
+-    char* return_type = self->return_type->to_string(self->return_type);
+-    char* params = "<unimplemented>";
+-
+-    char* body = calloc(8192, sizeof(char));
+-    bool first = true;
+-    for (int i = 0; i < self->body->length(self->body); i++) {
+-        StatementNode* statement = self->body->get(self->body, i);
+-        char* str = statement->to_string(statement);
+-        if (!first)
+-            strcat(body, ", ");
+-        else
+-            first = false;
+-        strcat(body, str);
+-    }
+-
+-    char* buffer = calloc(8192, sizeof(char));
+-    sprintf(buffer, "%s {target: %s, return_type: %s, params: [%s], body: [%s]}", type, target, return_type, params, body);
+-    
+-    char* result = calloc(strlen(buffer), sizeof(char));
+-    strcpy(result, buffer);
+-
+-    free(body);
+-    free(buffer);
+-    
+-    return result;
+-}
+-
+-ReturnNode* new_return_node(ExpressionNode* value);
+-void delete_return_node(ReturnNode* self);
+-char* return_node_to_string(ReturnNode* self);
+-
+-IntNode* new_int_node(Token* token);
+-void delete_int_node(IntNode* self);
+-char* int_node_to_string(IntNode* self);
+-
+-Parser* new_parser(List* tokens);
+-void delete_parser(Parser* self);
+-List* parser_parse();
+-
+-List* parse(List* tokens);
+diff --git a/parser.h b/parser.h
+index ce3fd8f..67a955f 100644
+--- a/parser.h
++++ b/parser.h
+@@ -32,7 +32,7 @@ Token* new_token(
+     const char* value,
+     const size_t length);
+ void delete_token(Token* self);
+-const char* token_to_string(Token* self);
++char* token_to_string(Token* self);
+ 
+ typedef struct LexerStruct {
+     const char* text;
+@@ -52,28 +52,33 @@ void lexer_next(Lexer* self);
+ List* tokenize(const char* text);
+ 
+ typedef struct NodeStruct {
++    void (*delete)(struct NodeStruct* self);
+     char* (*to_string)(struct NodeStruct* self);
+ } Node;
+ 
+ typedef enum StatementNodeTypeEnum {
+     ST_FUNC_DEF,
++    ST_RETURN,
+     StatementNodeType_LAST,
+ } StatementNodeType;
+ 
+ const char* statement_node_type_to_string(StatementNodeType type);
+ 
+ typedef struct StatementNodeStruct {
++    void (*delete)(struct StatementNodeStruct* self);
+     char* (*to_string)(struct StatementNodeStruct* self);
+     StatementNodeType type;
+ } StatementNode;
+ 
+ typedef enum ExpressionNodeTypeEnum {
++    ET_INT,
+     ExpressionNodeType_LAST,
+ } ExpressionNodeType;
+ 
+ const char* expression_node_type_to_string(ExpressionNodeType type);
+ 
+ typedef struct ExpressionNodeStruct {
++    void (*delete)(struct ExpressionNodeStruct* self);
+     char* (*to_string)(struct ExpressionNodeStruct* self);
+     ExpressionNodeType type;
+ } ExpressionNode;
+@@ -85,11 +90,13 @@ typedef enum TypeNodeTypeEnum {
+ const char* type_node_type_to_string(TypeNodeType type);
+ 
+ typedef struct TypeNodeStruct {
++    void (*delete)(struct TypeNodeStruct* self);
+     char* (*to_string)(struct TypeNodeStruct* self);
+     ExpressionNodeType type;
+ } TypeNode;
+ 
+ typedef struct FuncDefNodeStruct {
++    void (*delete)(struct FuncDefNodeStruct* self);
+     char* (*to_string)(struct FuncDefNodeStruct* self);
+     StatementNodeType type;
+     Token* target;
+@@ -107,6 +114,7 @@ void delete_func_def_node(FuncDefNode* self);
+ char* func_def_node_to_string(FuncDefNode* self);
+ 
+ typedef struct ReturnNodeStruct {
++    void (*delete)(struct ReturnNodeStruct* self);
+     char* (*to_string)(struct ReturnNodeStruct* self);
+     StatementNodeType type;
+     ExpressionNode* value;
+@@ -117,6 +125,7 @@ void delete_return_node(ReturnNode* self);
+ char* return_node_to_string(ReturnNode* self);
+ 
+ typedef struct IntNodeStruct {
++    void (*delete)(struct IntNodeStruct* self);
+     char* (*to_string)(struct IntNodeStruct* self);
+     ExpressionNodeType type;
+     Token* token;
+@@ -135,6 +144,6 @@ typedef struct ParserStruct {
+ 
+ Parser* new_parser(List* tokens);
+ void delete_parser(Parser* self);
+-List* parser_parse();
++List* parser_parse(Parser* self);
+ 
+ List* parse(List* tokens);
+-- 
+2.25.1
+

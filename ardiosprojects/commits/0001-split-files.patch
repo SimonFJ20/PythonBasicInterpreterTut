@@ -1,0 +1,180 @@
+From 232303e4e264c3d4bfef0f2dd1d56557dec054fe Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Tue, 22 Jun 2021 22:21:09 +0200
+Subject: [PATCH] split files
+
+---
+ texrec/include/texrec.h |  5 +----
+ texrec/include/utils.h  |  2 +-
+ texrec/makefile         |  5 ++++-
+ texrec/src/main.c       | 26 +++++++-------------------
+ texrec/src/texrec.c     | 35 ++++++++++++-----------------------
+ texrec/src/utils.c      | 19 ++++++++++++-------
+ 6 files changed, 37 insertions(+), 55 deletions(-)
+
+diff --git a/texrec/include/texrec.h b/texrec/include/texrec.h
+index 615f061..b79ed52 100644
+--- a/texrec/include/texrec.h
++++ b/texrec/include/texrec.h
+@@ -1,9 +1,6 @@
+ #ifndef TEXREC_H
+ #define TEXREC_H
+ 
+-
+-int tr_test(char* test, char* input, short lTest, short lInput);
+-
+-
++char tr_test(char* test, char* input);
+ 
+ #endif
+diff --git a/texrec/include/utils.h b/texrec/include/utils.h
+index 7a822c1..1d2e9c8 100644
+--- a/texrec/include/utils.h
++++ b/texrec/include/utils.h
+@@ -1,6 +1,6 @@
+ #ifndef UTILS_H
+ #define UTILS_H
+ 
+-short u_clen(char array[]);
++short utl_strlen(char* str);
+ 
+ #endif
+diff --git a/texrec/makefile b/texrec/makefile
+index b94e88d..383b0fb 100644
+--- a/texrec/makefile
++++ b/texrec/makefile
+@@ -29,8 +29,11 @@ $(OBJ)/%.o: $(SRC)/%.c $(OBJ) $(HDRS)
+ $(OBJ):
+ 	mkdir -p $@
+ 
+-.PHONY: clean
++.PHONY: clean run
+ clean:
+ 	$(RM) -r $(OBJ)
+ 	$(RM) $(BIN)
+ 
++run:
++	./program
++
+diff --git a/texrec/src/main.c b/texrec/src/main.c
+index a2eb0c7..17b9367 100644
+--- a/texrec/src/main.c
++++ b/texrec/src/main.c
+@@ -3,29 +3,17 @@
+ 
+ int main()
+ {
+-    printf("=== PROGRAM START ===\n\n");
++    printf("\n=== PROGRAM BEGIN ===\n\n");
+ 
+-    char test[] = "long";
+-    char input[] = "this is a long sentence";
++    char test[] = "very";
++    char input[] = "this is a very long sentence";
+ 
+-    short lTest = sizeof(test) / sizeof(test[0]);
+-    short lInput = sizeof(input) / sizeof(input[0]);
+-
+-    int result = tr_test(test, input, lTest, lInput);
+-
+-    if (result)
+-    {
+-        printf("\"%s\"\n\n exists in \n\n\"%s\"", test, input);
+-    }
++    if (tr_test(test, input))
++        printf("\"%s\"\n\ndoes exist in\n\n\"%s\"", test, input);
+     else
+-    {
+-        printf("\"%s\"\n\n does not exist in \n\n\"%s\"", test, input);
+-    }
++        printf("\"%s\"\n\ndoes not exist in\n\n\"%s\"", test, input);
+ 
+-    printf("\n\ndebug: %d", result);
+-
+-    printf("\n\n=== PROGRAM STOP ===\n");
++    printf("\n\n=== PROGRAM END ===\n\n");
+     return 0;
+ }
+ 
+-
+diff --git a/texrec/src/texrec.c b/texrec/src/texrec.c
+index 5f31a11..fa73382 100644
+--- a/texrec/src/texrec.c
++++ b/texrec/src/texrec.c
+@@ -1,32 +1,21 @@
+ #include "texrec.h"
+ #include "utils.h"
+-#include <stdio.h>
+ 
+-int tr_test(char* test, char* input, short lTest, short lInput)
++char tr_test(char* test, char* input)
+ {
+-   
+-    char match = 0;
+-    for (short i = 0; i < lInput && match == 0; i++)
++    short lTest = utl_strlen(test);
++    short lInput = utl_strlen(input);
++
++    char stringMatch = 0;
++    for (short i = 0; i < lInput - lTest && !stringMatch; i++)
+     {
+-        char charmatch = 1;
+-        for (short j = 0; j < lTest; j++)
+-        {
+-            printf("%c %c\n", input[i + j], test[j]);
+-            if(input[i + j] != test[j])
+-            {
+-                charmatch = 0;
+-                break;
+-            }
+-        }
+-        
+-        if (charmatch == 1)
+-        {
+-            match = 1;
+-            break;
+-        }
++        char charMatch = 1;
++        for (short j = 0; j < lTest && input[i + j] != test[j]; j++)
++            charMatch = 0;
++        if (charMatch)
++            stringMatch = 1;
+     }
+ 
+-    return match;
++    return stringMatch;
+ }
+ 
+-
+diff --git a/texrec/src/utils.c b/texrec/src/utils.c
+index 66d7c46..e1c959d 100644
+--- a/texrec/src/utils.c
++++ b/texrec/src/utils.c
+@@ -1,12 +1,17 @@
+-
+ #include "utils.h"
+ 
+-// TODO fix
+-short u_clen(char array[])
++short utl_strlen(char* str)
+ {
+-    short array_size = sizeof(*array);
+-    short char_size = sizeof(array[0]);
+-    short array_length = array_size / char_size;
+-    return array_length;
++    short length = 0;
++    char* position = str;
++    while (*position)
++    {
++        length++;
++        position++;
++    }
++    return length;
+ }
+ 
++
++
++
+-- 
+2.25.1
+

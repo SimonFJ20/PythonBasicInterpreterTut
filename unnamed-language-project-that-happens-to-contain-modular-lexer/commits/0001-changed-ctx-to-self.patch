@@ -1,0 +1,316 @@
+From 41d81b868db98e15ff8e31936c249bde492d8436 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Sun, 5 Jun 2022 18:27:01 +0200
+Subject: [PATCH] changed ctx to self
+
+---
+ lexer.ts | 186 +++++++++++++++++++++++++++----------------------------
+ 1 file changed, 93 insertions(+), 93 deletions(-)
+
+diff --git a/lexer.ts b/lexer.ts
+index c229dab..b2d815a 100644
+--- a/lexer.ts
++++ b/lexer.ts
+@@ -79,29 +79,29 @@ export class Lexer {
+ 
+ export type LexerRule<TokenType> = {
+     pattern: RegExp,
+-    handler: (ctx: Lexer) => Token<TokenType> | null,
++    handler: (self: Lexer) => Token<TokenType> | null,
+ };
+ 
+ export const tokenize = <TokenType>(text: string, rules: LexerRule<TokenType>[]): Token<TokenType>[] => {
+-    const ctx = new Lexer(text);
++    const self = new Lexer(text);
+     const tokens: Token<TokenType>[] = [];
+-    while (ctx.index < ctx.text.length) {
+-        const indexBefore = ctx.index;
+-        const rule = rules.find((rule) => rule.pattern.test(ctx.text.slice(ctx.index)));
++    while (self.index < self.text.length) {
++        const indexBefore = self.index;
++        const rule = rules.find((rule) => rule.pattern.test(self.text.slice(self.index)));
+         if (!rule)
+             throw LexerError.fromPosition(
+-                ctx.pos,
+-                `unhandled character '${ctx.text.slice(
+-                    ctx.index,
+-                    ctx.index + Math.min(10, ctx.text.length - ctx.index, ctx.text.slice(ctx.index).indexOf('\n'))
++                self.pos,
++                `unhandled character '${self.text.slice(
++                    self.index,
++                    self.index + Math.min(10, self.text.length - self.index, self.text.slice(self.index).indexOf('\n'))
+                 )}'`
+             );
+-        const maybeToken = rule.handler(ctx);
++        const maybeToken = rule.handler(self);
+         if (maybeToken)
+             tokens.push(maybeToken);
+-        if (ctx.index === indexBefore)
++        if (self.index === indexBefore)
+             throw LexerError.fromSpan(
+-                new Span(ctx.prevPos(), ctx.pos),
++                new Span(self.prevPos(), self.pos),
+                 `rule with pattern '${rule.pattern.toString()}' doesn't step lexer forward`
+             );
+     }
+@@ -113,17 +113,17 @@ export const tokenize = <TokenType>(text: string, rules: LexerRule<TokenType>[])
+ export const hexRule = <TokenType>(tokenType: TokenType): LexerRule<TokenType> => {
+     return {
+         pattern: /^0x/,
+-        handler: (ctx) => {
+-            const begin = ctx.pos.copy();
+-            let text = ctx.text[ctx.index];
+-            ctx.step();
+-            text += ctx.text[ctx.index];
+-            ctx.step();
+-            while (/^[0-9a-fA-F]/.test(ctx.text[ctx.index])) {
+-                text += ctx.text[ctx.index];
+-                ctx.step();
++        handler: (self) => {
++            const begin = self.pos.copy();
++            let text = self.text[self.index];
++            self.step();
++            text += self.text[self.index];
++            self.step();
++            while (/^[0-9a-fA-F]/.test(self.text[self.index])) {
++                text += self.text[self.index];
++                self.step();
+             }
+-            const end = ctx.prevPos().copy();
++            const end = self.prevPos().copy();
+             return new Token(tokenType, new Span(begin, end), text);
+         }, 
+     };
+@@ -132,14 +132,14 @@ export const hexRule = <TokenType>(tokenType: TokenType): LexerRule<TokenType> =
+ export const intRule = <TokenType>(tokenType: TokenType): LexerRule<TokenType> => {
+     return {
+         pattern: /^[0-9]/,
+-        handler: (ctx) => {
+-            const begin = ctx.pos.copy();
++        handler: (self) => {
++            const begin = self.pos.copy();
+             let text = '';
+-            while (/[0-9]/.test(ctx.text[ctx.index])) {
+-                text += ctx.text[ctx.index];
+-                ctx.step();
++            while (/[0-9]/.test(self.text[self.index])) {
++                text += self.text[self.index];
++                self.step();
+             }
+-            const end = ctx.prevPos().copy();
++            const end = self.prevPos().copy();
+             return new Token(tokenType, new Span(begin, end), text);
+         }, 
+     };
+@@ -148,14 +148,14 @@ export const intRule = <TokenType>(tokenType: TokenType): LexerRule<TokenType> =
+ export const identifierRule = <TokenType>(tokenType: TokenType): LexerRule<TokenType> => {
+     return {
+         pattern: /^[a-zA-Z_]/,
+-        handler: (ctx) => {
+-            const begin = ctx.pos.copy();
++        handler: (self) => {
++            const begin = self.pos.copy();
+             let text = '';
+-            while (/[a-zA-Z_]/.test(ctx.text[ctx.index])) {
+-                text += ctx.text[ctx.index];
+-                ctx.step();
++            while (/[a-zA-Z_]/.test(self.text[self.index])) {
++                text += self.text[self.index];
++                self.step();
+             }
+-            const end = ctx.prevPos().copy();
++            const end = self.prevPos().copy();
+             return new Token(tokenType, new Span(begin, end), text);
+         }
+     };
+@@ -164,9 +164,9 @@ export const identifierRule = <TokenType>(tokenType: TokenType): LexerRule<Token
+ export const ignoreSingleLineWhitespaceRule = <TokenType>(): LexerRule<TokenType> => {
+     return {
+         pattern: /^[ \t]/,
+-        handler: (ctx) => {
+-            while (/[ \t]/.test(ctx.text[ctx.index]))
+-                ctx.step();
++        handler: (self) => {
++            while (/[ \t]/.test(self.text[self.index]))
++                self.step();
+             return null;
+         },
+     };
+@@ -175,14 +175,14 @@ export const ignoreSingleLineWhitespaceRule = <TokenType>(): LexerRule<TokenType
+ export const singleLineWhitespaceRule = <TokenType>(tokenType: TokenType): LexerRule<TokenType> => {
+     return {
+         pattern: /^[ \t]/,
+-        handler: (ctx) => {
+-            const begin = ctx.pos.copy();
++        handler: (self) => {
++            const begin = self.pos.copy();
+             let text = '';
+-            while (/[ \t]/.test(ctx.text[ctx.index])) {
+-                text += ctx.text[ctx.index];
+-                ctx.step();
++            while (/[ \t]/.test(self.text[self.index])) {
++                text += self.text[self.index];
++                self.step();
+             }
+-            const end = ctx.prevPos().copy();
++            const end = self.prevPos().copy();
+             return new Token(tokenType, new Span(begin, end), text);
+         },
+     };
+@@ -191,9 +191,9 @@ export const singleLineWhitespaceRule = <TokenType>(tokenType: TokenType): Lexer
+ export const ignoreSingleLineComment = <TokenType>(): LexerRule<TokenType> => {
+     return {
+         pattern: /^\/\//,
+-        handler: (ctx) => {
+-            while (ctx.index < ctx.text.length && ctx.text[ctx.index] !== '\n')
+-                ctx.step();
++        handler: (self) => {
++            while (self.index < self.text.length && self.text[self.index] !== '\n')
++                self.step();
+             return null;
+         }
+     };
+@@ -202,40 +202,40 @@ export const ignoreSingleLineComment = <TokenType>(): LexerRule<TokenType> => {
+ export const ignoreMultiLineComment = <TokenType>(): LexerRule<TokenType> => {
+     return {
+         pattern: /^\/\*/,
+-        handler: (ctx) => {
+-            while (ctx.index < ctx.text.length && (ctx.text[ctx.index - 1] !== '*' || ctx.text[ctx.index] !== '/'))
+-                ctx.step();
+-            ctx.step();
++        handler: (self) => {
++            while (self.index < self.text.length && (self.text[self.index - 1] !== '*' || self.text[self.index] !== '/'))
++                self.step();
++            self.step();
+             return null;
+         }
+     };
+ } 
+ 
+-export const makeLiteralChar = (ctx: Lexer): string => {
+-    const char = ctx.text[ctx.index];
+-    ctx.step();
++export const makeLiteralChar = (self: Lexer): string => {
++    const char = self.text[self.index];
++    self.step();
+     if (char !== '\\') {
+         return char;
+     } else {
+-        const identifier = ctx.text[ctx.index];
+-        ctx.step();
++        const identifier = self.text[self.index];
++        self.step();
+         if (identifier === '0') {
+-            let value = ctx.text[ctx.index];
+-            ctx.step();
+-            for (let i = 0; i < 3 && /[0-7]/.test(ctx.text[ctx.index]); i++)
+-                value += ctx.text[ctx.index];
++            let value = self.text[self.index];
++            self.step();
++            for (let i = 0; i < 3 && /[0-7]/.test(self.text[self.index]); i++)
++                value += self.text[self.index];
+             return String.fromCharCode(parseInt(value, 8));
+         } else if (identifier === 'x') {
+             let value = '';
+-            ctx.step();
+-            for (let i = 0; i < 2 && /[0-9a-zA-Z]/.test(ctx.text[ctx.index]); i++)
+-                value += ctx.text[ctx.index];
++            self.step();
++            for (let i = 0; i < 2 && /[0-9a-zA-Z]/.test(self.text[self.index]); i++)
++                value += self.text[self.index];
+             return String.fromCharCode(parseInt(value, 16));
+         } else if (/[1-9]/.test(identifier)) {
+-            let value = ctx.text[ctx.index];
+-            ctx.step();
+-            for (let i = 0; i < 3 && /[0-9]/.test(ctx.text[ctx.index]); i++)
+-                value += ctx.text[ctx.index];
++            let value = self.text[self.index];
++            self.step();
++            for (let i = 0; i < 3 && /[0-9]/.test(self.text[self.index]); i++)
++                value += self.text[self.index];
+             return String.fromCharCode(parseInt(value, 10));
+         } else {
+             switch (identifier) {
+@@ -255,19 +255,19 @@ export const makeLiteralChar = (ctx: Lexer): string => {
+ export const charLiteralRule = <TokenType>(tokenType: TokenType): LexerRule<TokenType> => {
+     return {
+         pattern: /^'/,
+-        handler: (ctx) => {
+-            const begin = ctx.pos.copy();
+-            let text = ctx.text[ctx.index];
+-            ctx.step();
+-            if (ctx.text[ctx.index] === '\'')
+-                throw LexerError.fromSpan(new Span(begin, ctx.pos), 'char literal cannot be empty');
+-            const value = makeLiteralChar(ctx);
++        handler: (self) => {
++            const begin = self.pos.copy();
++            let text = self.text[self.index];
++            self.step();
++            if (self.text[self.index] === '\'')
++                throw LexerError.fromSpan(new Span(begin, self.pos), 'char literal cannot be empty');
++            const value = makeLiteralChar(self);
+             text += value;
+-            text += ctx.text[ctx.index];
+-            if (ctx.text[ctx.index] !== '\'')
+-                throw LexerError.fromSpan(new Span(begin, ctx.pos), 'char literal can only contain 1 char');
+-            ctx.step();
+-            const end = ctx.prevPos().copy();
++            text += self.text[self.index];
++            if (self.text[self.index] !== '\'')
++                throw LexerError.fromSpan(new Span(begin, self.pos), 'char literal can only contain 1 char');
++            self.step();
++            const end = self.prevPos().copy();
+             return new Token(tokenType, new Span(begin, end), text, value);
+         },
+     };
+@@ -276,21 +276,21 @@ export const charLiteralRule = <TokenType>(tokenType: TokenType): LexerRule<Toke
+ export const stringLiteralRule = <TokenType>(tokenType: TokenType): LexerRule<TokenType> => {
+     return {
+         pattern: /^"/,
+-        handler: (ctx) => {
+-            const begin = ctx.pos.copy();
+-            let text = ctx.text[ctx.index];
++        handler: (self) => {
++            const begin = self.pos.copy();
++            let text = self.text[self.index];
+             let value = '';
+-            ctx.step();
+-            while (ctx.index < ctx.text.length && ctx.text[ctx.index] !== '\"') {
+-                const literalChar = makeLiteralChar(ctx);
++            self.step();
++            while (self.index < self.text.length && self.text[self.index] !== '\"') {
++                const literalChar = makeLiteralChar(self);
+                 value += literalChar;
+                 text += literalChar;
+             }
+-            text += ctx.text[ctx.index];
+-            if (ctx.text[ctx.index] !== '\"')
+-                throw LexerError.fromSpan(new Span(begin, ctx.pos), 'unterminated string literal');
+-            ctx.step();
+-            const end = ctx.prevPos().copy();
++            text += self.text[self.index];
++            if (self.text[self.index] !== '\"')
++                throw LexerError.fromSpan(new Span(begin, self.pos), 'unterminated string literal');
++            self.step();
++            const end = self.prevPos().copy();
+             return new Token(tokenType, new Span(begin, end), text, value);
+         },
+     };
+@@ -300,10 +300,10 @@ export const charPatternRule = <TokenType>(tokenType: TokenType, pattern: string
+     const safePattern = pattern.replaceAll(/([\b\n\f\r\t\v\(\)\{\}\[\]\.\\\^\-\?\+\|\*])/g, '\\$1');
+     return {
+         pattern: new RegExp(`^${safePattern}`),
+-        handler: (ctx) => {
+-            const begin = ctx.pos.copy();
+-            pattern.split('').forEach(() => ctx.step());
+-            const end = ctx.prevPos().copy();
++        handler: (self) => {
++            const begin = self.pos.copy();
++            pattern.split('').forEach(() => self.step());
++            const end = self.prevPos().copy();
+             return new Token(tokenType, new Span(begin, end), pattern);
+         },
+     };
+-- 
+2.25.1
+

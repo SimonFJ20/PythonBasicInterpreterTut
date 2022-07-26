@@ -1,0 +1,276 @@
+From acf1ea540fa1772f245c47e04ff379e62ac9050f Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Wed, 4 May 2022 23:49:20 +0200
+Subject: [PATCH] free str after use
+
+---
+ nodes.c | 75 +++++++++++++++++++++++++++++++++++++++++++--------------
+ 1 file changed, 57 insertions(+), 18 deletions(-)
+
+diff --git a/nodes.c b/nodes.c
+index fe69f79..dd95161 100644
+--- a/nodes.c
++++ b/nodes.c
+@@ -7,44 +7,52 @@
+ 
+ void delete_node_inheriter(Node* self)
+ {
++    LOG_ENTER();
+     self->delete(self);
++	LOG_LEAVE();
+ }
+ 
+ const char* statement_node_type_to_string(StatementNodeType type)
+ {
++    LOG_ENTER();
+     switch (type) {
+     case ST_FUNC_DEF:
+-        return "ST_FUNC_DEF";
++        LOG_RETURN(const char*, "ST_FUNC_DEF");
+     case ST_RETURN:
+-        return "ST_RETURN";
++        LOG_RETURN(const char*, "ST_RETURN");
+     case ST_EXPRESSION:
+-        return "ST_EXPRESSION";
++        LOG_RETURN(const char*, "ST_EXPRESSION");
+     case StatementNodeType_LAST:
+-        return "StatementNodeType_LAST";
++        LOG_RETURN(const char*, "StatementNodeType_LAST");
+     }
+     assert(0 && "unreachable");
++	LOG_LEAVE();
+ }
+ 
+ const char* expression_node_type_to_string(ExpressionNodeType type)
+ {
++    LOG_ENTER();
+     switch (type) {
+     case ET_INT:
+-        return "ET_INT";
++        LOG_RETURN(const char*, "ET_INT");
+     case ExpressionNodeType_LAST:
+-        return "ExpressionNodeType_LAST";
++        LOG_RETURN(const char*, "ExpressionNodeType_LAST");
+     }
+     assert(0 && "unreachable");
++	LOG_LEAVE();
+ }
+ 
+ const char* type_node_type_to_string(TypeNodeType type)
+ {
++    LOG_ENTER();
+     switch (type) {
+     case TNT_KEYWORD:
+-        return "TNT_KEYWORD";
++        LOG_RETURN(const char*, "TNT_KEYWORD");
+     case TypeNodeType_LAST:
+-        return "TypeNodeType_LAST";
++        LOG_RETURN(const char*, "TypeNodeType_LAST");
+     }
+     assert(0 && "unreachable");
++	LOG_LEAVE();
+ }
+ 
+ FuncDefNode* new_func_def_node(
+@@ -53,6 +61,7 @@ FuncDefNode* new_func_def_node(
+     List* params,
+     List* body)
+ {
++    LOG_ENTER();
+     static_assert(sizeof(Node) == 16, "incomplete implementation of Node");
+     static_assert(sizeof(StatementNode) == 24, "incomplete implementation of StatementNode");
+     static_assert(sizeof(FuncDefNode) == 56, "incomplete construction of FuncDefNode");
+@@ -66,19 +75,23 @@ FuncDefNode* new_func_def_node(
+         .params = params,
+         .body = body,
+     };
+-    return self;
++    LOG_RETURN(FuncDefNode*, self);
++	LOG_LEAVE();
+ }
+ 
+ void delete_func_def_node(FuncDefNode* self)
+ {
++    LOG_ENTER();
+     self->return_type->delete(self->return_type);
+     delete_list_and_elements(self->params, (void (*)(void*)) delete_node_inheriter);
+     delete_list_and_elements(self->body, (void (*)(void*)) delete_node_inheriter);
+     _free(self);
++	LOG_LEAVE();
+ }
+ 
+ char* func_def_node_to_string(FuncDefNode* self)
+ {
++    LOG_ENTER();
+     const char* type = statement_node_type_to_string(self->type);
+     char* target = token_to_string(self->target);
+     char* return_type = self->return_type->to_string(self->return_type);
+@@ -94,6 +107,7 @@ char* func_def_node_to_string(FuncDefNode* self)
+         else
+             first = false;
+         strcat(body, str);
++        _free(str);
+     }
+ 
+     char* buffer = _calloc(8192, sizeof(char));
+@@ -104,11 +118,13 @@ char* func_def_node_to_string(FuncDefNode* self)
+     _free(return_type);
+     _free(body);
+ 
+-    return buffer;
++    LOG_RETURN(char*, buffer);
++	LOG_LEAVE();
+ }
+ 
+ ReturnNode* new_return_node(ExpressionNode* value)
+ {
++    LOG_ENTER();
+     static_assert(sizeof(Node) == 16, "incomplete implementation of Node");
+     static_assert(sizeof(StatementNode) == 24, "incomplete implementation of StatementNode");
+     static_assert(sizeof(ReturnNode) == 32, "incomplete construction of ReturnNode");
+@@ -119,17 +135,21 @@ ReturnNode* new_return_node(ExpressionNode* value)
+         .type = ST_RETURN,
+         .value = value,
+     };
+-    return self;
++    LOG_RETURN(ReturnNode*, self);
++	LOG_LEAVE();
+ }
+ 
+ void delete_return_node(ReturnNode* self)
+ {
++    LOG_ENTER();
+     self->value->delete(self->value);
+     _free(self);
++	LOG_LEAVE();
+ }
+ 
+ char* return_node_to_string(ReturnNode* self)
+ {
++    LOG_ENTER();
+     const char* type = statement_node_type_to_string(self->type);
+     char* value = self->value->to_string(self->value);
+ 
+@@ -139,11 +159,13 @@ char* return_node_to_string(ReturnNode* self)
+ 
+     _free(value);
+ 
+-    return buffer;
++    LOG_RETURN(char*, buffer);
++	LOG_LEAVE();
+ }
+ 
+ ExprStmtNode* new_expression_statement_node(ExpressionNode* value)
+ {
++    LOG_ENTER();
+     static_assert(sizeof(Node) == 16, "incomplete implementation of Node");
+     static_assert(sizeof(StatementNode) == 24, "incomplete implementation of StatementNode");
+     static_assert(sizeof(ExprStmtNode) == 32, "incomplete construction of ExprStmtNode");
+@@ -154,17 +176,21 @@ ExprStmtNode* new_expression_statement_node(ExpressionNode* value)
+         .type = ST_EXPRESSION,
+         .value = value,
+     };
+-    return self;
++    LOG_RETURN(ExprStmtNode*, self);
++	LOG_LEAVE();
+ }
+ 
+ void delete_expression_statement_node(ExprStmtNode* self)
+ {
++    LOG_ENTER();
+     self->value->delete(self->value);
+     _free(self);
++	LOG_LEAVE();
+ }
+ 
+ char* expression_statment_to_string(ExprStmtNode* self)
+ {
++    LOG_ENTER();
+     const char* type = statement_node_type_to_string(self->type);
+     char* value = self->value->to_string(self->value);
+ 
+@@ -174,11 +200,13 @@ char* expression_statment_to_string(ExprStmtNode* self)
+ 
+     _free(value);
+ 
+-    return buffer;
++    LOG_RETURN(char*, buffer);
++	LOG_LEAVE();
+ }
+ 
+ KeywordTypeNode* new_keyword_type_node(Token* token)
+ {
++    LOG_ENTER();
+     static_assert(sizeof(Node) == 16, "incomplete implementation of Node");
+     static_assert(sizeof(TypeNode) == 24, "incomplete implementation of TypeNode");
+     static_assert(sizeof(KeywordTypeNode) == 32, "incomplete construction of KeywordTypeNode");
+@@ -189,16 +217,20 @@ KeywordTypeNode* new_keyword_type_node(Token* token)
+         .type = TNT_KEYWORD,
+         .token = token,
+     };
+-    return self;
++    LOG_RETURN(KeywordTypeNode*, self);
++	LOG_LEAVE();
+ }
+ 
+ void delete_keyword_type_token(KeywordTypeNode* self)
+ {
++    LOG_ENTER();
+     _free(self);
++	LOG_LEAVE();
+ }
+ 
+ char* keyword_type_to_string(KeywordTypeNode* self)
+ {
++    LOG_ENTER();
+     const char* type = type_node_type_to_string(self->type);
+     char* token = token_to_string(self->token);
+ 
+@@ -208,11 +240,13 @@ char* keyword_type_to_string(KeywordTypeNode* self)
+ 
+     _free(token);
+ 
+-    return buffer;
++    LOG_RETURN(char*, buffer);
++	LOG_LEAVE();
+ }
+ 
+ IntNode* new_int_node(Token* token)
+ {
++    LOG_ENTER();
+     static_assert(sizeof(Node) == 16, "incomplete implementation of Node");
+     static_assert(sizeof(ExpressionNode) == 24, "incomplete implementation of ExpressionNode");
+     static_assert(sizeof(IntNode) == 32, "incomplete construction of IntNode");
+@@ -223,16 +257,20 @@ IntNode* new_int_node(Token* token)
+         .type = ET_INT,
+         .token = token,
+     };
+-    return self;
++    LOG_RETURN(IntNode*, self);
++	LOG_LEAVE();
+ }
+ 
+ void delete_int_node(IntNode* self)
+ {
++    LOG_ENTER();
+     _free(self);
++	LOG_LEAVE();
+ }
+ 
+ char* int_node_to_string(IntNode* self)
+ {
++    LOG_ENTER();
+     static_assert(sizeof(Node) == 16, "incomplete implementation of Node");
+     const char* type = expression_node_type_to_string(self->type);
+     char* token = token_to_string(self->token);
+@@ -243,5 +281,6 @@ char* int_node_to_string(IntNode* self)
+ 
+     _free(token);
+ 
+-    return buffer;
++    LOG_RETURN(char*, buffer);
++	LOG_LEAVE();
+ }
+-- 
+2.25.1
+

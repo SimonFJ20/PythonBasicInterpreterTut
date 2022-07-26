@@ -1,0 +1,24 @@
+From 43d588f06c49639829f6b860a6646979bad5ab2c Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Wed, 4 May 2022 23:52:40 +0200
+Subject: [PATCH] memory: free str after use
+
+---
+ nodes.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/nodes.c b/nodes.c
+index efd66e5..88ba2b1 100644
+--- a/nodes.c
++++ b/nodes.c
+@@ -94,6 +94,7 @@ char* func_def_node_to_string(FuncDefNode* self)
+         else
+             first = false;
+         strcat(body, str);
++        free(str);
+     }
+ 
+     char* buffer = calloc(8192, sizeof(char));
+-- 
+2.25.1
+

@@ -1,0 +1,79 @@
+From 5215b3c6375cbf2110477ccb035c7ec5ce54515a Mon Sep 17 00:00:00 2001
+From: Simon From Jakobsen <simonfromjakobsen@gmail.com>
+Date: Tue, 7 Sep 2021 15:03:15 +0200
+Subject: [PATCH] return and similar nodes
+
+---
+ src/lexer.ts  |  1 +
+ src/parser.ts | 31 +++++++++++++++++++++++++------
+ 2 files changed, 26 insertions(+), 6 deletions(-)
+
+diff --git a/src/lexer.ts b/src/lexer.ts
+index 589213a..e13fc09 100644
+--- a/src/lexer.ts
++++ b/src/lexer.ts
+@@ -66,6 +66,7 @@ export enum KeywordTypes {
+ 
+ export class Token {
+     constructor (public type: TokenType, public value?: any) {}
++    public matches = (token?: Token) => this.type === token?.type && this.value === token.value;
+ }
+ 
+ export class Consts {
+diff --git a/src/parser.ts b/src/parser.ts
+index ab1f409..af925e2 100644
+--- a/src/parser.ts
++++ b/src/parser.ts
+@@ -18,6 +18,24 @@ class ListNode extends ParseNode {
+     }
+ }
+ 
++class ReturnNode extends ParseNode {
++    constructor (public node?: ParseNode) {
++        super();
++    }
++}
++
++class ContinueNode extends ParseNode {
++    constructor () {
++        super();
++    }
++}
++
++class BreakNode extends ParseNode {
++    constructor () {
++        super();
++    }
++}
++
+ class ParseResult {
+     public node?: ParseNode = undefined;
+     public error?: InvalidSyntaxError = undefined;
+@@ -83,17 +101,18 @@ export class Parser {
+     private makeStatement = (): ParseResult => {
+         const result = new ParseResult();
+ 
+-        if (
+-            this.currentToken?.type === TokenType.Keyword 
+-            && this.currentToken.value === Keywords[KeywordTypes.Return]
+-        ) {
++        // if (this.currentToken?.type === TokenType.Keyword 
++        // && this.currentToken.value === Keywords[KeywordTypes.Return]) {
++        if (this.currentToken?.matches(new Token(TokenType.Keyword, Keywords[KeywordTypes.Return]))) {
+             result.registerAdvance();
+             this.advance();
+ 
+-            // line 623
++            const expression = result.tryRegister(this.makeExpression());
++            if (!expression)
++                this.reverse(result.toReverseCount)
++            return result.success(new ReturnNode(expression))
+         }
+ 
+-        return result; // temp
+     }
+ 
+     private makeStatements = (): ParseResult => {
+-- 
+2.25.1
+

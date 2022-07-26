@@ -1,0 +1,20 @@
+From c8e3e6aa95a41bed4b691b7b0e4e0b7fef015b16 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Sat, 30 Apr 2022 22:05:26 +0200
+Subject: [PATCH] first commit
+
+---
+ README.md | 1 +
+ 1 file changed, 1 insertion(+)
+ create mode 100644 README.md
+
+diff --git a/README.md b/README.md
+new file mode 100644
+index 0000000..8700214
+--- /dev/null
++++ b/README.md
+@@ -0,0 +1 @@
++# neocc
+-- 
+2.25.1
+

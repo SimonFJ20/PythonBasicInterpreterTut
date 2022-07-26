@@ -1,0 +1,280 @@
+From b21febc15a4682953452c3be3aac9bc8c47bd83b Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Sat, 30 Apr 2022 22:05:48 +0200
+Subject: [PATCH] init
+
+---
+ .clang-format     |  3 +++
+ Makefile          | 31 +++++++++++++++++++++++++++
+ arraylist.c       | 34 +++++++++++++++++++++++++++++
+ compile_flags.txt |  3 +++
+ lexer.c           | 54 +++++++++++++++++++++++++++++++++++++++++++++++
+ lexer.h           | 49 ++++++++++++++++++++++++++++++++++++++++++
+ neocc.c           |  8 +++++++
+ utils.h           | 23 ++++++++++++++++++++
+ 8 files changed, 205 insertions(+)
+ create mode 100644 .clang-format
+ create mode 100644 Makefile
+ create mode 100644 arraylist.c
+ create mode 100644 compile_flags.txt
+ create mode 100644 lexer.c
+ create mode 100644 lexer.h
+ create mode 100644 neocc.c
+ create mode 100644 utils.h
+
+diff --git a/.clang-format b/.clang-format
+new file mode 100644
+index 0000000..22b2419
+--- /dev/null
++++ b/.clang-format
+@@ -0,0 +1,3 @@
++Language:        Cpp
++BasedOnStyle:  WebKit
++IndentWidth: 4
+diff --git a/Makefile b/Makefile
+new file mode 100644
+index 0000000..75338c6
+--- /dev/null
++++ b/Makefile
+@@ -0,0 +1,31 @@
++
++EXECUTABLE = neocc
++
++CC = gcc
++LD = gcc
++
++CFLAGS = -std=c17 -Wall -Werror
++LFLAGS = 
++
++OFILES = \
++	neocc.o \
++	lexer.o \
++	arralist.o
++
++HEADERS = $(wildcard *.h)
++
++all: $(EXECUTABLE)
++
++$(EXECUTABLE): $(OFILES)
++	$(LD) -o $@ $(CFLAGS) $(LFLAGS) $^
++
++%.o: %.c $(HEADERS)
++	$(CC) -c -o $@ $(CFLAGS) $<
++
++.PHONY: clean compile_flags
++
++clean:
++	$(RM) $(OFILES) $(EXECUTABLE)
++
++compile_flags:
++	printf "%s\n" $(CFLAGS) > compile_flags.txt
+diff --git a/arraylist.c b/arraylist.c
+new file mode 100644
+index 0000000..378d75c
+--- /dev/null
++++ b/arraylist.c
+@@ -0,0 +1,34 @@
++#include "utils.h"
++
++ArrayList* new_array_list()
++{
++    static_assert(sizeof(List) == 24, "incomplete implementation");
++    ArrayList* self = calloc(1, sizeof(ArrayList));
++    *self = (ArrayList) {
++        .delete = delete_array_list,
++        .get = array_list_get,
++        .add = array_list_add,
++        .m_length = 0,
++        .m_elememts = NULL,
++    };
++    return self;
++}
++
++void delete_array_list(ArrayList* self)
++{
++    free(self);
++}
++
++void* array_list_get(ArrayList* self, int index)
++{
++    if (index < 0)
++        return array_list_get(self, self->m_length - index);
++    assert(index < self->m_length && "index out of range");
++    return self->m_elememts[index];
++}
++
++void array_list_add(ArrayList* self, void* element)
++{
++    self->m_length++;
++    self->m_elememts = realloc(self->m_elememts, sizeof(void*) * self->m_length);
++}
+diff --git a/compile_flags.txt b/compile_flags.txt
+new file mode 100644
+index 0000000..e90fcd4
+--- /dev/null
++++ b/compile_flags.txt
+@@ -0,0 +1,3 @@
++-std=c17
++-Wall
++-Werror
+diff --git a/lexer.c b/lexer.c
+new file mode 100644
+index 0000000..c1b52db
+--- /dev/null
++++ b/lexer.c
+@@ -0,0 +1,54 @@
++#include <assert.h>
++#include <stdlib.h>
++#include "lexer.h"
++
++const char* token_type_to_string(TokenType type)
++{
++    static_assert(TokenType_LAST == 11, "unexhaustive");
++    switch (type) {
++    case TT_KEYWORD:
++        return "TT_KEYWORD";
++    case TT_IDENTIFIER:
++        return "TT_IDENTIFIER";
++    case TT_INT:
++        return "TT_INT";
++    case TT_LPAREN:
++        return "TT_LPAREN";
++    case TT_RPAREN:
++        return "TT_RPAREN";
++    case TT_LBRACE:
++        return "TT_LBRACE";
++    case TT_RBRACE:
++        return "TT_RBRACE";
++    case TT_LBRACKET:
++        return "TT_LBRACKET";
++    case TT_RBRACKET:
++        return "TT_RBRACKET";
++    case TT_EOL:
++        return "TT_EOL";
++    case TT_EOF:
++        return "TT_EOF";
++    case TokenType_LAST:
++        return "TokenType_LAST";
++    }
++    assert(0 && "unreachable");
++}
++
++Token* new_token(
++    const TokenType type,
++    const char* value,
++    const size_t length)
++{
++    Token* self = calloc(1, sizeof(Token));
++    *self = (Token) {
++        .type = type,
++        .value = value,
++        .length = length,
++    };
++    return self;
++}
++
++void delete_token(Token* self)
++{
++    free(self);
++}
+diff --git a/lexer.h b/lexer.h
+new file mode 100644
+index 0000000..5269ba2
+--- /dev/null
++++ b/lexer.h
+@@ -0,0 +1,49 @@
++#pragma once
++
++#include "utils.h"
++#include <stdlib.h>
++
++typedef enum TokenTypeEnum {
++    TT_KEYWORD,
++    TT_IDENTIFIER,
++    TT_INT,
++    TT_LPAREN,
++    TT_RPAREN,
++    TT_LBRACE,
++    TT_RBRACE,
++    TT_LBRACKET,
++    TT_RBRACKET,
++    TT_EOL,
++    TT_EOF,
++    TokenType_LAST,
++} TokenType;
++
++typedef struct TokenStruct {
++    TokenType type;
++    const char* value;
++    size_t length;
++} Token;
++
++Token* new_token(
++    const TokenType type,
++    const char* value,
++    const size_t length);
++void delete_token(Token* self);
++
++typedef struct LexerStruct {
++
++} Lexer;
++
++Lexer* new_lexer()
++{
++    Lexer* self = calloc(1, sizeof(Lexer));
++    *self = (Lexer) {};
++    return self;
++}
++
++void delete_lexer(Lexer* self)
++{
++    free(self);
++}
++
++List* tokenize(Lexer* self, const char* text);
+diff --git a/neocc.c b/neocc.c
+new file mode 100644
+index 0000000..0282b5e
+--- /dev/null
++++ b/neocc.c
+@@ -0,0 +1,8 @@
++#include "lexer.h"
++
++int main()
++{
++    Token* token = new_token(TT_INT, "123", 3);
++    
++    delete_token(token);
++}
+diff --git a/utils.h b/utils.h
+new file mode 100644
+index 0000000..e4fb036
+--- /dev/null
++++ b/utils.h
+@@ -0,0 +1,23 @@
++#pragma once
++
++#include <assert.h>
++#include <stdlib.h>
++
++typedef struct ListStruct {
++    void (*delete)(struct ListStruct* self);
++    void* (*get)(struct ListStruct* self, int index);
++    void (*add)(struct ListStruct* self, void* element);
++} List;
++
++typedef struct ArrayListStruct {
++    void (*delete)(struct ArrayListStruct* self);
++    void* (*get)(struct ArrayListStruct* self, int index);
++    void (*add)(struct ArrayListStruct* self, void* element);
++    size_t m_length;
++    void** m_elememts;
++} ArrayList;
++
++ArrayList* new_array_list();
++void delete_array_list(ArrayList* self);
++void* array_list_get(ArrayList* self, int index);
++void array_list_add(ArrayList* self, void* element);
+-- 
+2.25.1
+

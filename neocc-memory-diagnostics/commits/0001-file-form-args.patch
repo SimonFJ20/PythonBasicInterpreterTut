@@ -1,0 +1,30 @@
+From 2fb6f34a9cc3325d1dc733a18a8a238b9af89aa8 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Tue, 3 May 2022 23:48:29 +0200
+Subject: [PATCH] file form args
+
+---
+ neocc.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/neocc.c b/neocc.c
+index 2f48dce..b16bb53 100644
+--- a/neocc.c
++++ b/neocc.c
+@@ -5,9 +5,11 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ 
+-int main()
++int main(int argc, char** argv)
+ {
+-    char* content = read_file("examples/main.c");
++    assert(argc >= 2 && "not enough args / no input file");
++
++    char* content = read_file(argv[1]);
+ 
+     List* tokens = tokenize(content);
+     printf("=== TOKENIZING(TEXT) -> TOKENS ===\n");
+-- 
+2.25.1
+

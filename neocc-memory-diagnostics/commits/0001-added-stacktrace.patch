@@ -1,0 +1,917 @@
+From 2028e91563577b96052ac443aa7169acf3bc1216 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Wed, 4 May 2022 23:48:56 +0200
+Subject: [PATCH] added stacktrace
+
+---
+ compiler.c      | 22 +++++++++--
+ file.c          | 28 +++++++++++---
+ lexer.c         | 97 ++++++++++++++++++++++++++++++-------------------
+ memutils.c      | 85 +++++++++++++++++++++++++++++++------------
+ neocc.c         |  2 +
+ parser.c        | 44 +++++++++++++++++-----
+ stringbuilder.c | 27 +++++++++-----
+ utils.h         | 24 ++++++++++--
+ 8 files changed, 237 insertions(+), 92 deletions(-)
+
+diff --git a/compiler.c b/compiler.c
+index e3c037d..eb6fc8f 100644
+--- a/compiler.c
++++ b/compiler.c
+@@ -6,19 +6,23 @@
+ 
+ Compiler* new_compiler(List* ast)
+ {
++    LOG_ENTER();
+     static_assert(sizeof(Compiler) == 16, "incomplete construction of Compiler");
+     Compiler* self = _calloc(1, sizeof(Compiler));
+     *self = (Compiler) {
+         .ast = ast,
+         .assembly = new_string_builder(),
+     };
+-    return self;
++    LOG_RETURN(Compiler*, self);
++	LOG_LEAVE();
+ }
+ 
+ void delete_compiler(Compiler* self)
+ {
++    LOG_ENTER();
+     delete_string_builder(self->assembly);
+     _free(self);
++	LOG_LEAVE();
+ }
+ 
+ // forward definitions
+@@ -28,6 +32,7 @@ void compiler_make_function_definition(Compiler* self, FuncDefNode* node);
+ 
+ char* compiler_compile(Compiler* self)
+ {
++    LOG_ENTER();
+     string_builder_write(self->assembly, ".global _start\n");
+     string_builder_write(self->assembly, ".text\n");
+     string_builder_write(self->assembly, "_start:\n");
+@@ -39,30 +44,36 @@ char* compiler_compile(Compiler* self)
+     string_builder_write(self->assembly, "    mov $1, %rax\n");
+     string_builder_write(self->assembly, "    int $0x80\n");
+ 
+-    return string_builder_c_string(self->assembly);
++    LOG_RETURN(char*, string_builder_c_string(self->assembly));
++	LOG_LEAVE();
+ }
+ 
+ void compiler_make_statements(Compiler* self, List* statements)
+ {
++    LOG_ENTER();
+     for (int i = 0; i < statements->length(statements); i++)
+         compiler_make_statement(self, statements->get(statements, i));
++	LOG_LEAVE();
+ }
+ 
+ void compiler_make_statement(Compiler* self, StatementNode* node)
+ {
++    LOG_ENTER();
+     switch (node->type) {
+     case ST_FUNC_DEF:
+-        return compiler_make_function_definition(self, (FuncDefNode*) node);
++        LOG_RETURN_VOID(compiler_make_function_definition(self, (FuncDefNode*) node));
+     case ST_RETURN:
+     case ST_EXPRESSION:
+     case StatementNodeType_LAST:
+     default:
+         assert(!"unexpected StatementNodeType");
+     }
++	LOG_LEAVE();
+ }
+ 
+ void compiler_make_function_definition(Compiler* self, FuncDefNode* node)
+ {
++    LOG_ENTER();
+     string_builder_write_chars(self->assembly, (char*) node->target->value, node->target->length);
+     string_builder_write(self->assembly, ":\n");
+     string_builder_write(self->assembly, "    push %rbp\n");
+@@ -70,12 +81,15 @@ void compiler_make_function_definition(Compiler* self, FuncDefNode* node)
+     //compiler_make_statements(self, node->body);
+     string_builder_write(self->assembly, "    pop %rbp\n");
+     string_builder_write(self->assembly, "    ret\n");
++	LOG_LEAVE();
+ }
+ 
+ char* compile(List* ast)
+ {
++    LOG_ENTER();
+     Compiler* compiler = new_compiler(ast);
+     char* result = compiler_compile(compiler);
+     delete_compiler(compiler);
+-    return result;
++    LOG_RETURN(char*, result);
++	LOG_LEAVE();
+ }
+diff --git a/file.c b/file.c
+index 84d3b8c..a072022 100644
+--- a/file.c
++++ b/file.c
+@@ -5,28 +5,35 @@
+ 
+ FileReader* new_file_reader(const char* path)
+ {
++    LOG_ENTER();
+     FileReader* self = _calloc(1, sizeof(FileReader));
+     *self = (FileReader) {
+         .fp = fopen(path, "r"),
+     };
+     assert(self->fp && "could not open file");
+-    return self;
++    LOG_RETURN(FileReader*, self);
++	LOG_LEAVE();
+ }
+ 
+ void delete_file_reader(FileReader* self)
+ {
++    LOG_ENTER();
+     fclose(self->fp);
+     _free(self);
++	LOG_LEAVE();
+ }
+ 
+ size_t file_reader_length(FileReader* self)
+ {
++    LOG_ENTER();
+     fseek(self->fp, 0, SEEK_END);
+-    return ftell(self->fp);
++    LOG_RETURN(size_t, ftell(self->fp));
++	LOG_LEAVE();
+ }
+ 
+ char* file_reader_read(FileReader* self)
+ {
++    LOG_ENTER();
+     size_t length = file_reader_length(self);
+     fseek(self->fp, 0, SEEK_SET);
+     char* content = _calloc(length, sizeof(char));
+@@ -35,42 +42,53 @@ char* file_reader_read(FileReader* self)
+     for (int i = 0; i < length + 1; i++)
+         if (content[i] == EOF)
+             content[i] = '\0';
+-    return content;
++    LOG_RETURN(char*, content);
++	LOG_LEAVE();
+ }
+ 
+ char* read_file(const char* path)
+ {
++    LOG_ENTER();
+     FileReader* file = new_file_reader("examples/main.c");
+     char* content = file_reader_read(file);
+     delete_file_reader(file);
+-    return content;
++    LOG_RETURN(char*, content);
++	LOG_LEAVE();
+ }
+ 
+ FileWriter* new_file_writer(const char* path)
+ {
++    LOG_ENTER();
+     FileWriter* self = _calloc(1, sizeof(FileWriter));
+     *self = (FileWriter) {
+         .fp = fopen(path, "w"),
+     };
+     assert(self->fp && "could not open file");
+-    return self;
++    LOG_RETURN(FileWriter*, self);
++	LOG_LEAVE();
+ }
+ 
+ void delete_file_writer(FileWriter* self)
+ {
++    LOG_ENTER();
+     fclose(self->fp);
+     _free(self);
++	LOG_LEAVE();
+ }
+ 
+ void file_writer_write(FileWriter* self, char* string)
+ {
++    LOG_ENTER();
+     int error = fputs(string, self->fp);
+     assert(error != EOF && "could not write to file");
++	LOG_LEAVE();
+ }
+ 
+ void write_file(const char* path, char* string)
+ {
++    LOG_ENTER();
+     FileWriter* writer = new_file_writer(path);
+     file_writer_write(writer, string);
+     delete_file_writer(writer); 
++	LOG_LEAVE();
+ }
+diff --git a/lexer.c b/lexer.c
+index 6f083a5..d7343ad 100644
+--- a/lexer.c
++++ b/lexer.c
+@@ -8,61 +8,65 @@
+ 
+ List* tokenize(const char* text)
+ {
++    LOG_ENTER();
+     Lexer* lexer = new_lexer(text);
+     List* result = lexer_tokenize(lexer);
+     delete_lexer(lexer);
+-    return result;
++    LOG_RETURN(List*, result);
++	LOG_LEAVE();
+ }
+ 
+ const char* token_type_to_string(TokenType type)
+ {
++    LOG_ENTER();
+     switch (type) {
+     case TT_IDENTIFIER:
+-        return "TT_IDENTIFIER";
++        LOG_RETURN(const char*, "TT_IDENTIFIER");
+     case TT_KW_VOID:
+-        return "TT_KW_VOID";
++        LOG_RETURN(const char*, "TT_KW_VOID");
+     case TT_KW_INT:
+-        return "TT_KW_INT";
++        LOG_RETURN(const char*, "TT_KW_INT");
+     case TT_KW_IF:
+-        return "TT_KW_IF";
++        LOG_RETURN(const char*, "TT_KW_IF");
+     case TT_KW_ELSE:
+-        return "TT_KW_ELSE";
++        LOG_RETURN(const char*, "TT_KW_ELSE");
+     case TT_KW_FOR:
+-        return "TT_KW_FOR";
++        LOG_RETURN(const char*, "TT_KW_FOR");
+     case TT_KW_WHILE:
+-        return "TT_KW_WHILE";
++        LOG_RETURN(const char*, "TT_KW_WHILE");
+     case TT_KW_SWITCH:
+-        return "TT_KW_SWITCH";
++        LOG_RETURN(const char*, "TT_KW_SWITCH");
+     case TT_KW_CASE:
+-        return "TT_KW_CASE";
++        LOG_RETURN(const char*, "TT_KW_CASE");
+     case TT_KW_RETURN:
+-        return "TT_KW_RETURN";
++        LOG_RETURN(const char*, "TT_KW_RETURN");
+     case TT_KW_CONTINUE:
+-        return "TT_KW_CONTINUE";
++        LOG_RETURN(const char*, "TT_KW_CONTINUE");
+     case TT_KW_BREAK:
+-        return "TT_KW_BREAK";
++        LOG_RETURN(const char*, "TT_KW_BREAK");
+     case TT_INT_LITERAL:
+-        return "TT_INT_LITERAL";
++        LOG_RETURN(const char*, "TT_INT_LITERAL");
+     case TT_LPAREN:
+-        return "TT_LPAREN";
++        LOG_RETURN(const char*, "TT_LPAREN");
+     case TT_RPAREN:
+-        return "TT_RPAREN";
++        LOG_RETURN(const char*, "TT_RPAREN");
+     case TT_LBRACE:
+-        return "TT_LBRACE";
++        LOG_RETURN(const char*, "TT_LBRACE");
+     case TT_RBRACE:
+-        return "TT_RBRACE";
++        LOG_RETURN(const char*, "TT_RBRACE");
+     case TT_LBRACKET:
+-        return "TT_LBRACKET";
++        LOG_RETURN(const char*, "TT_LBRACKET");
+     case TT_RBRACKET:
+-        return "TT_RBRACKET";
++        LOG_RETURN(const char*, "TT_RBRACKET");
+     case TT_EOL:
+-        return "TT_EOL";
++        LOG_RETURN(const char*, "TT_EOL");
+     case TT_EOF:
+-        return "TT_EOF";
++        LOG_RETURN(const char*, "TT_EOF");
+     case TokenType_LAST:
+-        return "TokenType_LAST";
++        LOG_RETURN(const char*, "TokenType_LAST");
+     }
+     assert(0 && "unreachable");
++	LOG_LEAVE();
+ }
+ 
+ Token* new_token(
+@@ -70,33 +74,39 @@ Token* new_token(
+     const char* value,
+     const size_t length)
+ {
++    LOG_ENTER();
+     Token* self = _calloc(1, sizeof(Token));
+     *self = (Token) {
+         .type = type,
+         .value = value,
+         .length = length,
+     };
+-    return self;
++    LOG_RETURN(Token*, self);
++	LOG_LEAVE();
+ }
+ 
+ void delete_token(Token* self)
+ {
++    LOG_ENTER();
+     _free(self);
++	LOG_LEAVE();
+ }
+ 
+ char* token_to_string(Token* self)
+ {
+-
++    LOG_ENTER();
+     char value_str[64] = { 0 };
+     strncpy(value_str, self->value, self->length);
+ 
+     char* buffer = _calloc(64, sizeof(char));
+     sprintf(buffer, "Token(%s, '%s', %ld)", token_type_to_string(self->type), value_str, self->length);
+-    return buffer;
++    LOG_RETURN(char*, buffer);
++	LOG_LEAVE();
+ }
+ 
+ Lexer* new_lexer(const char* text)
+ {
++    LOG_ENTER();
+     Lexer* self = _calloc(1, sizeof(Lexer));
+     *self = (Lexer) {
+         .text = text,
+@@ -104,12 +114,15 @@ Lexer* new_lexer(const char* text)
+         .c = text[0],
+         .done = false,
+     };
+-    return self;
++    LOG_RETURN(Lexer*, self);
++	LOG_LEAVE();
+ }
+ 
+ void delete_lexer(Lexer* self)
+ {
++    LOG_ENTER();
+     _free(self);
++	LOG_LEAVE();
+ }
+ 
+ static inline bool is_whitespace(const char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
+@@ -118,6 +131,7 @@ static inline bool is_letter(const char c) { return (c >= 'A' && c <= 'Z') || (c
+ 
+ List* lexer_tokenize(Lexer* self)
+ {
++    LOG_ENTER();
+     List* tokens = (List*) new_array_list();
+ 
+     while (!self->done) {
+@@ -133,7 +147,8 @@ List* lexer_tokenize(Lexer* self)
+     }
+ 
+     tokens->add(tokens, new_token(TT_EOF, self->text + self->index, 1));
+-    return tokens;
++    LOG_RETURN(List*, tokens);
++	LOG_LEAVE();
+ }
+ 
+ static inline Token* call_next_after(Lexer* self, Token* token)
+@@ -149,29 +164,32 @@ static inline Token* make_single_char_token_and_call_next_after(Lexer* self, Tok
+ 
+ Token* lexer_match_char(Lexer* self)
+ {
++    LOG_ENTER();
+     switch (self->c) {
+     case '(':
+-        return make_single_char_token_and_call_next_after(self, TT_LPAREN);
++        LOG_RETURN(Token*, make_single_char_token_and_call_next_after(self, TT_LPAREN));
+     case ')':
+-        return make_single_char_token_and_call_next_after(self, TT_RPAREN);
++        LOG_RETURN(Token*, make_single_char_token_and_call_next_after(self, TT_RPAREN));
+     case '{':
+-        return make_single_char_token_and_call_next_after(self, TT_LBRACE);
++        LOG_RETURN(Token*, make_single_char_token_and_call_next_after(self, TT_LBRACE));
+     case '}':
+-        return make_single_char_token_and_call_next_after(self, TT_RBRACE);
++        LOG_RETURN(Token*, make_single_char_token_and_call_next_after(self, TT_RBRACE));
+     case '[':
+-        return make_single_char_token_and_call_next_after(self, TT_LBRACKET);
++        LOG_RETURN(Token*, make_single_char_token_and_call_next_after(self, TT_LBRACKET));
+     case ']':
+-        return make_single_char_token_and_call_next_after(self, TT_RBRACKET);
++        LOG_RETURN(Token*, make_single_char_token_and_call_next_after(self, TT_RBRACKET));
+     case ';':
+-        return make_single_char_token_and_call_next_after(self, TT_EOL);
++        LOG_RETURN(Token*, make_single_char_token_and_call_next_after(self, TT_EOL));
+     default:
+         printf("unexpected char %d == '%c'\n", self->c, self->c);
+         assert(!"unexpected char");
+     }
++	LOG_LEAVE();
+ }
+ 
+ Token* lexer_make_number(Lexer* self)
+ {
++    LOG_ENTER();
+     const char* value = &self->text[self->index];
+     size_t value_length = 1;
+     lexer_next(self);
+@@ -179,7 +197,8 @@ Token* lexer_make_number(Lexer* self)
+         value_length++;
+         lexer_next(self);
+     }
+-    return new_token(TT_INT_LITERAL, value, value_length);
++    LOG_RETURN(Token*, new_token(TT_INT_LITERAL, value, value_length));
++	LOG_LEAVE();
+ }
+ 
+ #define CHECK_KEYWORD(identifier, length, type, keyword)    \
+@@ -206,6 +225,7 @@ static inline TokenType identifier_or_kw_token_type(const char* identifer, size_
+ 
+ Token* lexer_make_name(Lexer* self)
+ {
++    LOG_ENTER();
+     const char* value = &self->text[self->index];
+     size_t value_length = 1;
+     lexer_next(self);
+@@ -214,11 +234,14 @@ Token* lexer_make_name(Lexer* self)
+         lexer_next(self);
+     }
+     TokenType type = identifier_or_kw_token_type(value, value_length);
+-    return new_token(type, value, value_length);
++    LOG_RETURN(Token*, new_token(type, value, value_length));
++	LOG_LEAVE();
+ }
+ 
+ void lexer_next(Lexer* self)
+ {
++    LOG_ENTER();
+     self->c = self->text[++self->index];
+     self->done = self->c == '\0';
++	LOG_LEAVE();
+ }
+diff --git a/memutils.c b/memutils.c
+index a39a083..e80301f 100644
+--- a/memutils.c
++++ b/memutils.c
+@@ -5,14 +5,47 @@
+ 
+ void println_and_free(char* string)
+ {
++    LOG_ENTER();
+     printf("%s\n", string);
+     _free(string);
++	LOG_LEAVE();
+ }
+ 
+ void delete_list_and_elements(List* list, void (*deletor)(void*))
+ {
++    LOG_ENTER();
+     list->delete_all(list, deletor);
+     list->delete (list);
++	LOG_LEAVE();
++}
++
++const char* SPACES_FOR_INDENTATION = 
++    "                                "
++    "                                "
++    "                                "
++    "                                "
++    "                                "
++    "                                "
++    "                                "
++    "                                ";
++
++static inline const char* indent_spaces(int n)
++{
++    return SPACES_FOR_INDENTATION + (252 - n * 4);
++}
++
++int function_log_indentation = 0;
++
++void log_enter(const char* function, const char* file, const int line)
++{
++    printf("%sEntering %s in ./%s:%d:\n", indent_spaces(function_log_indentation), function, file, line);
++    function_log_indentation++;
++}
++
++void log_leave(const char* function, const char* file, const int line)
++{
++    function_log_indentation--;
++    printf("%sLeaving %s in ./%s:%d:\n", indent_spaces(function_log_indentation), function, file, line);
+ }
+ 
+ struct allocation allocations[8192];
+@@ -24,17 +57,15 @@ void* logging_calloc(size_t amount, size_t size, const char* func, const char* f
+     allocations[allocations_index].func = func;
+     allocations[allocations_index].file = file;
+     allocations[allocations_index].line = line;
+-    allocations[allocations_index].amount = amount;
+-    allocations[allocations_index].size = size;
++    allocations[allocations_index].size = size * amount;
+     allocations[allocations_index].ptr = ptr;
+     allocations[allocations_index].deallocated = false;
+     allocations_index++;
+-#ifdef ALLOCATION_LOGGING
++#ifdef ENABLE_LOGGING
+     printf(
+-        "Allocated\t%p\tof %ldx%ld=%ld bytes\tin %s\tin ./%s:%d:\n",
++        "%sAllocated\t%p\tof %ld bytes\tin %s\tin ./%s:%d:\n",
++        indent_spaces(function_log_indentation),
+         ptr,
+-        amount,
+-        size,
+         amount * size,
+         func,
+         file,
+@@ -43,23 +74,24 @@ void* logging_calloc(size_t amount, size_t size, const char* func, const char* f
+     return ptr;
+ }
+ 
+-void* logging_realloc(void* ptr, size_t new_size, const char* func, const char* file, const int line)
++void* logging_realloc(void* old_ptr, size_t new_size, const char* func, const char* file, const int line)
+ {
+-    void* new = realloc(ptr, new_size);
++    void* new_ptr = realloc(old_ptr, new_size);
+     for (int i = 0; i < allocations_index; i++) {
+-        if (allocations[i].ptr == ptr && !allocations[i].deallocated) {
+-            allocations[i].ptr = new;
+-            allocations[i].amount = 1;
++        if (allocations[i].ptr == old_ptr) {
++            allocations[i].ptr = new_ptr;
+             allocations[i].size = new_size;
+             printf(
+-                "Reallocated\t%p\t\tin %s\tin ./%s:%d:\n",
+-                ptr,
++                "%sReallocated\t%p\tto %p\tin %s\tin ./%s:%d:\n",
++                indent_spaces(function_log_indentation),
++                old_ptr,
++                new_ptr,
+                 func,
+                 file,
+                 line);
+         }
+     }
+-    return new;
++    return new_ptr;
+ }
+ 
+ void logging_free(void* ptr, const char* func, const char* file, const int line)
+@@ -68,13 +100,12 @@ void logging_free(void* ptr, const char* func, const char* file, const int line)
+     for (int i = 0; i < allocations_index; i++) {
+         if (allocations[i].ptr == ptr && !allocations[i].deallocated) {
+             allocations[i].deallocated = true;
+-#ifdef ALLOCATION_LOGGING
++#ifdef ENABLE_LOGGING
+             printf(
+-                "Deallocated\t%p\tof %ldx%ld=%ld bytes\tin %s\tin ./%s:%d:\n",
++                "%sDeallocated\t%p\tof %ld bytes\tin %s\tin ./%s:%d:\n",
++                indent_spaces(function_log_indentation),
+                 ptr,
+-                allocations[i].amount,
+                 allocations[i].size,
+-                allocations[i].amount * allocations[i].size,
+                 func,
+                 file,
+                 line);
+@@ -82,9 +113,10 @@ void logging_free(void* ptr, const char* func, const char* file, const int line)
+             return;
+         }
+     }
+-#ifdef ALLOCATION_LOGGING
++#ifdef ENABLE_LOGGING
+     printf(
+-        "Deallocated unallocated\t%p\tin %s\tin ./%s:%d:\n",
++        "%sDeallocated unallocated\t%p\tin %s\tin ./%s:%d:\n",
++        indent_spaces(function_log_indentation),
+         ptr,
+         func,
+         file,
+@@ -98,17 +130,22 @@ void print_allocation_report()
+     size_t allocated_bytes_end = 0;
+     printf("address\tsize\tdeallocated\tlocation\tfunction\n");
+     for (int i = 0; i < allocations_index; i++) {
+-        allocated_bytes_total += allocations[i].size * allocations[i].amount;
++        allocated_bytes_total += allocations[i].size;
+         if (!allocations[i].deallocated)
+-            allocated_bytes_end += allocations[i].size * allocations[i].amount;
++            allocated_bytes_end += allocations[i].size;
+         printf("%p\t%ld\t%s\t./%s:%d:\t%s\n", 
+             allocations[i].ptr,
+-            allocations[i].size * allocations[i].amount,
++            allocations[i].size,
+             allocations[i].deallocated ? "true" : "false",
+             allocations[i].file,
+             allocations[i].line,
+             allocations[i].func
+             );
+     }
+-    printf("bytes allocated: %ld, bytes leaked: %ld\n", allocated_bytes_total, allocated_bytes_end);
++    printf(
++        "bytes allocated: %ld, bytes leaked: %ld, leaked %2.2lf%%\n",
++        allocated_bytes_total,
++        allocated_bytes_end,
++        (double) allocated_bytes_end / allocated_bytes_total
++    );
+ }
+diff --git a/neocc.c b/neocc.c
+index 18377b5..209c401 100644
+--- a/neocc.c
++++ b/neocc.c
+@@ -7,6 +7,7 @@
+ 
+ int main(int argc, char** argv)
+ {
++    LOG_ENTER();
+     assert(argc >= 2 && "not enough args / no input file");
+ 
+     char* content = read_file(argv[1]);
+@@ -41,4 +42,5 @@ int main(int argc, char** argv)
+     delete_list_and_elements(tokens, (void (*)(void*)) delete_token);
+     _free(content);
+     print_allocation_report();
++    LOG_LEAVE();
+ }
+diff --git a/parser.c b/parser.c
+index f0b4b71..42c262d 100644
+--- a/parser.c
++++ b/parser.c
+@@ -7,6 +7,7 @@
+ 
+ Parser* new_parser(List* tokens)
+ {
++    LOG_ENTER();
+     Parser* self = _calloc(1, sizeof(Parser));
+     *self = (Parser) {
+         .tokens = tokens,
+@@ -14,31 +15,39 @@ Parser* new_parser(List* tokens)
+         .t = tokens->get(tokens, 0),
+         .done = false,
+     };
+-    return self;
++    LOG_RETURN(Parser*, self);
++	LOG_LEAVE();
+ }
+ 
+ void delete_parser(Parser* self)
+ {
++    LOG_ENTER();
+     _free(self);
++	LOG_LEAVE();
+ }
+ 
+ List* parser_parse(Parser* self)
+ {
+-    return parser_make_statements(self);
++    LOG_ENTER();
++    LOG_RETURN(List*, parser_make_statements(self));
++	LOG_LEAVE();
+ }
+ 
+ List* parser_make_statements(Parser* self)
+ {
++    LOG_ENTER();
+     List* statements = (List*) new_array_list();
+     while (!self->done && self->t->type != TT_RBRACE)
+         statements->add(statements, parser_make_statement(self));
+     if (self->t->type == TT_RBRACE)
+         parser_next(self);
+-    return statements;
++    LOG_RETURN(List*, statements);
++	LOG_LEAVE();
+ }
+ 
+ StatementNode* parser_make_statement(Parser* self)
+ {
++    LOG_ENTER();
+     StatementNode* result;
+     switch (self->t->type) {
+     case TT_KW_RETURN:
+@@ -54,18 +63,22 @@ StatementNode* parser_make_statement(Parser* self)
+     default:
+         assert(!"unexpected token type");
+     }
+-    return result;
++    LOG_RETURN(StatementNode*, result);
++	LOG_LEAVE();
+ }
+ 
+ ReturnNode* parser_make_return(Parser* self)
+ {
++    LOG_ENTER();
+     parser_next(self);
+     ExpressionNode* value = parser_make_expression(self);
+-    return new_return_node(value);
++    LOG_RETURN(ReturnNode*, new_return_node(value));
++	LOG_LEAVE();
+ }
+ 
+ StatementNode* parser_make_declaration_definition_or_initialization(Parser* self)
+ {
++    LOG_ENTER();
+     TypeNode* type = parser_make_type(self);
+     if (self->t->type != TT_IDENTIFIER)
+         assert(!"unexpected token, expected identifier");
+@@ -81,52 +94,63 @@ StatementNode* parser_make_declaration_definition_or_initialization(Parser* self
+         assert(!"unexpected token, expected '{'");
+     parser_next(self);
+     List* body = parser_make_statements(self);
+-    return (StatementNode*) new_func_def_node(target, type, (List*) new_array_list(), body);
++    LOG_RETURN(StatementNode*, (StatementNode*) new_func_def_node(target, type, (List*) new_array_list(), body));
++	LOG_LEAVE();
+ }
+ 
+ TypeNode* parser_make_type(Parser* self)
+ {
++    LOG_ENTER();
+     Token* token = self->t;
+     parser_next(self);
+     switch (token->type) {
+     case TT_KW_VOID:
+-        return (TypeNode*) new_keyword_type_node(token);
++        LOG_RETURN(TypeNode*, (TypeNode*) new_keyword_type_node(token));
+     case TT_KW_INT:
+-        return (TypeNode*) new_keyword_type_node(token);
++        LOG_RETURN(TypeNode*, (TypeNode*) new_keyword_type_node(token));
+     default:
+         assert(!"unexpected token type");
+     }
++	LOG_LEAVE();
+ }
+ 
+ ExpressionNode* parser_make_expression(Parser* self)
+ {
++    LOG_ENTER();
+     if (self->t->type == TT_INT_LITERAL) {
+         Token* token = self->t;
+         parser_next(self);
+-        return (ExpressionNode*) new_int_node(token);
++        LOG_RETURN(ExpressionNode*, (ExpressionNode*) new_int_node(token));
+     } else {
+         assert(!"unexpected token type");
+     }
++	LOG_LEAVE();
+ }
+ 
+ void parser_skip_newline(Parser* self)
+ {
++    LOG_ENTER();
+     while (self->t->type == TT_EOL)
+         parser_next(self);
++	LOG_LEAVE();
+ }
+ 
+ void parser_next(Parser* self)
+ {
++    LOG_ENTER();
+     self->index++;
+     self->done = self->index >= self->tokens->length(self->tokens);
+     self->t = self->done ? NULL : self->tokens->get(self->tokens, self->index);
+     self->done = self->t->type == TT_EOF || self->done;
++	LOG_LEAVE();
+ }
+ 
+ List* parse(List* tokens)
+ {
++    LOG_ENTER();
+     Parser* parser = new_parser(tokens);
+     List* ast = parser_parse(parser);
+     _free(parser);
+-    return ast;
++    LOG_RETURN(List*, ast);
++	LOG_LEAVE();
+ }
+diff --git a/stringbuilder.c b/stringbuilder.c
+index 47afa88..506cae5 100644
+--- a/stringbuilder.c
++++ b/stringbuilder.c
+@@ -3,58 +3,67 @@
+ #include <stdlib.h>
+ #include <string.h>
+ 
+-// typedef struct StringBuilderStruct {
+-//     size_t m_length;
+-//     char* m_buffer;
+-// } StringBuilder;
+-
+ StringBuilder* new_string_builder()
+ {
++    LOG_ENTER();
+     static_assert(sizeof(StringBuilder) == 16, "incomplete construction of StringBuilder");
+     StringBuilder* self = _calloc(1, sizeof(StringBuilder));
+     *self = (StringBuilder) {
+         .m_length = 0,
+         .m_buffer = _calloc(1, sizeof(char)),
+     };
+-    return self;
++    LOG_RETURN(StringBuilder*, self);
++	LOG_LEAVE();
+ }
+ 
+ void delete_string_builder(StringBuilder* self)
+ {
++    LOG_ENTER();
+     _free(self->m_buffer);
+     _free(self);
++	LOG_LEAVE();
+ }
+ 
+ size_t string_builder_length(StringBuilder* self)
+ {
+-    return self->m_length;
++    LOG_ENTER();
++    LOG_RETURN(size_t, self->m_length);
++	LOG_LEAVE();
+ }
+ 
+ char* string_builder_c_string(StringBuilder* self)
+ {
++    LOG_ENTER();
+     char* buffer = _calloc(1, self->m_length * sizeof(char) + 1);
+     memcpy(buffer, self->m_buffer, self->m_length);
+-    return buffer;
++    LOG_RETURN(char*, buffer);
++	LOG_LEAVE();
+ }
+ 
+ char* string_builder_buffer(StringBuilder* self)
+ {
+-    return self->m_buffer;
++    LOG_ENTER();
++    LOG_RETURN(char*, self->m_buffer);
++	LOG_LEAVE();
+ }
+ 
+ void string_builder_write(StringBuilder* self, char* string)
+ {
++    LOG_ENTER();
+     self->m_length += strlen(string);
+     self->m_buffer = _realloc(self->m_buffer, self->m_length * sizeof(char) + 1);
+     strcat(self->m_buffer, string);
++	LOG_LEAVE();
+ }
+ 
+ void string_builder_write_chars(StringBuilder* self, char* chars, size_t amount)
+ {
++    LOG_ENTER();
+     size_t new_length = self->m_length + amount;
+     self->m_buffer = _realloc(self->m_buffer, new_length * sizeof(char) + 1);
+     // memcpy(self->m_buffer + (self->m_length - 1), chars, amount);
+     for (int i = 0; i < amount; i++)
+         self->m_buffer[self->m_length + i] = chars[i];
+     self->m_length += amount;
++	LOG_LEAVE();
+ }
+diff --git a/utils.h b/utils.h
+index 4710e3b..2f049e5 100644
+--- a/utils.h
++++ b/utils.h
+@@ -1,9 +1,9 @@
+ #pragma once
+ 
+ #include <assert.h>
++#include <stdbool.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+-#include <stdbool.h>
+ 
+ typedef struct ListStruct {
+     void (*delete)(struct ListStruct* self);
+@@ -69,13 +69,31 @@ struct allocation {
+     const char* func;
+     const char* file;
+     int line;
+-    size_t amount;
+     size_t size;
+     void* ptr;
+     bool deallocated;
+ };
+ 
+-#define ALLOCATION_LOGGING
++#define ENABLE_LOGGING
++
++#define LOG_ENTER() (log_enter(__FUNCTION__, __FILE__, __LINE__))
++#define LOG_LEAVE() (log_leave(__FUNCTION__, __FILE__, __LINE__))
++#define LOG_RETURN(t, v)                             \
++    ({                                               \
++        t _value = v;                                \
++        log_leave(__FUNCTION__, __FILE__, __LINE__); \
++        return _value;                               \
++    })
++#define LOG_RETURN_VOID(v)                           \
++    ({                                               \
++        v;                                           \
++        log_leave(__FUNCTION__, __FILE__, __LINE__); \
++        return;                                      \
++    })
++
++void log_enter(const char* function, const char* file, const int line);
++void log_leave(const char* function, const char* file, const int line);
++
+ #define _calloc(amount, size) logging_calloc(amount, size, __FUNCTION__, __FILE__, __LINE__)
+ #define _realloc(ptr, new_size) logging_realloc(ptr, new_size, __FUNCTION__, __FILE__, __LINE__)
+ #define _free(ptr) logging_free(ptr, __FUNCTION__, __FILE__, __LINE__)
+-- 
+2.25.1
+

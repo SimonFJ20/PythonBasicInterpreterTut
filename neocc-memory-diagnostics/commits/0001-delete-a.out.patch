@@ -1,0 +1,30 @@
+From acc279e7dd99769338cb5a3e50d5d52e24eca1fc Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Tue, 3 May 2022 15:13:36 +0200
+Subject: [PATCH] delete a.out
+
+---
+ a.out | Bin 4800 -> 0 bytes
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+ delete mode 100755 a.out
+
+diff --git a/a.out b/a.out
+deleted file mode 100755
+index 2bdc9a766e74d2f356649dbec577549a6a44eccc..0000000000000000000000000000000000000000
+GIT binary patch
+literal 0
+HcmV?d00001
+
+literal 4800
+zcmeHLze~eV5Wd8;)uB+G6qh)-1_uWx$)a`;5u~Gplm>N3T9PN&N!R{Yg$_>s4=#m*
+zlYfEUz1+nTl!7=oT;RR$?tAy+_3QNR@#Or}bsUh-g=4T@C$v<#1B9Crfi@h0hkFwm
+zHrD$(LaWNK>?M~LgiaYubc0Oxf%^&Wlwlw!any^J&vkt#w2^`b)&me+Xa8z$2EWO(
+zIaq`4dUnyn-|I|?<M!aP&utV`0aZX1Pz6*0RX`O`1yli5Kow90RDpk~z{16Ay)}E?
+z$^3fOoy@w=Q+nFIJgvAb1$prPQ4cHM+b*=^J<kDq7F}r9_$}l+_==Wyztn3B?}tKJ
+zq<Mgiukrp5JeVXM1w%;Vy9}bJUldVc;@m)#3}O=_WCMVp7^f!gBbvO#Td}gCNrIc~
+zJ{aZ0QIeZ61SWYf_A-C4?P84<F8UkjlR1XZ0|uF6l&1hP&k#RAgF>4^h`u~mspcnq
+z&SfRq=1T91M8oI&DU&qwpe6mcncqNMV|y81Ie&kdM7!Rf#!BDiH+bH3xFY`(Km$G^
+
+-- 
+2.25.1
+

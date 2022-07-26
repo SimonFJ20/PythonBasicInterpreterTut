@@ -1,0 +1,132 @@
+From 50313d3cced47f0165b78466007260ce46060396 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Tue, 19 Apr 2022 22:56:22 +0200
+Subject: [PATCH] start lexer
+
+---
+ examples/{main.bl => main.euc} |  0
+ lexer.c                        |  0
+ lexer.h                        | 26 +++++++++++++++++++++++++-
+ list.c                         | 12 +++++++++++-
+ utils.h                        |  9 +++++++--
+ 5 files changed, 43 insertions(+), 4 deletions(-)
+ rename examples/{main.bl => main.euc} (100%)
+ create mode 100644 lexer.c
+
+diff --git a/examples/main.bl b/examples/main.euc
+similarity index 100%
+rename from examples/main.bl
+rename to examples/main.euc
+diff --git a/lexer.c b/lexer.c
+new file mode 100644
+index 0000000..e69de29
+diff --git a/lexer.h b/lexer.h
+index aec926c..cfee607 100644
+--- a/lexer.h
++++ b/lexer.h
+@@ -1,4 +1,28 @@
+ #ifndef LEXER_H
+ #define LEXER_H
+ 
+-#endif
++#include <stdlib.h>
++
++typedef enum {
++    TT_IDENTIFIER,
++    TT_KEYWORD,
++    TT_INT,
++    TT_LPAREN,
++    TT_RPAREN,
++    TT_LBRACE,
++    TT_RBRACE,
++    TT_LBRACKET,
++    TT_RBRACKET,
++    TT_SEMICOLON
++} TokenType;
++
++typedef struct {
++    TokenType type;
++    const char* value;
++    size_t length;
++} Token;
++
++Token* new_token(TokenType type, const char* value, size_t length);
++void delete_token(Token* self);
++
++#endif
+\ No newline at end of file
+diff --git a/list.c b/list.c
+index b5e3697..1e9845e 100644
+--- a/list.c
++++ b/list.c
+@@ -41,7 +41,7 @@ void* list_at(List* self, int index)
+     }
+ }
+ 
+-void* list_remove(List* self, int index)
++void* list_remove_at(List* self, int index)
+ {
+     self->length--;
+     if (index >= 0) {
+@@ -52,6 +52,16 @@ void* list_remove(List* self, int index)
+     }
+ }
+ 
++int list_remove(List* self, void* value)
++{
++    int removed = 0;
++    for (int i = 0; i < self->length; i++) {
++        if (self->values[i] == value)
++            list_remove_at(self, i--);
++    }
++    return removed;
++}
++
+ size_t list_length(List* self)
+ {
+     return self->length;
+diff --git a/utils.h b/utils.h
+index 44c8aeb..50e588a 100644
+--- a/utils.h
++++ b/utils.h
+@@ -3,6 +3,7 @@
+ 
+ #include <stdlib.h>
+ #include <stdio.h>
++#include <stdbool.h>
+ 
+ typedef struct {
+     void** values;
+@@ -14,8 +15,8 @@ void delete_list(List* self);
+ 
+ void list_add(List* self, void* value);
+ void* list_at(List* self, int index);
+-void* list_remove(List* self, int index);
+-void* list_remove_at(List* self, void* value);
++void* list_remove_at(List* self, int index);
++int list_remove(List* self, void* value);
+ size_t list_length(List* self);
+ void** list_to_array(List* self);
+ 
+@@ -28,6 +29,8 @@ typedef struct LinkedListNodeStruct {
+ LinkedListNode* new_linked_list_node(LinkedListNode* prev, LinkedListNode* next, void* value);
+ void delete_linked_list_node(LinkedListNode* self);
+ 
++void linked_list_node_short_circuit_child_and_parent(LinkedListNode* self);
++
+ typedef struct {
+     LinkedListNode* head;
+     size_t length;
+@@ -37,7 +40,9 @@ LinkedList* new_linked_list();
+ void delete_linked_list();
+ 
+ void linked_list_add(LinkedList* self, void* value);
++LinkedListNode* linked_list_node_at(LinkedList* self, int index);
+ void* linked_list_at(LinkedList* self, int index);
++void linked_list_delete_node(LinkedList* self, LinkedListNode* node, bool is_head);
+ void* linked_list_remove_at(LinkedList* self, int index);
+ int linked_list_remove(LinkedList* self, void* value);
+ size_t linked_list_length(LinkedList* self);
+-- 
+2.25.1
+

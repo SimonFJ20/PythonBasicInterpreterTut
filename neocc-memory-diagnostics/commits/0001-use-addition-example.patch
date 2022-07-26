@@ -1,0 +1,25 @@
+From 5779b536e65b1187dd647d145aa5e6a99dfb6391 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Sat, 7 May 2022 20:51:50 +0200
+Subject: [PATCH] use addition example
+
+---
+ Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Makefile b/Makefile
+index 067ef25..3ba362b 100644
+--- a/Makefile
++++ b/Makefile
+@@ -14,7 +14,7 @@ HEADERS = $(wildcard *.h)
+ all: $(EXECUTABLE)
+ 
+ run: $(EXECUTABLE)
+-	./neocc examples/main.c
++	./neocc examples/addition.c
+ 	$(RM) temp.o temp.s
+ 
+ # CFLAGS += -g # compile debug symbols
+-- 
+2.25.1
+

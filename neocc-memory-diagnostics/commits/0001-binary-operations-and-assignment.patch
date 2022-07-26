@@ -1,0 +1,199 @@
+From 197fc207b20cc50e1a7dcfbda5040001b990db96 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Sat, 7 May 2022 20:50:47 +0200
+Subject: [PATCH] binary operations and assignment
+
+---
+ nodes.c  | 100 ++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ parser.h |  57 ++++++++++++++++++++++++++++---
+ 2 files changed, 152 insertions(+), 5 deletions(-)
+
+diff --git a/nodes.c b/nodes.c
+index 2633cbd..a73a3f1 100644
+--- a/nodes.c
++++ b/nodes.c
+@@ -69,7 +69,7 @@ FuncDefNode* new_func_def_node(
+ 
+ void delete_func_def_node(FuncDefNode* self)
+ {
+-    self->return_type->delete(self->return_type);
++    self->return_type->delete (self->return_type);
+     list_delete_all_and_self(self->params, (void (*)(void*)) delete_node_inheriter);
+     list_delete_all_and_self(self->body, (void (*)(void*)) delete_node_inheriter);
+     free(self);
+@@ -210,6 +210,104 @@ char* keyword_type_node_to_string(KeywordTypeNode* self)
+     return buffer;
+ }
+ 
++const char* assignment_type_to_string(AssignmentType type)
++{
++    switch (type) {
++    case ASSIGNMENT_TYPE_NONE:
++        return "ASSIGNMENT_TYPE_NONE";
++    }
++    assert(!"unreachable");
++}
++
++AssignmentNode* new_assignment_node(AssignmentType asignment_type, Token* target, ExpressionNode* value)
++{
++    static_assert(sizeof(Node) == 16, "incomplete implementation of Node");
++    static_assert(sizeof(ExpressionNode) == 24, "incomplete implementation of ExpressionNode");
++    static_assert(sizeof(AssignmentNode) == 40, "incomplete construction of AssignmentNode");
++    AssignmentNode* self = calloc(1, sizeof(AssignmentNode));
++    *self = (AssignmentNode) {
++        .delete = delete_assignment_node,
++        .to_string = assignment_node_to_string,
++        .node_type = EXPRESSION_TYPE_ASSIGNMENT,
++        .asignment_type = asignment_type,
++        .target = target,
++        .value = value,
++    };
++    return self;
++}
++
++void delete_assignment_node(AssignmentNode* self)
++{
++    delete_token(self->target);
++    self->value->delete (self->value);
++    free(self);
++}
++
++char* assignment_node_to_string(AssignmentNode* self)
++{
++    const char* node_type = expression_node_type_to_string(self->node_type);
++    char* target = token_to_string(self->target);
++    char* value = self->value->to_string(self->value);
++
++    StringBuilder* sb = new_string_builder();
++    string_builder_write_fmt(sb, "%s {assignment_type: %s, target: %s, value: %s}", node_type, target, value);
++    char* result = string_builder_c_string(sb);
++    delete_string_builder(sb);
++
++    free(target);
++    free(value);
++    return result;
++}
++
++const char* binary_operation_type_to_string(BinaryOperationType type)
++{
++    switch (type) {
++    case BINARY_OPERATION_TYPE_ADD:
++        return "BINARY_OPERATION_TYPE_ADD";
++    }
++    assert(!"unreachable");
++}
++
++BinaryOperationNode* new_binary_operation_node(BinaryOperationType operation_type, ExpressionNode* left, ExpressionNode* right)
++{
++    static_assert(sizeof(Node) == 16, "incomplete implementation of Node");
++    static_assert(sizeof(ExpressionNode) == 24, "incomplete implementation of ExpressionNode");
++    static_assert(sizeof(BinaryOperationNode) == 40, "incomplete construction of BinaryOperationNode");
++    BinaryOperationNode* self = calloc(1, sizeof(BinaryOperationNode));
++    *self = (BinaryOperationNode) {
++        .delete = delete_binary_operation_node,
++        .to_string = binary_operation_to_string,
++        .node_type = EXPRESSION_TYPE_ASSIGNMENT,
++        .operation_type = operation_type,
++        .left = left,
++        .right = right,
++    };
++    return self;
++}
++
++void delete_binary_operation_node(BinaryOperationNode* self)
++{
++    self->left->delete (self->left);
++    self->right->delete (self->right);
++    free(self);
++}
++
++char* binary_operation_to_string(BinaryOperationNode* self)
++{
++    const char* node_type = expression_node_type_to_string(self->node_type);
++    char* left = self->left->to_string(self->left);
++    char* right = self->right->to_string(self->right);
++
++    StringBuilder* sb = new_string_builder();
++    string_builder_write_fmt(sb, "%s {assignment_type: %s, left: %s, right: %s}", node_type, left, right);
++    char* result = string_builder_c_string(sb);
++    delete_string_builder(sb);
++
++    free(left);
++    free(right);
++    return result;
++}
++
+ IntNode* new_int_node(Token* token)
+ {
+     static_assert(sizeof(Node) == 16, "incomplete implementation of Node");
+diff --git a/parser.h b/parser.h
+index 20af32f..c71e9f8 100644
+--- a/parser.h
++++ b/parser.h
+@@ -151,10 +151,59 @@ ExprStmtNode* new_expression_statement_node(ExpressionNode* value);
+ void delete_expression_statement_node(ExprStmtNode* self);
+ char* expression_statment_to_string(ExprStmtNode* self);
+ 
+-typedef struct IntNodeStruct {
+-    void (*delete)(struct IntNodeStruct* self);
+-    char* (*to_string)(struct IntNodeStruct* self);
+-    ExpressionNodeType type;
++typedef struct KeywordTypeNode {
++    void (*delete)(struct KeywordTypeNode* self);
++    char* (*to_string)(struct KeywordTypeNode* self);
++    TypeNodeType node_type;
++    Token* token;
++} KeywordTypeNode;
++
++KeywordTypeNode* new_keyword_type_node(Token* token);
++void delete_keyword_type_node(KeywordTypeNode* self);
++char* keyword_type_node_to_string(KeywordTypeNode* self);
++
++typedef enum AssignmentType {
++    ASSIGNMENT_TYPE_NONE,
++} AssignmentType;
++
++const char* assignment_type_to_string(AssignmentType type);
++
++typedef struct AssignmentNode {
++    void (*delete)(struct AssignmentNode* self);
++    char* (*to_string)(struct AssignmentNode* self);
++    ExpressionNodeType node_type;
++    AssignmentType asignment_type;
++    Token* target;
++    ExpressionNode* value;
++} AssignmentNode;
++
++AssignmentNode* new_assignment_node(AssignmentType asignment_type, Token* target, ExpressionNode* value);
++void delete_assignment_node(AssignmentNode* self);
++char* assignment_node_to_string(AssignmentNode* self);
++
++typedef enum BinaryOperationType {
++    BINARY_OPERATION_TYPE_ADD,
++} BinaryOperationType;
++
++const char* binary_operation_type_to_string(BinaryOperationType type);
++
++typedef struct BinaryOperationNode {
++    void (*delete)(struct BinaryOperationNode* self);
++    char* (*to_string)(struct BinaryOperationNode* self);
++    ExpressionNodeType node_type;
++    BinaryOperationType operation_type;
++    ExpressionNode* left;
++    ExpressionNode* right;
++} BinaryOperationNode;
++
++BinaryOperationNode* new_binary_operation_node(BinaryOperationType operation_type, ExpressionNode* left, ExpressionNode* right);
++void delete_binary_operation_node(BinaryOperationNode* self);
++char* binary_operation_to_string(BinaryOperationNode* self);
++
++typedef struct IntNode {
++    void (*delete)(struct IntNode* self);
++    char* (*to_string)(struct IntNode* self);
++    ExpressionNodeType node_type;
+     Token* token;
+ } IntNode;
+ 
+-- 
+2.25.1
+

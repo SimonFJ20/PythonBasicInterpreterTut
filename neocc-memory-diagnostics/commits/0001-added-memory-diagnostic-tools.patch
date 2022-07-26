@@ -1,0 +1,441 @@
+From 416711bf897ce0957137150ba97695b48885990d Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Wed, 4 May 2022 01:17:03 +0200
+Subject: [PATCH] added memory diagnostic tools
+
+---
+ compiler.c      |   4 +-
+ file.c          |  13 +++---
+ lexer.c         |  10 ++---
+ memutils.c      | 107 ++++++++++++++++++++++++++++++++++++++++++++++--
+ neocc.c         |   9 +++-
+ parser.c        |  10 ++---
+ parser.h        |   2 +-
+ stringbuilder.c |  14 +++----
+ utils.h         |  21 ++++++++++
+ 9 files changed, 158 insertions(+), 32 deletions(-)
+
+diff --git a/compiler.c b/compiler.c
+index 36c0a17..e3c037d 100644
+--- a/compiler.c
++++ b/compiler.c
+@@ -7,7 +7,7 @@
+ Compiler* new_compiler(List* ast)
+ {
+     static_assert(sizeof(Compiler) == 16, "incomplete construction of Compiler");
+-    Compiler* self = calloc(1, sizeof(Compiler));
++    Compiler* self = _calloc(1, sizeof(Compiler));
+     *self = (Compiler) {
+         .ast = ast,
+         .assembly = new_string_builder(),
+@@ -18,7 +18,7 @@ Compiler* new_compiler(List* ast)
+ void delete_compiler(Compiler* self)
+ {
+     delete_string_builder(self->assembly);
+-    free(self);
++    _free(self);
+ }
+ 
+ // forward definitions
+diff --git a/file.c b/file.c
+index b057f1c..84d3b8c 100644
+--- a/file.c
++++ b/file.c
+@@ -5,7 +5,7 @@
+ 
+ FileReader* new_file_reader(const char* path)
+ {
+-    FileReader* self = calloc(1, sizeof(FileReader));
++    FileReader* self = _calloc(1, sizeof(FileReader));
+     *self = (FileReader) {
+         .fp = fopen(path, "r"),
+     };
+@@ -16,7 +16,7 @@ FileReader* new_file_reader(const char* path)
+ void delete_file_reader(FileReader* self)
+ {
+     fclose(self->fp);
+-    free(self);
++    _free(self);
+ }
+ 
+ size_t file_reader_length(FileReader* self)
+@@ -29,8 +29,9 @@ char* file_reader_read(FileReader* self)
+ {
+     size_t length = file_reader_length(self);
+     fseek(self->fp, 0, SEEK_SET);
+-    char* content = calloc(length, sizeof(char));
+-    fread(content, length, length, self->fp);
++    char* content = _calloc(length, sizeof(char));
++    size_t fread_res = fread(content, length, length, self->fp);
++    assert(fread_res != -1);
+     for (int i = 0; i < length + 1; i++)
+         if (content[i] == EOF)
+             content[i] = '\0';
+@@ -47,7 +48,7 @@ char* read_file(const char* path)
+ 
+ FileWriter* new_file_writer(const char* path)
+ {
+-    FileWriter* self = calloc(1, sizeof(FileWriter));
++    FileWriter* self = _calloc(1, sizeof(FileWriter));
+     *self = (FileWriter) {
+         .fp = fopen(path, "w"),
+     };
+@@ -58,7 +59,7 @@ FileWriter* new_file_writer(const char* path)
+ void delete_file_writer(FileWriter* self)
+ {
+     fclose(self->fp);
+-    free(self);
++    _free(self);
+ }
+ 
+ void file_writer_write(FileWriter* self, char* string)
+diff --git a/lexer.c b/lexer.c
+index 61cbafd..6f083a5 100644
+--- a/lexer.c
++++ b/lexer.c
+@@ -70,7 +70,7 @@ Token* new_token(
+     const char* value,
+     const size_t length)
+ {
+-    Token* self = calloc(1, sizeof(Token));
++    Token* self = _calloc(1, sizeof(Token));
+     *self = (Token) {
+         .type = type,
+         .value = value,
+@@ -81,7 +81,7 @@ Token* new_token(
+ 
+ void delete_token(Token* self)
+ {
+-    free(self);
++    _free(self);
+ }
+ 
+ char* token_to_string(Token* self)
+@@ -90,14 +90,14 @@ char* token_to_string(Token* self)
+     char value_str[64] = { 0 };
+     strncpy(value_str, self->value, self->length);
+ 
+-    char* buffer = calloc(64, sizeof(char));
++    char* buffer = _calloc(64, sizeof(char));
+     sprintf(buffer, "Token(%s, '%s', %ld)", token_type_to_string(self->type), value_str, self->length);
+     return buffer;
+ }
+ 
+ Lexer* new_lexer(const char* text)
+ {
+-    Lexer* self = calloc(1, sizeof(Lexer));
++    Lexer* self = _calloc(1, sizeof(Lexer));
+     *self = (Lexer) {
+         .text = text,
+         .index = 0,
+@@ -109,7 +109,7 @@ Lexer* new_lexer(const char* text)
+ 
+ void delete_lexer(Lexer* self)
+ {
+-    free(self);
++    _free(self);
+ }
+ 
+ static inline bool is_whitespace(const char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
+diff --git a/memutils.c b/memutils.c
+index 8177d37..a39a083 100644
+--- a/memutils.c
++++ b/memutils.c
+@@ -1,15 +1,114 @@
+ #include "utils.h"
+-
++#include <stdbool.h>
++#include <stdio.h>
++#include <stdlib.h>
+ 
+ void println_and_free(char* string)
+ {
+     printf("%s\n", string);
+-    free(string);
++    _free(string);
+ }
+ 
+-void delete_list_and_elements(List* list, void (*deletor)(void *))
++void delete_list_and_elements(List* list, void (*deletor)(void*))
+ {
+     list->delete_all(list, deletor);
+-    list->delete(list);
++    list->delete (list);
+ }
+ 
++struct allocation allocations[8192];
++int allocations_index = 0;
++
++void* logging_calloc(size_t amount, size_t size, const char* func, const char* file, const int line)
++{
++    void* ptr = calloc(amount, size);
++    allocations[allocations_index].func = func;
++    allocations[allocations_index].file = file;
++    allocations[allocations_index].line = line;
++    allocations[allocations_index].amount = amount;
++    allocations[allocations_index].size = size;
++    allocations[allocations_index].ptr = ptr;
++    allocations[allocations_index].deallocated = false;
++    allocations_index++;
++#ifdef ALLOCATION_LOGGING
++    printf(
++        "Allocated\t%p\tof %ldx%ld=%ld bytes\tin %s\tin ./%s:%d:\n",
++        ptr,
++        amount,
++        size,
++        amount * size,
++        func,
++        file,
++        line);
++#endif
++    return ptr;
++}
++
++void* logging_realloc(void* ptr, size_t new_size, const char* func, const char* file, const int line)
++{
++    void* new = realloc(ptr, new_size);
++    for (int i = 0; i < allocations_index; i++) {
++        if (allocations[i].ptr == ptr && !allocations[i].deallocated) {
++            allocations[i].ptr = new;
++            allocations[i].amount = 1;
++            allocations[i].size = new_size;
++            printf(
++                "Reallocated\t%p\t\tin %s\tin ./%s:%d:\n",
++                ptr,
++                func,
++                file,
++                line);
++        }
++    }
++    return new;
++}
++
++void logging_free(void* ptr, const char* func, const char* file, const int line)
++{
++    free(ptr);
++    for (int i = 0; i < allocations_index; i++) {
++        if (allocations[i].ptr == ptr && !allocations[i].deallocated) {
++            allocations[i].deallocated = true;
++#ifdef ALLOCATION_LOGGING
++            printf(
++                "Deallocated\t%p\tof %ldx%ld=%ld bytes\tin %s\tin ./%s:%d:\n",
++                ptr,
++                allocations[i].amount,
++                allocations[i].size,
++                allocations[i].amount * allocations[i].size,
++                func,
++                file,
++                line);
++#endif
++            return;
++        }
++    }
++#ifdef ALLOCATION_LOGGING
++    printf(
++        "Deallocated unallocated\t%p\tin %s\tin ./%s:%d:\n",
++        ptr,
++        func,
++        file,
++        line);
++#endif
++}
++
++void print_allocation_report()
++{
++    size_t allocated_bytes_total = 0;
++    size_t allocated_bytes_end = 0;
++    printf("address\tsize\tdeallocated\tlocation\tfunction\n");
++    for (int i = 0; i < allocations_index; i++) {
++        allocated_bytes_total += allocations[i].size * allocations[i].amount;
++        if (!allocations[i].deallocated)
++            allocated_bytes_end += allocations[i].size * allocations[i].amount;
++        printf("%p\t%ld\t%s\t./%s:%d:\t%s\n", 
++            allocations[i].ptr,
++            allocations[i].size * allocations[i].amount,
++            allocations[i].deallocated ? "true" : "false",
++            allocations[i].file,
++            allocations[i].line,
++            allocations[i].func
++            );
++    }
++    printf("bytes allocated: %ld, bytes leaked: %ld\n", allocated_bytes_total, allocated_bytes_end);
++}
+diff --git a/neocc.c b/neocc.c
+index b16bb53..18377b5 100644
+--- a/neocc.c
++++ b/neocc.c
+@@ -11,11 +11,15 @@ int main(int argc, char** argv)
+ 
+     char* content = read_file(argv[1]);
+ 
++
+     List* tokens = tokenize(content);
+     printf("=== TOKENIZING(TEXT) -> TOKENS ===\n");
+     for (int i = 0; i < tokens->length(tokens); i++)
+         println_and_free(token_to_string(tokens->get(tokens, i)));
+ 
++    _free(_calloc(1, 69));
++
++
+     printf("=== PARSING(TOKENS) -> AST ===\n");
+     List* ast = parse(tokens);
+     for (int i = 0; i < ast->length(ast); i++) {
+@@ -32,8 +36,9 @@ int main(int argc, char** argv)
+     int assemble_link_result = system("as temp.s -o temp.o && ld temp.o");
+     assert(assemble_link_result == 0 && "failed to assemble or link");
+ 
+-    free(assembly);
++    _free(assembly);
+     delete_list_and_elements(ast, (void (*)(void*)) delete_node_inheriter);
+     delete_list_and_elements(tokens, (void (*)(void*)) delete_token);
+-    free(content);
++    _free(content);
++    print_allocation_report();
+ }
+diff --git a/parser.c b/parser.c
+index 812cbf8..f0b4b71 100644
+--- a/parser.c
++++ b/parser.c
+@@ -7,7 +7,7 @@
+ 
+ Parser* new_parser(List* tokens)
+ {
+-    Parser* self = calloc(1, sizeof(Parser));
++    Parser* self = _calloc(1, sizeof(Parser));
+     *self = (Parser) {
+         .tokens = tokens,
+         .index = 0,
+@@ -19,7 +19,7 @@ Parser* new_parser(List* tokens)
+ 
+ void delete_parser(Parser* self)
+ {
+-    free(self);
++    _free(self);
+ }
+ 
+ List* parser_parse(Parser* self)
+@@ -90,9 +90,9 @@ TypeNode* parser_make_type(Parser* self)
+     parser_next(self);
+     switch (token->type) {
+     case TT_KW_VOID:
+-        return (TypeNode*) new_keyword_type_token(token);
++        return (TypeNode*) new_keyword_type_node(token);
+     case TT_KW_INT:
+-        return (TypeNode*) new_keyword_type_token(token);
++        return (TypeNode*) new_keyword_type_node(token);
+     default:
+         assert(!"unexpected token type");
+     }
+@@ -127,6 +127,6 @@ List* parse(List* tokens)
+ {
+     Parser* parser = new_parser(tokens);
+     List* ast = parser_parse(parser);
+-    free(parser);
++    _free(parser);
+     return ast;
+ }
+diff --git a/parser.h b/parser.h
+index aad36e6..d105a55 100644
+--- a/parser.h
++++ b/parser.h
+@@ -115,7 +115,7 @@ typedef struct KeywordTypeNodeStruct {
+     Token* token;
+ } KeywordTypeNode;
+ 
+-KeywordTypeNode* new_keyword_type_token(Token* token);
++KeywordTypeNode* new_keyword_type_node(Token* token);
+ void delete_keyword_type_token(KeywordTypeNode* self);
+ char* keyword_type_to_string(KeywordTypeNode* self);
+ 
+diff --git a/stringbuilder.c b/stringbuilder.c
+index 3e50a7b..47afa88 100644
+--- a/stringbuilder.c
++++ b/stringbuilder.c
+@@ -11,18 +11,18 @@
+ StringBuilder* new_string_builder()
+ {
+     static_assert(sizeof(StringBuilder) == 16, "incomplete construction of StringBuilder");
+-    StringBuilder* self = calloc(1, sizeof(StringBuilder));
++    StringBuilder* self = _calloc(1, sizeof(StringBuilder));
+     *self = (StringBuilder) {
+         .m_length = 0,
+-        .m_buffer = calloc(1, sizeof(char)),
++        .m_buffer = _calloc(1, sizeof(char)),
+     };
+     return self;
+ }
+ 
+ void delete_string_builder(StringBuilder* self)
+ {
+-    free(self->m_buffer);
+-    free(self);
++    _free(self->m_buffer);
++    _free(self);
+ }
+ 
+ size_t string_builder_length(StringBuilder* self)
+@@ -32,7 +32,7 @@ size_t string_builder_length(StringBuilder* self)
+ 
+ char* string_builder_c_string(StringBuilder* self)
+ {
+-    char* buffer = calloc(1, self->m_length * sizeof(char) + 1);
++    char* buffer = _calloc(1, self->m_length * sizeof(char) + 1);
+     memcpy(buffer, self->m_buffer, self->m_length);
+     return buffer;
+ }
+@@ -45,14 +45,14 @@ char* string_builder_buffer(StringBuilder* self)
+ void string_builder_write(StringBuilder* self, char* string)
+ {
+     self->m_length += strlen(string);
+-    self->m_buffer = realloc(self->m_buffer, self->m_length * sizeof(char) + 1);
++    self->m_buffer = _realloc(self->m_buffer, self->m_length * sizeof(char) + 1);
+     strcat(self->m_buffer, string);
+ }
+ 
+ void string_builder_write_chars(StringBuilder* self, char* chars, size_t amount)
+ {
+     size_t new_length = self->m_length + amount;
+-    self->m_buffer = realloc(self->m_buffer, new_length * sizeof(char) + 1);
++    self->m_buffer = _realloc(self->m_buffer, new_length * sizeof(char) + 1);
+     // memcpy(self->m_buffer + (self->m_length - 1), chars, amount);
+     for (int i = 0; i < amount; i++)
+         self->m_buffer[self->m_length + i] = chars[i];
+diff --git a/utils.h b/utils.h
+index 1f4e173..4710e3b 100644
+--- a/utils.h
++++ b/utils.h
+@@ -3,6 +3,7 @@
+ #include <assert.h>
+ #include <stdio.h>
+ #include <stdlib.h>
++#include <stdbool.h>
+ 
+ typedef struct ListStruct {
+     void (*delete)(struct ListStruct* self);
+@@ -63,3 +64,23 @@ void println_and_free(char* string);
+ void delete_list_and_elements(List* list, void (*)(void*));
+ char* read_file(const char* path);
+ void write_file(const char* path, char* string);
++
++struct allocation {
++    const char* func;
++    const char* file;
++    int line;
++    size_t amount;
++    size_t size;
++    void* ptr;
++    bool deallocated;
++};
++
++#define ALLOCATION_LOGGING
++#define _calloc(amount, size) logging_calloc(amount, size, __FUNCTION__, __FILE__, __LINE__)
++#define _realloc(ptr, new_size) logging_realloc(ptr, new_size, __FUNCTION__, __FILE__, __LINE__)
++#define _free(ptr) logging_free(ptr, __FUNCTION__, __FILE__, __LINE__)
++
++void* logging_calloc(size_t amount, size_t size, const char* func, const char* file, const int line);
++void* logging_realloc(void* ptr, size_t new_size, const char* func, const char* file, const int line);
++void logging_free(void* ptr, const char* func, const char* file, const int line);
++void print_allocation_report();
+-- 
+2.25.1
+

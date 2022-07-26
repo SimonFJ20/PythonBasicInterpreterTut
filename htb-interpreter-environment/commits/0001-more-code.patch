@@ -1,0 +1,89 @@
+From 204ac1ca4c2c17d6923d7df0e660e2580f891324 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Tue, 30 Nov 2021 02:18:28 +0100
+Subject: [PATCH] more code
+
+---
+ bin/shell.htb      | 29 +++++++++++++++++++++++++++++
+ examples/hello.htb |  2 +-
+ lib/strings.htb    | 24 ++++++++++++++++++++++++
+ 3 files changed, 54 insertions(+), 1 deletion(-)
+ create mode 100644 lib/strings.htb
+
+diff --git a/bin/shell.htb b/bin/shell.htb
+index 139597f..db967de 100644
+--- a/bin/shell.htb
++++ b/bin/shell.htb
+@@ -1,2 +1,31 @@
+ 
++run("lib/strings.htb")
++import("lib/lists.htb")
+ 
++func exists(list, value)
++    for i = 0 to length(list) do
++        if list/i == value then
++            return true
++        end
++    end
++    return false
++end
++
++func decode(line)
++    let words = split(line, " ")
++    let command = words/0
++
++    if command == "run" then
++        let file = words/1
++        let res = run(file)
++        if exists(words, "-s") or exists(words, "--status") then
++            println(res)
++        end
++    end
++end
++
++while true do
++    print("trash$ ")
++    let line = input()
++    decode(line)
++end
+diff --git a/examples/hello.htb b/examples/hello.htb
+index 5d09ce2..b30cc77 100644
+--- a/examples/hello.htb
++++ b/examples/hello.htb
+@@ -1,2 +1,2 @@
+ 
+-print("Hello, world!")
++println("Hello, world!")
+diff --git a/lib/strings.htb b/lib/strings.htb
+new file mode 100644
+index 0000000..373dfd3
+--- /dev/null
++++ b/lib/strings.htb
+@@ -0,0 +1,24 @@
++
++func split(source, seperator)
++    let elements = []
++    let buffer = ""
++    for i = 0 to stringLength(source) do
++        let char = charAt(source, i)
++        print(char)
++        if char == seperator and buffer != "" then
++            append(elements, buffer)
++            let buffer = ""
++        else
++            let buffer = buffer + char
++        end
++    end
++    return elements
++end
++
++func test()
++
++    print(split("hello world !", " "))
++
++end
++
++test()
+-- 
+2.25.1
+

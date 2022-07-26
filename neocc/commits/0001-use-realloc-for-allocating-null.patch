@@ -1,0 +1,28 @@
+From cb7d03ebf410e315e6be9a31cf35a58b14b81a29 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Thu, 5 May 2022 00:42:42 +0200
+Subject: [PATCH] use realloc for allocating null
+
+---
+ arraylist.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/arraylist.c b/arraylist.c
+index 9dbeb90..abedfc5 100644
+--- a/arraylist.c
++++ b/arraylist.c
+@@ -43,10 +43,7 @@ void* array_list_get(ArrayList* self, int index)
+ void array_list_add(ArrayList* self, void* element)
+ {
+     self->m_length++;
+-    if (!self->m_elements)
+-        self->m_elements = calloc(1, sizeof(void*));
+-    else
+-        self->m_elements = realloc(self->m_elements, sizeof(void*) * self->m_length);
++    self->m_elements = realloc(self->m_elements, sizeof(void*) * self->m_length);
+     self->m_elements[self->m_length - 1] = element;
+ }
+ 
+-- 
+2.25.1
+

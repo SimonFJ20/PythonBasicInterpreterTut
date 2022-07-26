@@ -1,0 +1,8 @@
+
+import("lib/strings.htb")
+
+
+func myFunc()
+    println("bruh")
+end
+

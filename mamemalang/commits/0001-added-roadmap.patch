@@ -1,0 +1,35 @@
+From 512cd5da5ddbd7cf743b0d8f0b8f54f6c6dff288 Mon Sep 17 00:00:00 2001
+From: Simon From <simonfromjakobsen@gmail.com>
+Date: Wed, 24 Nov 2021 00:40:12 +0100
+Subject: [PATCH] added roadmap
+
+---
+ README.md | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/README.md b/README.md
+index dfb946b..fe61ff7 100644
+--- a/README.md
++++ b/README.md
+@@ -1,2 +1,18 @@
+ # mamemalang
+ Manual Memory Management Programming Language
++
++# Roadmap
++
++ - [ ] Examples
++ - [ ] Grammer spec
++ - [ ] AST spec
++ - [ ] Parser
++ - [ ] Interpreter
++ - [ ] Bytecode spec
++ - [ ] BC Compiler
++ - [ ] BC VM
++ - [ ] x86-64 Compiler
++ - [ ] Std library
++ - [ ] Self hosting
++
++
+-- 
+2.25.1
+

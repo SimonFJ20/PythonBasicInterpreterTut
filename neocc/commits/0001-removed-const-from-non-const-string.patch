@@ -1,0 +1,34 @@
+From 00d89710ab29eb24deb5d2fe16c41b714889f676 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Thu, 5 May 2022 01:52:25 +0200
+Subject: [PATCH] removed const from non const string
+
+---
+ parser.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/parser.h b/parser.h
+index aad36e6..7590032 100644
+--- a/parser.h
++++ b/parser.h
+@@ -50,7 +50,7 @@ typedef struct LexerStruct {
+     bool done;
+ } Lexer;
+ 
+-Lexer* new_lexer(const char* text);
++Lexer* new_lexer(char* text);
+ void delete_lexer(Lexer* self);
+ List* lexer_tokenize(Lexer* self);
+ Token* lexer_match_char(Lexer* self);
+@@ -58,7 +58,7 @@ Token* lexer_make_number(Lexer* self);
+ Token* lexer_make_name(Lexer* self);
+ void lexer_next(Lexer* self);
+ 
+-List* tokenize(const char* text);
++List* tokenize(char* text);
+ 
+ typedef struct NodeStruct {
+     void (*delete)(struct NodeStruct* self);
+-- 
+2.25.1
+

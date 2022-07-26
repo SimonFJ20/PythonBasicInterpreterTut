@@ -1,0 +1,830 @@
+From e621ba9510302523939b47557520074bffe80eea Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Sat, 7 May 2022 20:46:28 +0200
+Subject: [PATCH] better naming of structs, enums, node_type
+
+---
+ compiler.c |  14 +++--
+ compiler.h |   2 +-
+ lexer.c    | 146 ++++++++++++++++++++++++++++-------------------------
+ nodes.c    |  66 ++++++++++++------------
+ parser.c   |  34 ++++++-------
+ parser.h   | 142 ++++++++++++++++++++++++---------------------------
+ utils.h    |  36 ++++++-------
+ 7 files changed, 218 insertions(+), 222 deletions(-)
+
+diff --git a/compiler.c b/compiler.c
+index 442e51e..20fc4a4 100644
+--- a/compiler.c
++++ b/compiler.c
+@@ -47,13 +47,12 @@ void compiler_make_statements(Compiler* self, List* statements)
+ 
+ void compiler_make_statement(Compiler* self, StatementNode* node)
+ {
+-    switch (node->type) {
+-    case ST_FUNC_DEF:
++    switch (node->node_type) {
++    case STATEMENT_TYPE_FUNC_DEF:
+         return compiler_make_function_definition(self, (FuncDefNode*) node);
+-    case ST_RETURN:
++    case STATEMENT_TYPE_RETURN:
+         return compiler_make_return(self, (ReturnNode*) node);
+-    case ST_EXPRESSION:
+-    case StatementNodeType_LAST:
++    case STATEMENT_TYPE_EXPRESSION:
+     default:
+         assert(!"unexpected StatementNodeType");
+     }
+@@ -90,10 +89,9 @@ void compiler_make_return(Compiler* self, ReturnNode* node)
+ 
+ void compiler_make_expression(Compiler* self, ExpressionNode* node)
+ {
+-    switch (node->type) {
+-    case ET_INT:
++    switch (node->node_type) {
++    case EXPRESSION_TYPE_INT:
+         return compiler_make_int_literal(self, (IntNode*) node);
+-    case ExpressionNodeType_LAST:
+     default:
+         assert(!"unexpected ExpressionNodeType");
+     }
+diff --git a/compiler.h b/compiler.h
+index fe9461d..7f26864 100644
+--- a/compiler.h
++++ b/compiler.h
+@@ -4,7 +4,7 @@
+ #include "utils.h"
+ #include "parser.h"
+ 
+-typedef struct CompilerStruct {
++typedef struct Compiler {
+     List* ast;
+     StringBuilder* assembly;
+     bool inside_function;
+diff --git a/lexer.c b/lexer.c
+index f0948fc..e7ccc52 100644
+--- a/lexer.c
++++ b/lexer.c
+@@ -17,50 +17,54 @@ List* tokenize(char* text)
+ const char* token_type_to_string(TokenType type)
+ {
+     switch (type) {
+-    case TT_IDENTIFIER:
+-        return "TT_IDENTIFIER";
+-    case TT_KW_VOID:
+-        return "TT_KW_VOID";
+-    case TT_KW_INT:
+-        return "TT_KW_INT";
+-    case TT_KW_IF:
+-        return "TT_KW_IF";
+-    case TT_KW_ELSE:
+-        return "TT_KW_ELSE";
+-    case TT_KW_FOR:
+-        return "TT_KW_FOR";
+-    case TT_KW_WHILE:
+-        return "TT_KW_WHILE";
+-    case TT_KW_SWITCH:
+-        return "TT_KW_SWITCH";
+-    case TT_KW_CASE:
+-        return "TT_KW_CASE";
+-    case TT_KW_RETURN:
+-        return "TT_KW_RETURN";
+-    case TT_KW_CONTINUE:
+-        return "TT_KW_CONTINUE";
+-    case TT_KW_BREAK:
+-        return "TT_KW_BREAK";
+-    case TT_INT_LITERAL:
+-        return "TT_INT_LITERAL";
+-    case TT_LPAREN:
+-        return "TT_LPAREN";
+-    case TT_RPAREN:
+-        return "TT_RPAREN";
+-    case TT_LBRACE:
+-        return "TT_LBRACE";
+-    case TT_RBRACE:
+-        return "TT_RBRACE";
+-    case TT_LBRACKET:
+-        return "TT_LBRACKET";
+-    case TT_RBRACKET:
+-        return "TT_RBRACKET";
+-    case TT_EOL:
+-        return "TT_EOL";
+-    case TT_EOF:
+-        return "TT_EOF";
+-    case TokenType_LAST:
+-        return "TokenType_LAST";
++    case TOKEN_TYPE_IDENTIFIER:
++        return "TOKEN_TYPE_IDENTIFIER";
++    case TOKEN_TYPE_KW_VOID:
++        return "TOKEN_TYPE_KW_VOID";
++    case TOKEN_TYPE_KW_INT:
++        return "TOKEN_TYPE_KW_INT";
++    case TOKEN_TYPE_KW_IF:
++        return "TOKEN_TYPE_KW_IF";
++    case TOKEN_TYPE_KW_ELSE:
++        return "TOKEN_TYPE_KW_ELSE";
++    case TOKEN_TYPE_KW_FOR:
++        return "TOKEN_TYPE_KW_FOR";
++    case TOKEN_TYPE_KW_WHILE:
++        return "TOKEN_TYPE_KW_WHILE";
++    case TOKEN_TYPE_KW_SWITCH:
++        return "TOKEN_TYPE_KW_SWITCH";
++    case TOKEN_TYPE_KW_CASE:
++        return "TOKEN_TYPE_KW_CASE";
++    case TOKEN_TYPE_KW_RETURN:
++        return "TOKEN_TYPE_KW_RETURN";
++    case TOKEN_TYPE_KW_CONTINUE:
++        return "TOKEN_TYPE_KW_CONTINUE";
++    case TOKEN_TYPE_KW_BREAK:
++        return "TOKEN_TYPE_KW_BREAK";
++    case TOKEN_TYPE_INT_LITERAL:
++        return "TOKEN_TYPE_INT_LITERAL";
++    case TOKEN_TYPE_LPAREN:
++        return "TOKEN_TYPE_LPAREN";
++    case TOKEN_TYPE_RPAREN:
++        return "TOKEN_TYPE_RPAREN";
++    case TOKEN_TYPE_LBRACE:
++        return "TOKEN_TYPE_LBRACE";
++    case TOKEN_TYPE_RBRACE:
++        return "TOKEN_TYPE_RBRACE";
++    case TOKEN_TYPE_LBRACKET:
++        return "TOKEN_TYPE_LBRACKET";
++    case TOKEN_TYPE_RBRACKET:
++        return "TOKEN_TYPE_RBRACKET";
++    case TOKEN_TYPE_ASSIGN:
++        return "TOKEN_TYPE_ASSIGN";
++    case TOKEN_TYPE_EQUAL:
++        return "TOKEN_TYPE_EQUAL";
++    case TOKEN_TYPE_PLUS:
++        return "TOKEN_TYPE_PLUS";
++    case TOKEN_TYPE_EOL:
++        return "TOKEN_TYPE_EOL";
++    case TOKEN_TYPE_EOF:
++        return "TOKEN_TYPE_EOF";
+     }
+     assert(0 && "unreachable");
+ }
+@@ -136,7 +140,7 @@ List* lexer_tokenize(Lexer* self)
+         }
+     }
+ 
+-    tokens->add(tokens, new_token(TT_EOF, self->text + self->index, 1));
++    tokens->add(tokens, new_token(TOKEN_TYPE_EOF, self->text + self->index, 1));
+     return tokens;
+ }
+ 
+@@ -155,19 +159,23 @@ Token* lexer_match_char(Lexer* self)
+ {
+     switch (self->c) {
+     case '(':
+-        return make_single_char_token_and_call_next_after(self, TT_LPAREN);
++        return make_single_char_token_and_call_next_after(self, TOKEN_TYPE_LPAREN);
+     case ')':
+-        return make_single_char_token_and_call_next_after(self, TT_RPAREN);
++        return make_single_char_token_and_call_next_after(self, TOKEN_TYPE_RPAREN);
+     case '{':
+-        return make_single_char_token_and_call_next_after(self, TT_LBRACE);
++        return make_single_char_token_and_call_next_after(self, TOKEN_TYPE_LBRACE);
+     case '}':
+-        return make_single_char_token_and_call_next_after(self, TT_RBRACE);
++        return make_single_char_token_and_call_next_after(self, TOKEN_TYPE_RBRACE);
+     case '[':
+-        return make_single_char_token_and_call_next_after(self, TT_LBRACKET);
++        return make_single_char_token_and_call_next_after(self, TOKEN_TYPE_LBRACKET);
+     case ']':
+-        return make_single_char_token_and_call_next_after(self, TT_RBRACKET);
++        return make_single_char_token_and_call_next_after(self, TOKEN_TYPE_RBRACKET);
++    case '=':
++        return lexer_make_equal_or_assign(self);
++    case '+':
++        return make_single_char_token_and_call_next_after(self, TOKEN_TYPE_PLUS);
+     case ';':
+-        return make_single_char_token_and_call_next_after(self, TT_EOL);
++        return make_single_char_token_and_call_next_after(self, TOKEN_TYPE_EOL);
+     default:
+         printf("unexpected char %d == '%c'\n", self->c, self->c);
+         assert(!"unexpected char");
+@@ -183,29 +191,29 @@ Token* lexer_make_number(Lexer* self)
+         value_length++;
+         lexer_next(self);
+     }
+-    return new_token(TT_INT_LITERAL, value, value_length);
++    return new_token(TOKEN_TYPE_INT_LITERAL, value, value_length);
+ }
+ 
+-#define CHECK_KEYWORD(identifier, length, type, keyword)    \
+-    ({                                                \
+-        if (strncmp(identifer, keyword, length) == 0) \
+-            return type;                              \
++#define CHECK_KEYWORD(identifier, length, type, keyword) \
++    ({                                                   \
++        if (strncmp(identifer, keyword, length) == 0)    \
++            return type;                                 \
+     })
+ 
+ static inline TokenType identifier_or_kw_token_type(const char* identifer, size_t length)
+ {
+-    CHECK_KEYWORD(identifer, length, TT_KW_VOID, "void");
+-    CHECK_KEYWORD(identifer, length, TT_KW_INT, "int");
+-    CHECK_KEYWORD(identifer, length, TT_KW_IF, "if");
+-    CHECK_KEYWORD(identifer, length, TT_KW_ELSE, "else");
+-    CHECK_KEYWORD(identifer, length, TT_KW_FOR, "for");
+-    CHECK_KEYWORD(identifer, length, TT_KW_WHILE, "while");
+-    CHECK_KEYWORD(identifer, length, TT_KW_SWITCH, "switch");
+-    CHECK_KEYWORD(identifer, length, TT_KW_CASE, "case");
+-    CHECK_KEYWORD(identifer, length, TT_KW_RETURN, "return");
+-    CHECK_KEYWORD(identifer, length, TT_KW_CONTINUE, "continue");
+-    CHECK_KEYWORD(identifer, length, TT_KW_BREAK, "break");
+-    return TT_IDENTIFIER;
++    CHECK_KEYWORD(identifer, length, TOKEN_TYPE_KW_VOID, "void");
++    CHECK_KEYWORD(identifer, length, TOKEN_TYPE_KW_INT, "int");
++    CHECK_KEYWORD(identifer, length, TOKEN_TYPE_KW_IF, "if");
++    CHECK_KEYWORD(identifer, length, TOKEN_TYPE_KW_ELSE, "else");
++    CHECK_KEYWORD(identifer, length, TOKEN_TYPE_KW_FOR, "for");
++    CHECK_KEYWORD(identifer, length, TOKEN_TYPE_KW_WHILE, "while");
++    CHECK_KEYWORD(identifer, length, TOKEN_TYPE_KW_SWITCH, "switch");
++    CHECK_KEYWORD(identifer, length, TOKEN_TYPE_KW_CASE, "case");
++    CHECK_KEYWORD(identifer, length, TOKEN_TYPE_KW_RETURN, "return");
++    CHECK_KEYWORD(identifer, length, TOKEN_TYPE_KW_CONTINUE, "continue");
++    CHECK_KEYWORD(identifer, length, TOKEN_TYPE_KW_BREAK, "break");
++    return TOKEN_TYPE_IDENTIFIER;
+ }
+ 
+ Token* lexer_make_name(Lexer* self)
+diff --git a/nodes.c b/nodes.c
+index ec93159..2633cbd 100644
+--- a/nodes.c
++++ b/nodes.c
+@@ -7,20 +7,18 @@
+ 
+ void delete_node_inheriter(Node* self)
+ {
+-    self->delete(self);
++    self->delete (self);
+ }
+ 
+ const char* statement_node_type_to_string(StatementNodeType type)
+ {
+     switch (type) {
+-    case ST_FUNC_DEF:
+-        return "ST_FUNC_DEF";
+-    case ST_RETURN:
+-        return "ST_RETURN";
+-    case ST_EXPRESSION:
+-        return "ST_EXPRESSION";
+-    case StatementNodeType_LAST:
+-        return "StatementNodeType_LAST";
++    case STATEMENT_TYPE_FUNC_DEF:
++        return "STATEMENT_TYPE_FUNC_DEF";
++    case STATEMENT_TYPE_RETURN:
++        return "STATEMENT_TYPE_RETURN";
++    case STATEMENT_TYPE_EXPRESSION:
++        return "STATEMENT_TYPE_EXPRESSION";
+     }
+     assert(0 && "unreachable");
+ }
+@@ -28,10 +26,12 @@ const char* statement_node_type_to_string(StatementNodeType type)
+ const char* expression_node_type_to_string(ExpressionNodeType type)
+ {
+     switch (type) {
+-    case ET_INT:
+-        return "ET_INT";
+-    case ExpressionNodeType_LAST:
+-        return "ExpressionNodeType_LAST";
++    case EXPRESSION_TYPE_ASSIGNMENT:
++        return "EXPRESSION_TYPE_ASSIGNMENT";
++    case EXPRESSION_TYPE_BINARY_OPERATION:
++        return "EXPRESSION_TYPE_BINARY_OPERATION";
++    case EXPRESSION_TYPE_INT:
++        return "EXPRESSION_TYPE_INT";
+     }
+     assert(0 && "unreachable");
+ }
+@@ -39,10 +39,8 @@ const char* expression_node_type_to_string(ExpressionNodeType type)
+ const char* type_node_type_to_string(TypeNodeType type)
+ {
+     switch (type) {
+-    case TNT_KEYWORD:
+-        return "TNT_KEYWORD";
+-    case TypeNodeType_LAST:
+-        return "TypeNodeType_LAST";
++    case TYPE_NODE_TYPE_KEYWORD:
++        return "TYPE_NODE_TYPE_KEYWORD";
+     }
+     assert(0 && "unreachable");
+ }
+@@ -60,7 +58,7 @@ FuncDefNode* new_func_def_node(
+     *self = (FuncDefNode) {
+         .delete = delete_func_def_node,
+         .to_string = func_def_node_to_string,
+-        .type = ST_FUNC_DEF,
++        .node_type = STATEMENT_TYPE_FUNC_DEF,
+         .target = target,
+         .return_type = return_type,
+         .params = params,
+@@ -79,7 +77,7 @@ void delete_func_def_node(FuncDefNode* self)
+ 
+ char* func_def_node_to_string(FuncDefNode* self)
+ {
+-    const char* type = statement_node_type_to_string(self->type);
++    const char* type = statement_node_type_to_string(self->node_type);
+     char* target = token_to_string(self->target);
+     char* return_type = self->return_type->to_string(self->return_type);
+     char* params = "<unimplemented>";
+@@ -117,7 +115,7 @@ ReturnNode* new_return_node(ExpressionNode* value)
+     *self = (ReturnNode) {
+         .delete = delete_return_node,
+         .to_string = return_node_to_string,
+-        .type = ST_RETURN,
++        .node_type = STATEMENT_TYPE_RETURN,
+         .value = value,
+     };
+     return self;
+@@ -125,13 +123,13 @@ ReturnNode* new_return_node(ExpressionNode* value)
+ 
+ void delete_return_node(ReturnNode* self)
+ {
+-    self->value->delete(self->value);
++    self->value->delete (self->value);
+     free(self);
+ }
+ 
+ char* return_node_to_string(ReturnNode* self)
+ {
+-    const char* type = statement_node_type_to_string(self->type);
++    const char* type = statement_node_type_to_string(self->node_type);
+     char* value = self->value->to_string(self->value);
+ 
+     char* buffer = calloc(8192, sizeof(char));
+@@ -152,7 +150,7 @@ ExprStmtNode* new_expression_statement_node(ExpressionNode* value)
+     *self = (ExprStmtNode) {
+         .delete = delete_expression_statement_node,
+         .to_string = expression_statment_to_string,
+-        .type = ST_EXPRESSION,
++        .node_type = STATEMENT_TYPE_EXPRESSION,
+         .value = value,
+     };
+     return self;
+@@ -160,13 +158,13 @@ ExprStmtNode* new_expression_statement_node(ExpressionNode* value)
+ 
+ void delete_expression_statement_node(ExprStmtNode* self)
+ {
+-    self->value->delete(self->value);
++    self->value->delete (self->value);
+     free(self);
+ }
+ 
+ char* expression_statment_to_string(ExprStmtNode* self)
+ {
+-    const char* type = statement_node_type_to_string(self->type);
++    const char* type = statement_node_type_to_string(self->node_type);
+     char* value = self->value->to_string(self->value);
+ 
+     char* buffer = calloc(8192, sizeof(char));
+@@ -178,29 +176,29 @@ char* expression_statment_to_string(ExprStmtNode* self)
+     return buffer;
+ }
+ 
+-KeywordTypeNode* new_keyword_type_token(Token* token)
++KeywordTypeNode* new_keyword_type_node(Token* token)
+ {
+     static_assert(sizeof(Node) == 16, "incomplete implementation of Node");
+     static_assert(sizeof(TypeNode) == 24, "incomplete implementation of TypeNode");
+     static_assert(sizeof(KeywordTypeNode) == 32, "incomplete construction of KeywordTypeNode");
+     KeywordTypeNode* self = calloc(1, sizeof(KeywordTypeNode));
+     *self = (KeywordTypeNode) {
+-        .delete = delete_keyword_type_token,
+-        .to_string = keyword_type_to_string,
+-        .type = TNT_KEYWORD,
++        .delete = delete_keyword_type_node,
++        .to_string = keyword_type_node_to_string,
++        .node_type = TYPE_NODE_TYPE_KEYWORD,
+         .token = token,
+     };
+     return self;
+ }
+ 
+-void delete_keyword_type_token(KeywordTypeNode* self)
++void delete_keyword_type_node(KeywordTypeNode* self)
+ {
+     free(self);
+ }
+ 
+-char* keyword_type_to_string(KeywordTypeNode* self)
++char* keyword_type_node_to_string(KeywordTypeNode* self)
+ {
+-    const char* type = type_node_type_to_string(self->type);
++    const char* type = type_node_type_to_string(self->node_type);
+     char* token = token_to_string(self->token);
+ 
+     char* buffer = calloc(8192, sizeof(char));
+@@ -221,7 +219,7 @@ IntNode* new_int_node(Token* token)
+     *self = (IntNode) {
+         .delete = delete_int_node,
+         .to_string = int_node_to_string,
+-        .type = ET_INT,
++        .node_type = EXPRESSION_TYPE_INT,
+         .token = token,
+     };
+     return self;
+@@ -235,7 +233,7 @@ void delete_int_node(IntNode* self)
+ char* int_node_to_string(IntNode* self)
+ {
+     static_assert(sizeof(Node) == 16, "incomplete implementation of Node");
+-    const char* type = expression_node_type_to_string(self->type);
++    const char* type = expression_node_type_to_string(self->node_type);
+     char* token = token_to_string(self->token);
+ 
+     char* buffer = calloc(8192, sizeof(char));
+diff --git a/parser.c b/parser.c
+index 812cbf8..a29c067 100644
+--- a/parser.c
++++ b/parser.c
+@@ -30,9 +30,9 @@ List* parser_parse(Parser* self)
+ List* parser_make_statements(Parser* self)
+ {
+     List* statements = (List*) new_array_list();
+-    while (!self->done && self->t->type != TT_RBRACE)
++    while (!self->done && self->t->type != TOKEN_TYPE_RBRACE)
+         statements->add(statements, parser_make_statement(self));
+-    if (self->t->type == TT_RBRACE)
++    if (self->t->type == TOKEN_TYPE_RBRACE)
+         parser_next(self);
+     return statements;
+ }
+@@ -41,14 +41,14 @@ StatementNode* parser_make_statement(Parser* self)
+ {
+     StatementNode* result;
+     switch (self->t->type) {
+-    case TT_KW_RETURN:
++    case TOKEN_TYPE_KW_RETURN:
+         result = (StatementNode*) parser_make_return(self);
+-        if (self->t->type != TT_EOL)
++        if (self->t->type != TOKEN_TYPE_EOL)
+             assert(!"expected ';'");
+         parser_skip_newline(self);
+         break;
+-    case TT_KW_VOID:
+-    case TT_KW_INT:
++    case TOKEN_TYPE_KW_VOID:
++    case TOKEN_TYPE_KW_INT:
+         result = parser_make_declaration_definition_or_initialization(self);
+         break;
+     default:
+@@ -67,17 +67,17 @@ ReturnNode* parser_make_return(Parser* self)
+ StatementNode* parser_make_declaration_definition_or_initialization(Parser* self)
+ {
+     TypeNode* type = parser_make_type(self);
+-    if (self->t->type != TT_IDENTIFIER)
++    if (self->t->type != TOKEN_TYPE_IDENTIFIER)
+         assert(!"unexpected token, expected identifier");
+     Token* target = self->t;
+     parser_next(self);
+-    if (self->t->type != TT_LPAREN)
++    if (self->t->type != TOKEN_TYPE_LPAREN)
+         assert(!"unexpected token, expected '(', declarations not implemented btw");
+     parser_next(self);
+-    if (self->t->type != TT_RPAREN)
++    if (self->t->type != TOKEN_TYPE_RPAREN)
+         assert(!"unexpected token, expected ')', parameters not implemented btw");
+     parser_next(self);
+-    if (self->t->type != TT_LBRACE)
++    if (self->t->type != TOKEN_TYPE_LBRACE)
+         assert(!"unexpected token, expected '{'");
+     parser_next(self);
+     List* body = parser_make_statements(self);
+@@ -89,10 +89,10 @@ TypeNode* parser_make_type(Parser* self)
+     Token* token = self->t;
+     parser_next(self);
+     switch (token->type) {
+-    case TT_KW_VOID:
+-        return (TypeNode*) new_keyword_type_token(token);
+-    case TT_KW_INT:
+-        return (TypeNode*) new_keyword_type_token(token);
++    case TOKEN_TYPE_KW_VOID:
++        return (TypeNode*) new_keyword_type_node(token);
++    case TOKEN_TYPE_KW_INT:
++        return (TypeNode*) new_keyword_type_node(token);
+     default:
+         assert(!"unexpected token type");
+     }
+@@ -100,7 +100,7 @@ TypeNode* parser_make_type(Parser* self)
+ 
+ ExpressionNode* parser_make_expression(Parser* self)
+ {
+-    if (self->t->type == TT_INT_LITERAL) {
++    if (self->t->type == TOKEN_TYPE_INT_LITERAL) {
+         Token* token = self->t;
+         parser_next(self);
+         return (ExpressionNode*) new_int_node(token);
+@@ -111,7 +111,7 @@ ExpressionNode* parser_make_expression(Parser* self)
+ 
+ void parser_skip_newline(Parser* self)
+ {
+-    while (self->t->type == TT_EOL)
++    while (self->t->type == TOKEN_TYPE_EOL)
+         parser_next(self);
+ }
+ 
+@@ -120,7 +120,7 @@ void parser_next(Parser* self)
+     self->index++;
+     self->done = self->index >= self->tokens->length(self->tokens);
+     self->t = self->done ? NULL : self->tokens->get(self->tokens, self->index);
+-    self->done = self->t->type == TT_EOF || self->done;
++    self->done = self->t->type == TOKEN_TYPE_EOF || self->done;
+ }
+ 
+ List* parse(List* tokens)
+diff --git a/parser.h b/parser.h
+index 7590032..20af32f 100644
+--- a/parser.h
++++ b/parser.h
+@@ -3,34 +3,36 @@
+ #include "utils.h"
+ #include <stdbool.h>
+ 
+-typedef enum TokenTypeEnum {
+-    TT_IDENTIFIER,
+-    TT_KW_VOID,
+-    TT_KW_INT,
+-    TT_KW_IF,
+-    TT_KW_ELSE,
+-    TT_KW_FOR,
+-    TT_KW_WHILE,
+-    TT_KW_SWITCH,
+-    TT_KW_CASE,
+-    TT_KW_RETURN,
+-    TT_KW_CONTINUE,
+-    TT_KW_BREAK,
+-    TT_INT_LITERAL,
+-    TT_LPAREN,
+-    TT_RPAREN,
+-    TT_LBRACE,
+-    TT_RBRACE,
+-    TT_LBRACKET,
+-    TT_RBRACKET,
+-    TT_EOL,
+-    TT_EOF,
+-    TokenType_LAST,
++typedef enum TokenType {
++    TOKEN_TYPE_IDENTIFIER,
++    TOKEN_TYPE_KW_VOID,
++    TOKEN_TYPE_KW_INT,
++    TOKEN_TYPE_KW_IF,
++    TOKEN_TYPE_KW_ELSE,
++    TOKEN_TYPE_KW_FOR,
++    TOKEN_TYPE_KW_WHILE,
++    TOKEN_TYPE_KW_SWITCH,
++    TOKEN_TYPE_KW_CASE,
++    TOKEN_TYPE_KW_RETURN,
++    TOKEN_TYPE_KW_CONTINUE,
++    TOKEN_TYPE_KW_BREAK,
++    TOKEN_TYPE_INT_LITERAL,
++    TOKEN_TYPE_LPAREN,
++    TOKEN_TYPE_RPAREN,
++    TOKEN_TYPE_LBRACE,
++    TOKEN_TYPE_RBRACE,
++    TOKEN_TYPE_LBRACKET,
++    TOKEN_TYPE_RBRACKET,
++    TOKEN_TYPE_ASSIGN,
++    TOKEN_TYPE_EQUAL,
++    TOKEN_TYPE_PLUS,
++    TOKEN_TYPE_EOL,
++    TOKEN_TYPE_EOF,
+ } TokenType;
+ 
+ const char* token_type_to_string(TokenType type);
+ 
+-typedef struct TokenStruct {
++typedef struct Token {
+     TokenType type;
+     const char* value;
+     size_t length;
+@@ -43,7 +45,7 @@ Token* new_token(
+ void delete_token(Token* self);
+ char* token_to_string(Token* self);
+ 
+-typedef struct LexerStruct {
++typedef struct Lexer {
+     const char* text;
+     int index;
+     char c;
+@@ -56,73 +58,63 @@ List* lexer_tokenize(Lexer* self);
+ Token* lexer_match_char(Lexer* self);
+ Token* lexer_make_number(Lexer* self);
+ Token* lexer_make_name(Lexer* self);
++Token* lexer_make_equal_or_assign(Lexer* self);
+ void lexer_next(Lexer* self);
+ 
+ List* tokenize(char* text);
+ 
+-typedef struct NodeStruct {
+-    void (*delete)(struct NodeStruct* self);
+-    char* (*to_string)(struct NodeStruct* self);
++typedef struct Node {
++    void (*delete)(struct Node* self);
++    char* (*to_string)(struct Node* self);
+ } Node;
+ 
++// Should only be used as passed deletor.
+ void delete_node_inheriter(Node* self);
+ 
+-typedef enum StatementNodeTypeEnum {
+-    ST_FUNC_DEF,
+-    ST_RETURN,
+-    ST_EXPRESSION,
+-    StatementNodeType_LAST,
++typedef enum StatementNodeType {
++    STATEMENT_TYPE_FUNC_DEF,
++    STATEMENT_TYPE_RETURN,
++    STATEMENT_TYPE_EXPRESSION,
+ } StatementNodeType;
+ 
+ const char* statement_node_type_to_string(StatementNodeType type);
+ 
+-typedef struct StatementNodeStruct {
+-    void (*delete)(struct StatementNodeStruct* self);
+-    char* (*to_string)(struct StatementNodeStruct* self);
+-    StatementNodeType type;
++typedef struct StatementNode {
++    void (*delete)(struct StatementNode* self);
++    char* (*to_string)(struct StatementNode* self);
++    StatementNodeType node_type;
+ } StatementNode;
+ 
+-typedef enum ExpressionNodeTypeEnum {
+-    ET_INT,
+-    ExpressionNodeType_LAST,
++typedef enum ExpressionNodeType {
++    EXPRESSION_TYPE_ASSIGNMENT,
++    EXPRESSION_TYPE_BINARY_OPERATION,
++    EXPRESSION_TYPE_INT,
+ } ExpressionNodeType;
+ 
+ const char* expression_node_type_to_string(ExpressionNodeType type);
+ 
+-typedef struct ExpressionNodeStruct {
+-    void (*delete)(struct ExpressionNodeStruct* self);
+-    char* (*to_string)(struct ExpressionNodeStruct* self);
+-    ExpressionNodeType type;
++typedef struct ExpressionNode {
++    void (*delete)(struct ExpressionNode* self);
++    char* (*to_string)(struct ExpressionNode* self);
++    ExpressionNodeType node_type;
+ } ExpressionNode;
+ 
+-typedef enum TypeNodeTypeEnum {
+-    TNT_KEYWORD,
+-    TypeNodeType_LAST,
++typedef enum TypeNodeType {
++    TYPE_NODE_TYPE_KEYWORD,
+ } TypeNodeType;
+ 
+ const char* type_node_type_to_string(TypeNodeType type);
+ 
+-typedef struct TypeNodeStruct {
+-    void (*delete)(struct TypeNodeStruct* self);
+-    char* (*to_string)(struct TypeNodeStruct* self);
+-    TypeNodeType type;
++typedef struct TypeNode {
++    void (*delete)(struct TypeNode* self);
++    char* (*to_string)(struct TypeNode* self);
++    TypeNodeType node_type;
+ } TypeNode;
+ 
+-typedef struct KeywordTypeNodeStruct {
+-    void (*delete)(struct KeywordTypeNodeStruct* self);
+-    char* (*to_string)(struct KeywordTypeNodeStruct* self);
+-    TypeNodeType type;
+-    Token* token;
+-} KeywordTypeNode;
+-
+-KeywordTypeNode* new_keyword_type_token(Token* token);
+-void delete_keyword_type_token(KeywordTypeNode* self);
+-char* keyword_type_to_string(KeywordTypeNode* self);
+-
+-typedef struct FuncDefNodeStruct {
+-    void (*delete)(struct FuncDefNodeStruct* self);
+-    char* (*to_string)(struct FuncDefNodeStruct* self);
+-    StatementNodeType type;
++typedef struct FuncDefNode {
++    void (*delete)(struct FuncDefNode* self);
++    char* (*to_string)(struct FuncDefNode* self);
++    StatementNodeType node_type;
+     Token* target;
+     TypeNode* return_type;
+     List* params;
+@@ -137,10 +129,10 @@ FuncDefNode* new_func_def_node(
+ void delete_func_def_node(FuncDefNode* self);
+ char* func_def_node_to_string(FuncDefNode* self);
+ 
+-typedef struct ReturnNodeStruct {
+-    void (*delete)(struct ReturnNodeStruct* self);
+-    char* (*to_string)(struct ReturnNodeStruct* self);
+-    StatementNodeType type;
++typedef struct ReturnNode {
++    void (*delete)(struct ReturnNode* self);
++    char* (*to_string)(struct ReturnNode* self);
++    StatementNodeType node_type;
+     ExpressionNode* value;
+ } ReturnNode;
+ 
+@@ -148,10 +140,10 @@ ReturnNode* new_return_node(ExpressionNode* value);
+ void delete_return_node(ReturnNode* self);
+ char* return_node_to_string(ReturnNode* self);
+ 
+-typedef struct ExprStmtNodeStruct {
+-    void (*delete)(struct ExprStmtNodeStruct* self);
+-    char* (*to_string)(struct ExprStmtNodeStruct* self);
+-    StatementNodeType type;
++typedef struct ExprStmtNode {
++    void (*delete)(struct ExprStmtNode* self);
++    char* (*to_string)(struct ExprStmtNode* self);
++    StatementNodeType node_type;
+     ExpressionNode* value;
+ } ExprStmtNode;
+ 
+@@ -170,7 +162,7 @@ IntNode* new_int_node(Token* token);
+ void delete_int_node(IntNode* self);
+ char* int_node_to_string(IntNode* self);
+ 
+-typedef struct ParserStruct {
++typedef struct Parser {
+     List* tokens;
+     int index;
+     Token* t;
+diff --git a/utils.h b/utils.h
+index 7a52c42..9061a94 100644
+--- a/utils.h
++++ b/utils.h
+@@ -4,25 +4,25 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ 
+-typedef struct ListStruct {
+-    void (*delete)(struct ListStruct* self);
+-    size_t (*length)(struct ListStruct* self);
+-    void* (*get)(struct ListStruct* self, int index);
+-    void (*add)(struct ListStruct* self, void* element);
+-    void (*free_all)(struct ListStruct* self);
+-    void (*delete_all)(struct ListStruct* self, void (*)(void*));
++typedef struct List {
++    void (*delete)(struct List* self);
++    size_t (*length)(struct List* self);
++    void* (*get)(struct List* self, int index);
++    void (*add)(struct List* self, void* element);
++    void (*free_all)(struct List* self);
++    void (*delete_all)(struct List* self, void (*)(void*));
+ } List;
+ 
+ void list_free_all_and_self(List* list);
+-void list_delete_all_and_self(List* list, void (*deletor)(void *));
++void list_delete_all_and_self(List* list, void (*deletor)(void*));
+ 
+-typedef struct ArrayListStruct {
+-    void (*delete)(struct ArrayListStruct* self);
+-    size_t (*length)(struct ArrayListStruct* self);
+-    void* (*get)(struct ArrayListStruct* self, int index);
+-    void (*add)(struct ArrayListStruct* self, void* element);
+-    void (*free_all)(struct ArrayListStruct* self);
+-    void (*delete_all)(struct ArrayListStruct* self, void (*)(void*));
++typedef struct ArrayList {
++    void (*delete)(struct ArrayList* self);
++    size_t (*length)(struct ArrayList* self);
++    void* (*get)(struct ArrayList* self, int index);
++    void (*add)(struct ArrayList* self, void* element);
++    void (*free_all)(struct ArrayList* self);
++    void (*delete_all)(struct ArrayList* self, void (*)(void*));
+     size_t m_length;
+     void** m_elements;
+ } ArrayList;
+@@ -35,7 +35,7 @@ void array_list_add(ArrayList* self, void* element);
+ void array_list_free_all(ArrayList* self);
+ void array_list_delete_all(ArrayList* self, void (*)(void*));
+ 
+-typedef struct FileReaderStruct {
++typedef struct FileReader {
+     FILE* fp;
+ } FileReader;
+ 
+@@ -44,7 +44,7 @@ void delete_file_reader(FileReader* self);
+ size_t file_reader_length(FileReader* self);
+ char* file_reader_read(FileReader* self);
+ 
+-typedef struct FileWriterStruct {
++typedef struct FileWriter {
+     FILE* fp;
+ } FileWriter;
+ 
+@@ -52,7 +52,7 @@ FileWriter* new_file_writer(const char* path);
+ void delete_file_writer(FileWriter* self);
+ void file_writer_write(FileWriter* self, char* string);
+ 
+-typedef struct StringBuilderStruct {
++typedef struct StringBuilder {
+     size_t m_length;
+     char* m_buffer;
+ } StringBuilder;
+-- 
+2.25.1
+

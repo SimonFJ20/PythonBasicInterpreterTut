@@ -1,0 +1,39 @@
+From ce904439e38afe858104f9b027766f5c8ffa838c Mon Sep 17 00:00:00 2001
+From: Simon From <simonfromjakobsen@gmail.com>
+Date: Wed, 3 Nov 2021 23:44:56 +0100
+Subject: [PATCH] update readme
+
+---
+ README.md | 21 ++++++++++++++++++++-
+ 1 file changed, 20 insertions(+), 1 deletion(-)
+
+diff --git a/README.md b/README.md
+index 8b355a9..d292b01 100644
+--- a/README.md
++++ b/README.md
+@@ -1 +1,20 @@
+-# comal-2000
+\ No newline at end of file
++
++# neocomal
++
++**A non-[standard](http://datamuseum.dk/w/images/d/d5/KR_COMAL80_Kernel_Syntax_and_Semantics_Apr_1985.pdf) [COMAL](https://en.wikipedia.org/wiki/COMAL) implementation for modern hardware**
++
++## Roadmap
++
++- [ ] Direct interpretation/simulation
++    - [ ] [Lexing](https://en.wikipedia.org/wiki/Lexical_analysis)/[Parsing](https://en.wikipedia.org/wiki/Parsing) to [AST](https://en.wikipedia.org/wiki/AST)
++    - [ ] Direct [Interpretation](https://en.wikipedia.org/wiki/Interpreter_(computing)) of [AST](https://en.wikipedia.org/wiki/AST)
++- [ ] Compilation via. [NASM](https://nasm.us/) to [x86-64](https://en.wikipedia.org/wiki/X86-64)
++- [ ] Static analysis of [AST](https://en.wikipedia.org/wiki/AST)
++- [ ] Self hosting
++
++## Sources
++
++- [COMAL](https://en.wikipedia.org/wiki/COMAL)
++- [BASIC](https://en.wikipedia.org/wiki/BASIC)
++- [BASIC interpreter](https://en.wikipedia.org/wiki/BASIC_interpreter)
++
+-- 
+2.25.1
+

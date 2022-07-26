@@ -1,0 +1,551 @@
+From 3b763ae7197062c4fd3aee0259a1d239e43da48e Mon Sep 17 00:00:00 2001
+From: Simon From Jakobsen <simonfromjakobsen@gmail.com>
+Date: Tue, 14 Sep 2021 14:02:31 +0200
+Subject: [PATCH] Everything.
+
+---
+ .gitignore        |  3 ++
+ Makefile          | 36 +++++++++++++++++++++++
+ src/error.c       | 49 +++++++++++++++++++++++++++++++
+ src/error.h       | 34 ++++++++++++++++++++++
+ src/lexer.c       |  4 +++
+ src/lexer.h       | 11 +++++++
+ src/main.c        |  8 ++++++
+ src/position.c    | 50 ++++++++++++++++++++++++++++++++
+ src/position.h    | 25 ++++++++++++++++
+ src/stringutils.c | 62 ++++++++++++++++++++++++++++++++++++++++
+ src/stringutils.h | 12 ++++++++
+ src/tokens.c      | 67 +++++++++++++++++++++++++++++++++++++++++++
+ src/tokens.h      | 73 +++++++++++++++++++++++++++++++++++++++++++++++
+ 13 files changed, 434 insertions(+)
+ create mode 100644 .gitignore
+ create mode 100644 Makefile
+ create mode 100644 src/error.c
+ create mode 100644 src/error.h
+ create mode 100644 src/lexer.c
+ create mode 100644 src/lexer.h
+ create mode 100644 src/main.c
+ create mode 100644 src/position.c
+ create mode 100644 src/position.h
+ create mode 100644 src/stringutils.c
+ create mode 100644 src/stringutils.h
+ create mode 100644 src/tokens.c
+ create mode 100644 src/tokens.h
+
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..71d0db4
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,3 @@
++obj/
++out
++*.exe
+diff --git a/Makefile b/Makefile
+new file mode 100644
+index 0000000..01a709e
+--- /dev/null
++++ b/Makefile
+@@ -0,0 +1,36 @@
++
++#
++# Makefile by SimonFJ20
++#
++
++BIN=out
++
++CC=gcc
++
++LFLAGS=-lm
++CFLAGS=-g -Wall
++
++SRC=src
++HDR=src
++OBJ=obj
++LIB=lib
++
++SRCS=$(wildcard $(SRC)/*.c)
++HDRS=$(wildcard $(HDR)/*.h)
++OBJS=$(patsubst $(SRC)/%.c, $(OBJ)/%.o, $(SRCS))
++
++$(BIN): $(OBJS) $(OBJ)
++	$(CC) $(OBJS) -o $@ -L$(LIB) $(CFLAGS) $(LFLAGS)
++
++$(OBJ)/%.o: $(SRC)/%.c $(OBJ) $(HDRS)
++	$(CC) -c $< -o $@ -I$(HDR) $(CFLAGS)
++
++$(OBJ):
++	mkdir -p $@
++
++.PHONY: clean
++
++clean:
++	$(RM) -r $(OBJ)
++	$(RM) $(BIN)
++
+diff --git a/src/error.c b/src/error.c
+new file mode 100644
+index 0000000..780b355
+--- /dev/null
++++ b/src/error.c
+@@ -0,0 +1,49 @@
++#include <string.h>
++#include <stdio.h>
++#include "error.h"
++#include "stringutils.h"
++
++int error_init(Error* e,
++               ErrorType type, 
++               Position* pos_start, 
++               Position* pos_end, 
++               char* name, 
++               char* details)
++{
++    e->type = type;
++    e->pos_start = pos_start;
++    e->pos_end = pos_end;
++
++    e->name[0] = '\0';
++    e->details[0] = '\0';
++
++    strcpy(e->name, name);
++    strcpy(e->details, details);
++
++    return 0;
++} 
++
++int error_to_string(Error* e, char* result) 
++{
++    result[0] = '\0';
++
++    char swa[64] = {'\0'};
++
++    str_string_with_arrows(
++            e->pos_start->ftxt, 
++            swa, 
++            e->pos_start, 
++            e->pos_end);
++
++    sprintf(result, 
++            "%s: %s\nOn line %d, in \"%s\"\n\n%s",
++            e->name,
++            e->details,
++            e->pos_start->ln - 1,
++            e->pos_start->fn, 
++            swa);
++    
++    return 0;
++}
++
++
+diff --git a/src/error.h b/src/error.h
+new file mode 100644
+index 0000000..3d0fcb0
+--- /dev/null
++++ b/src/error.h
+@@ -0,0 +1,34 @@
++#ifndef ERROR_H
++#define ERROR_H
++
++#include "position.h"
++
++typedef enum
++{
++    IllegalCharError,
++    ExpectedCharError,
++    InvalidSyntaxError,
++    RTError
++}
++ErrorType;
++
++typedef struct
++{
++    ErrorType type;
++    Position* pos_start;
++    Position* pos_end;
++    char name[32];
++    char details[256];
++}
++Error;
++
++int error_init(Error* e,
++               ErrorType type, 
++               Position* pos_start, 
++               Position* pos_end, 
++               char* name, 
++               char* details);
++
++int error_to_string(Error* e, char* result);
++
++#endif
+diff --git a/src/lexer.c b/src/lexer.c
+new file mode 100644
+index 0000000..0cd98c2
+--- /dev/null
++++ b/src/lexer.c
+@@ -0,0 +1,4 @@
++#include "lexer.h"
++
++
++
+diff --git a/src/lexer.h b/src/lexer.h
+new file mode 100644
+index 0000000..cce547c
+--- /dev/null
++++ b/src/lexer.h
+@@ -0,0 +1,11 @@
++#ifndef LEXER_H
++#define LEXER_H
++
++typedef struct
++{
++    char fn[64];
++    char text
++}
++Lexer;
++
++#endif
+diff --git a/src/main.c b/src/main.c
+new file mode 100644
+index 0000000..0154911
+--- /dev/null
++++ b/src/main.c
+@@ -0,0 +1,8 @@
++#include <stdio.h>
++
++
++int main()
++{
++    printf("test\n");
++}
++
+diff --git a/src/position.c b/src/position.c
+new file mode 100644
+index 0000000..db20967
+--- /dev/null
++++ b/src/position.c
+@@ -0,0 +1,50 @@
++#include "position.h"
++#include <string.h>
++
++int position_init(Position* p, 
++                  int idx, 
++                  int ln, 
++                  int col, 
++                  char* fn, 
++                  char* ftxt)
++{
++    p->idx = idx;
++    p->ln = ln;
++    p->col = col;
++
++    p->fn[0] = '\0';
++    p->ftxt[0] = '\0';
++
++    strcpy(p->fn, fn);
++    strcpy(p->ftxt, ftxt);
++
++    return 0;
++}
++
++int position_advance(Position* p, char current_char)
++{
++    p->idx++;
++    p->col++;
++    if (current_char == '\n')
++    {
++        p->ln++;
++        p->col = 0;
++    }
++    return 0;
++}
++
++int position_copy(Position* origin, Position* clone)
++{
++    clone->idx = origin->idx;
++    clone->ln = origin->ln;
++    clone->col = origin->col;
++
++    clone->fn[0] = '\0';
++    clone->ftxt[0] = '\0';
++
++    strcpy(clone->fn, origin->fn);
++    strcpy(clone->ftxt, origin->ftxt);
++
++    return 0;
++}
++
+diff --git a/src/position.h b/src/position.h
+new file mode 100644
+index 0000000..50bbbda
+--- /dev/null
++++ b/src/position.h
+@@ -0,0 +1,25 @@
++#ifndef POSITION_H
++#define POSITION_H
++
++typedef struct
++{
++    int idx;
++    int ln;
++    int col;
++    char fn[64];
++    char ftxt[65536];
++}
++Position;
++
++int position_init(Position* p, 
++                  int idx, 
++                  int ln, 
++                  int col, 
++                  char* fn, 
++                  char* ftxt); 
++
++int position_advance(Position* p, char current_char);
++
++int position_copy(Position* origin, Position* clone);
++
++#endif
+diff --git a/src/stringutils.c b/src/stringutils.c
+new file mode 100644
+index 0000000..f5cea9a
+--- /dev/null
++++ b/src/stringutils.c
+@@ -0,0 +1,62 @@
++#include "stringutils.h"
++#include <string.h>
++#include <stdlib.h>
++
++int str_index_of(char* text, char c, int start, int end)
++{   
++    int len = strlen(text);
++    if (end)
++        len = end;
++    for (int i = start; i < len; i++)
++        if (text[i] == c)
++            return i;
++    return -1;
++}
++
++int str_last_index_of(char* text, char c, int start, int end)
++{   
++    int len = strlen(text);
++    if (end)
++        len = end;
++
++    int lastIndex = -1;
++    for (int i = start; i < len; i++)
++        if (text[i] == c)
++            lastIndex = i;
++    return lastIndex;
++}
++
++int str_string_with_arrows(char* text, char* output, Position* start, Position* end)
++{
++    size_t output_size = 0;
++
++    int idx_start = str_last_index_of(text, '\n', 0, start->idx);
++    int idx_end = str_index_of(text, '\n', idx_start + 1, 0);
++
++    if (idx_end < 0)
++        idx_end = strlen(text);
++
++    int line_count = end->ln - start->ln + 1;
++    for (int i = 0; i < line_count; i++)
++    {
++        char line[256];// = text[idx_start:idx_end];
++        for (int j = 0; j < idx_end - idx_start; j++)
++            line[j] = text[idx_start + j];
++        int col_start = (i == 0) ? start->col : 0;
++        int col_end = (i == line_count - 1) ? end->col : strlen(line) - 1;
++        
++        for (int j = 0; j < strlen(line); j++)
++            output[output_size++] = line[j];
++        line[output_size++] = '\n';
++        for (int j = 0; j < col_start; j++)
++            output[output_size++] = ' ';
++        for (int j = 0; j < (col_start - col_end); j++)
++            output[output_size++] = '^';
++        idx_start = idx_end;
++        idx_end = str_index_of(text, '\n', idx_start + 1, 0);
++    }
++    output[output_size++] = '\0';
++
++    return 0;
++}
++
+diff --git a/src/stringutils.h b/src/stringutils.h
+new file mode 100644
+index 0000000..e1fb00f
+--- /dev/null
++++ b/src/stringutils.h
+@@ -0,0 +1,12 @@
++#ifndef STRINGUTILS_H
++#define STRINGUTILS_H
++
++#include "position.h"
++
++int str_index_of(char* text, char c, int start, int end);
++
++int str_last_index_of(char* text, char c, int start, int end);
++
++int str_string_with_arrows(char* text, char* output, Position* start, Position* end);
++
++#endif
+diff --git a/src/tokens.c b/src/tokens.c
+new file mode 100644
+index 0000000..1dd744f
+--- /dev/null
++++ b/src/tokens.c
+@@ -0,0 +1,67 @@
++#include "tokens.h"
++#include "position.h"
++#include <string.h>
++
++const char* KEYWORDS[] = {
++    "VAR",
++    "AND",
++    "OR",
++    "NOT",
++    "IF",
++    "ELIF",
++    "ELSE",
++    "FOR",
++    "TO",
++    "STEP",
++    "WHILE",
++    "FUN",
++    "THEN",
++    "DO",
++    "END",
++    "RETURN",
++    "CONTINUE",
++    "BREAK"
++};
++
++int token_init(Token* t,
++               TokenType type,
++               Position* pos_start,
++               Position* pos_end)
++{
++    t->type = type;
++
++    position_copy(pos_start, &t->pos_start);
++    position_copy(pos_end, &t->pos_end);
++
++    return 0;
++} 
++
++int token_set_int(Token* t, int value)
++{
++    t->type = TV_INT;
++    t->intValue = value;
++
++    return 0;
++}
++int token_set_float(Token* t, double value)
++{
++    t->type = TV_FLOAT;
++    t->floatValue = value;
++
++    return 0;
++}
++int token_set_char(Token* t, char value)
++{
++    t->type = TV_CHAR;
++    t->charValue = value;
++
++    return 0;
++}
++int token_set_string(Token* t, char* value)
++{
++    t->type = TV_STRING;
++    t->stringValue[0] = '\0';
++    strcpy(t->stringValue, value);
++
++    return 0;
++}
+\ No newline at end of file
+diff --git a/src/tokens.h b/src/tokens.h
+new file mode 100644
+index 0000000..02d7cf2
+--- /dev/null
++++ b/src/tokens.h
+@@ -0,0 +1,73 @@
++#ifndef TOKENS_H
++#define TOKENS_H
++
++#include "position.h"
++
++typedef enum
++{
++    TT_INT,
++    TT_FLOAT,
++    TT_STRING,
++    TT_IDENTIFIER,
++    TT_KEYWORD,
++    TT_PLUS,
++    TT_MINUS,
++    TT_MUL,
++    TT_DIV,
++    TT_POW,
++    TT_EQ,
++    TT_LPAREN,
++    TT_RPAREN,
++    TT_LSQUARE,
++    TT_RSQUARE,
++    TT_EE,
++    TT_NE,
++    TT_LT,
++    TT_GT,
++    TT_LTE,
++    TT_GTE,
++    TT_COMMA,
++    TT_ARROW,
++    TT_NEWLINE,
++    TT_EOF,
++}
++TokenType;
++
++typedef enum
++{
++    TV_INT,
++    TV_FLOAT,
++    TV_CHAR,
++    TV_STRING,
++}
++TokenValueType;
++
++extern const char* KEYWORDS[];
++
++typedef struct
++{
++    TokenType type;
++    TokenValueType vType;
++    union
++    {
++        int intValue;
++        double floatValue;
++        char charValue;
++        char* stringValue;
++    };
++    Position pos_start;
++    Position pos_end;
++}
++Token;
++
++int token_init(Token* t,
++               TokenType type,
++               Position* pos_start,
++               Position* pos_end);
++
++int token_set_int(Token* t, int value);
++int token_set_float(Token* t, double value);
++int token_set_char(Token* t, char value);
++int token_set_string(Token* t, char* value);
++
++#endif
+\ No newline at end of file
+-- 
+2.25.1
+

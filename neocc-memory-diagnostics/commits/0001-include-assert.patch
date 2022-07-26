@@ -1,0 +1,24 @@
+From 362188b6211d7aa79acebcfbe3199be1164db44f Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Tue, 10 May 2022 02:05:16 +0200
+Subject: [PATCH] include assert
+
+---
+ arraylist.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arraylist.c b/arraylist.c
+index abedfc5..1915c3b 100644
+--- a/arraylist.c
++++ b/arraylist.c
+@@ -2,6 +2,7 @@
+ #include "utils.h"
+ #include <stdio.h>
+ #include <stdlib.h>
++#include <assert.h>
+ 
+ ArrayList* new_array_list()
+ {
+-- 
+2.25.1
+

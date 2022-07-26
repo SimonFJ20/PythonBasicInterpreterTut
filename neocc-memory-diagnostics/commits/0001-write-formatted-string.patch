@@ -1,0 +1,84 @@
+From 5012a73e406a413a895c8b49633a22a0a767ac69 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Sat, 7 May 2022 04:50:49 +0200
+Subject: [PATCH] write formatted string
+
+---
+ stringbuilder.c | 15 ++++++++-------
+ utils.c         |  9 +++++++++
+ utils.h         |  3 ++-
+ 3 files changed, 19 insertions(+), 8 deletions(-)
+
+diff --git a/stringbuilder.c b/stringbuilder.c
+index 5cb02aa..c9af438 100644
+--- a/stringbuilder.c
++++ b/stringbuilder.c
+@@ -1,7 +1,9 @@
+ #include "utils.h"
+ #include <assert.h>
++#include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
++#include <stdarg.h>
+ 
+ // typedef struct StringBuilderStruct {
+ //     size_t m_length;
+@@ -51,12 +53,11 @@ void string_builder_write(StringBuilder* self, char* string)
+     strcat(self->m_buffer, string);
+ }
+ 
+-void string_builder_write_chars(StringBuilder* self, char* chars, size_t amount)
++void string_builder_write_fmt(StringBuilder* self, const char* fmt, ...)
+ {
+-    size_t new_length = self->m_length + amount;
+-    self->m_buffer = realloc(self->m_buffer, new_length * sizeof(char) + 1);
+-    // memcpy(self->m_buffer + (self->m_length - 1), chars, amount);
+-    for (int i = 0; i < amount; i++)
+-        self->m_buffer[self->m_length + i] = chars[i];
+-    self->m_length += amount;
++    va_list args;
++    va_start(args, fmt);
++    char buffer[8192] = "";
++    vsnprintf(buffer, 8192, fmt, args);
++    string_builder_write(self, buffer);
+ }
+diff --git a/utils.c b/utils.c
+index 35ece67..8a35edb 100644
+--- a/utils.c
++++ b/utils.c
+@@ -1,4 +1,6 @@
+ #include "utils.h"
++#include <stdlib.h>
++#include <string.h>
+ 
+ void list_free_all_and_self(List* list)
+ {
+@@ -17,3 +19,10 @@ void println_and_free(char* string)
+     printf("%s\n", string);
+     free(string);
+ }
++
++char* chars_to_string(char* chars, size_t amount)
++{
++    char* buffer = calloc(amount + 1, sizeof(char));
++    strncpy(buffer, chars, amount);
++    return buffer;
++}
+diff --git a/utils.h b/utils.h
+index 0080a4b..7a52c42 100644
+--- a/utils.h
++++ b/utils.h
+@@ -63,8 +63,9 @@ size_t string_builder_length(StringBuilder* self);
+ char* string_builder_c_string(StringBuilder* self);
+ char* string_builder_buffer(StringBuilder* self);
+ void string_builder_write(StringBuilder* self, char* string);
+-void string_builder_write_chars(StringBuilder* self, char* chars, size_t amount);
++void string_builder_write_fmt(StringBuilder* self, const char* fmt, ...);
+ 
++char* chars_to_string(char* chars, size_t amount);
+ void println_and_free(char* string);
+ void list_delete_all_and_self(List* list, void (*)(void*));
+ char* read_file(const char* path);
+-- 
+2.25.1
+

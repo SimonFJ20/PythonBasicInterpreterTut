@@ -1,0 +1,24 @@
+From e78055d2bbe9362394b245bf18170f921a8ff752 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Tue, 30 Nov 2021 00:01:36 +0100
+Subject: [PATCH] fixed import
+
+---
+ examples/lists.htb | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/examples/lists.htb b/examples/lists.htb
+index 068a8bf..f5c175f 100644
+--- a/examples/lists.htb
++++ b/examples/lists.htb
+@@ -1,6 +1,6 @@
+ 
+ 
+-run("lib/lists.hb")
++run("lib/lists.htb")
+ 
+ 
+ 
+-- 
+2.25.1
+

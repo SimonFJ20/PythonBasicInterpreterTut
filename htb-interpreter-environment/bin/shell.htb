@@ -1,0 +1,31 @@
+
+import("lib/strings.htb")
+import("lib/lists.htb")
+
+func exists(list, value)
+    for i = 0 to length(list) do
+        if list/i == value then
+            return true
+        end
+    end
+    return false
+end
+
+func decode(line)
+    let words = split(line, " ")
+    let command = words/0
+
+    if command == "run" then
+        let file = words/1
+        let res = run(file)
+        if exists(words, "-s") or exists(words, "--status") then
+            println(res)
+        end
+    end
+end
+
+while true do
+    print("trash$ ")
+    let line = input()
+    decode(line)
+end

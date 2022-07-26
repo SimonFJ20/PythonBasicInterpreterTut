@@ -1,0 +1,188 @@
+From f8c3daeb14e38305e1aa92247c180e659c2eccaa Mon Sep 17 00:00:00 2001
+From: Simon From <simonfromjakobsen@gmail.com>
+Date: Thu, 4 Nov 2021 00:57:04 +0100
+Subject: [PATCH] start of spec
+
+---
+ .SPEC.md.swp             | Bin 0 -> 12288 bytes
+ README.md                |   2 +-
+ SPEC.md                  | 102 +++++++++++++++++++++++++++++++++++++++
+ examples/helloworld.ncml |  11 +++++
+ 4 files changed, 114 insertions(+), 1 deletion(-)
+ create mode 100644 .SPEC.md.swp
+ create mode 100644 SPEC.md
+ create mode 100644 examples/helloworld.ncml
+
+diff --git a/.SPEC.md.swp b/.SPEC.md.swp
+new file mode 100644
+index 0000000000000000000000000000000000000000..efdfdac8f8e09e62c0ee58e041372972bb324884
+GIT binary patch
+literal 12288
+zcmeI2&x;&I6vr!~VAM^-;6Xw2oIu=NcCtURZuYXml1(J$Cv1M8i7?gOH9O5#SG8T$
+zyNrS!^q`(RDEJpBn1g2zihJ}V#2-=cqTsJTK!}1rzOQ<AHrX7Kqmdf;(A`z9UcL9N
+zSH%p|$<+B{Cu#n`w7};<A?EkKCO_XhF82Q|gv$$SxcwHNGHn;R@wc!N;+5cV@`9~a
+zT`5yF>6CN1HSL+Hnd$cQbo=0>Q8u-O)RW6+jvPKvWViGg4Wa^3f!k1^_TBdU$hm_v
+z(^G7{uk{4&dFb4242&jGfv7-KASw_Qhzdjnq5@HYsKEb40blMAuOgYd1_@mlTz71{
+z4j$trDi9Tj3Pc5>0#SjeKvW<q5EY0DL<OP(QGq*90g1oZpTAd#D?1T9{{P?n{r}Hy
+zA$|rwf$zY#;A8L}SOurSDX;_%gF|2rJPIBG4}(2mH`od80e6Exb_sC}Tm|2NE8q*T
+z0WO0N!294W@FsW}yab*E`@yFpLVN;_gJ;3j2jB<%c|UxE-@*4_1AGK7gAc(Qpad7e
+z(_jn`*a7~!4`abK@EiCQ`~rRiKY*{nS6~Bt2HpklfVaWxAO{La&;cjFaqu{J4D13U
+z;7e#6biM=YB!(Onhzdjnq5@HYsK9?(fi`u@%BECScqwz#d0bX#P3l^Wb?6K?lBA2v
+zq5Xx?G4hs{&n}%lcNTAj?c-ZIktda``a&#fO|D-gRy)d6s%51z*q5Z$n$m<v%8R1*
+zGEtgG@1tk5O{Av7)_7^W!xy4XM<|mC!e??4LD`i`7UaCFyrZ6~lnBulGB=}R!CV|!
+zQ&oSvsr2M~icZ1~S=dx%HO7WXZ*HTbN_zAo0FDal#h2l*ZE<mIm4dyYR$-Bp?@2>`
+z-L?dGDeY9a;fGDT8+s}4lBtVCRkW}`GaRV7X@oVZ@ppsqbYnbNrpC#lYgT8J*Q#k6
+z!&l6Kih~F;TPM1Si_MxxTA<vNwWo2K5!}3@{8BIszCzzX<niZhO|EBaonbYqd<|(^
+zD&(r7zO5_j)+Y6MJJ(UGgpym&tqCfWG+b54vrpFOKB}Wce7NT}DkaufdB_oFoFIw5
+z%qmC5dg6ldiY)iSMy8(DbKeUiZOx-xYD?9Og1bs3ebRZ6d!EzfnIhHgsucCZeo;#B
+z)&!tT+CMOk!X1W-*&GU9ugkvMTs+xqhv5X|`=x3O6JC5p4&jq@;eMcZu(93Hw5bhd
+z?dC?YOg!gS+B$cBf>Nl58%G$HD8H_hA*@5HYX`Z<Xo?k|-5Ta5wssjN?}RB0Lg`G9
+zgTNIM%?M)P9qB@%h>s4}h__-BOxB1gH<M*2$duR*UpX`mXc#PJbr$KSHXCS;;^)N-
+z!WN3(>|W&gv8X)1gYrn2eejU2>AF}clfnnK4_BTE0VDg`b4e!BVKfGYnrL?9Fads~
+z;Zs=G?Yp&Q%_Xxb!zH63ylaV8Pibvw-BvooQ>!^ajy0!}#!9LeYmO>}+d~Q|3T$vJ
+zG`p-hqh_C)J2WraGY7>~<6>^Mo#Y<nwqg)ASLzBXGn}JM?8lm>5czpNUf~sIFO=)h
+z5#9@3s2vnav`tsJk59S|EpgGHm?1?t1{=$Z!+dclvvG4Ibgn<D!|b72*#I%2cMt}j
+f<kxkxoX1rkvSgerof^DYPs^oB^KPEXrfB~Kquyb_
+
+literal 0
+HcmV?d00001
+
+diff --git a/README.md b/README.md
+index d292b01..0c1bad8 100644
+--- a/README.md
++++ b/README.md
+@@ -1,5 +1,5 @@
+ 
+-# neocomal
++# Neocomal
+ 
+ **A non-[standard](http://datamuseum.dk/w/images/d/d5/KR_COMAL80_Kernel_Syntax_and_Semantics_Apr_1985.pdf) [COMAL](https://en.wikipedia.org/wiki/COMAL) implementation for modern hardware**
+ 
+diff --git a/SPEC.md b/SPEC.md
+new file mode 100644
+index 0000000..783ab04
+--- /dev/null
++++ b/SPEC.md
+@@ -0,0 +1,102 @@
++
++# Neocomal Specification
++
++## Keywords
++
++- `int` [Integer]() value type
++- `string` [String]() value type
++- `proc` Definition start of a [Procedure]()
++- `end` End of a code block
++
++## Values
++
++### Integer
++
++64-bit signed integer value
++
++```
++0
++-23
++45678
++```
++
++### String
++
++Immutable sequence of characters
++
++```
++""
++"hello world"
++"on\nseperate\nlines"
++```
++
++## Functions and Procedures
++
++### Functions
++
++A separated section of code with a reference, that generates output based on input
++
++Functions are defined with a return type, a name, a list of parameters, some code, and an end statement
++
++A parameter list, consists of between (inclusive) 0 to 4 parameters, declared as `type name`, seperated by commas
++
++A function must always return a value with the `return <value>` keyword, and the type must be the same as the return type of the function definetion
++
++*You should strive to make your functions "pure functions", meaning they only depend on the parameter input, and does not mutate or interact with the outer scope, and thereby limiting side effects and state dependency.*
++
++```
++int getDouble(int input)
++    int double = input * 2
++    return double
++end
++
++string numberAsString(int number)
++    if number == 1 then
++        return "one"
++    else if number == 2 then
++        return "two"
++    else
++        return "more than two"
++end
++```
++
++### Procedures
++
++Procedures are like functions, they have names, they take parameters, they have code and an end statement, except they never return a value
++
++Procedures are used to generate side effects
++
++Procedures are defined with the `proc` keyword, then a name, a parameter list, some code and an end statement
++
++Procedures can use the `return` keyword, without a value, to stop executing and return to the previous location
++
++```
++import "std"
++
++proc printHelloWorld()
++    print("Hello world")
++end
++```
++
++### 
++
++## Features
++
++### Main Procedure
++
++Every program starts at the Main Procedure
++
++```
++proc main()
++    // program starts here
++end
++```
++
++### Global Contants
++
++All symbols declared top level are immutabel
++
++## STD Library
++
++- `proc print(string value)` Print a [String]() to STDOUT
++
+diff --git a/examples/helloworld.ncml b/examples/helloworld.ncml
+new file mode 100644
+index 0000000..62c1f00
+--- /dev/null
++++ b/examples/helloworld.ncml
+@@ -0,0 +1,11 @@
++
++//
++// Hello World Example
++//
++
++import "std"
++
++proc main()
++    print("Hello, world!")
++end
++
+-- 
+2.25.1
+

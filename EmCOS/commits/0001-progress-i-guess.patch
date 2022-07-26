@@ -1,0 +1,180 @@
+From 5e781447670673dba2b61d69c19f22d1022142c0 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Sat, 24 Jul 2021 04:27:14 +0200
+Subject: [PATCH] progress, i guess...
+
+---
+ prototype/.vscode/settings.json               |   3 +
+ .../__pycache__/brainfuck.cpython-39.pyc      | Bin 1220 -> 1235 bytes
+ prototype/assembler.py                        | 112 +++++++++++++++---
+ 3 files changed, 100 insertions(+), 15 deletions(-)
+ create mode 100644 prototype/.vscode/settings.json
+
+diff --git a/prototype/.vscode/settings.json b/prototype/.vscode/settings.json
+new file mode 100644
+index 0000000..6a8ea6a
+--- /dev/null
++++ b/prototype/.vscode/settings.json
+@@ -0,0 +1,3 @@
++{
++    "editor.fontLigatures": false
++}
+\ No newline at end of file
+diff --git a/prototype/__pycache__/brainfuck.cpython-39.pyc b/prototype/__pycache__/brainfuck.cpython-39.pyc
+index 3f6e5698c8e15397db577481e8c53d75852c09a0..d6ac51f9415bd9413c69a7c28157f9930162b678 100644
+GIT binary patch
+delta 77
+zcmX@Yd6|<pk(ZZ?0SGKCekVk1<W*-hv~jkI2`x@7Dvl}6%+1e>ami0E%}vcKDUNZ^
+fEb%B!igC?#_79FJD9SI%FR3g@joBQ=n8yqNp6(gw
+
+delta 62
+zcmcc2d4!WUk(ZZ?0SFEl{7%r^$g9q%q^qBipPQ;*oSB=Sr|+DflB(~T>+Bz_Ur>}^
+Ql3!9;kgC5ql`)SQ05<v)U;qFB
+
+diff --git a/prototype/assembler.py b/prototype/assembler.py
+index 4cfade4..e21c907 100644
+--- a/prototype/assembler.py
++++ b/prototype/assembler.py
+@@ -1,11 +1,12 @@
+ from re import match
+ from brainfuck import brainfuck
+ 
+-def getregnum(rchar: str):
+-    return ord(rchar) - 97
++def get_reg_num(rchar: str):
++    return ord(rchar) - 96
+ 
+ def assemble(program: str):
+     out = ''
++    stackindex = 0
+     lines = program.split('\n')
+     for line in lines:
+         args = line.split(' ')
+@@ -14,30 +15,111 @@ def assemble(program: str):
+             if len(args) < 3:
+                 return print('mov incomplete')
+             if match('[a-f]', args[1]):
+-                if match('\d+', args[2]):
+-                    regnum = getregnum(args[1])
+-                    out += '>'*regnum
+-                    out += '[-]'
+-                    out += '+'*int(args[2])
+-                    out += '<'*regnum
++
++                if match('[a-f]', args[2]):
++                    rmd = get_reg_num(args[1])
++                    rms = get_reg_num(args[2])
++                    out += '[<->-]' # reset temp
++                    out += '>'*rms # goto source
++                    out += '[' + '<'*rms + '+<+>' + '>'*rms + '-]' # move source to temp
++                    out += '<'*rms + '<' # goto temp2
++                    out += '[' + '>'*rms + '>+<' + '<'*rms + '-]' # move temp2 to source
++                    out += '>' # go back
++                    out += '[' + '>'*rmd + '+' + '<'*rmd + '-]' # move temp in destination
++
++                elif match('\d+', args[2]):
++                    regnum = get_reg_num(args[1])
++                    out += '>'*regnum # goto destination
++                    out += '[-]' # reset destination
++                    out += '+'*int(args[2]) # set destination to source
++                    out += '<'*regnum # go back
+ 
+                 elif match('\'\w\'', args[2]):
+                     m = match(r"'(\w)'", args[2])
+-                    regnum = getregnum(args[1])
+-                    out += '>'*regnum
+-                    out += '[-]'
+-                    out += '+'*ord(m.group(1))
+-                    out += '<'*regnum
++                    regnum = get_reg_num(args[1])
++                    out += '>'*regnum # goto destination
++                    out += '[-]' # reset destination
++                    out += '+'*ord(m.group(1)) # set destination to source
++                    out += '<'*regnum # go back
++                
++                else:
++                    print('bad arg 2 on mov')
++
++        elif match('^add', args[0]):
++            if len(args) < 2:
++                return print('add incomplete')
++            if match('[a-f]', args[1]):
++                rms = get_reg_num(args[1])
++                out += '[<->-]' # reset temp
++                out += '>'*rms # goto source
++                out += '[' + '<'*rms + '+<+>' + '>'*rms + '-]' # move source to temp
++                out += '<'*rms + '<' # goto temp2
++                out += '[' + '>'*rms + '>+<' + '<'*rms + '-]' # move temp2 to source
++                out += '>' # go back
++                out += '[' + '>' + '+' + '<' + '-]' # add temp in acc
++
++            elif match('\d+', args[1]):
++                out += '>' # goto acc
++                out += '+'*int(args[1]) # add source to acc
++                out += '<' # go back
++
++            elif match('\'\w\'', args[1]):
++                m = match(r"'(\w)'", args[1])
++                out += '>' # goto acc
++                out += '+'*ord(m.group(1)) # add source to acc
++                out += '<' # go back
++
++            else:
++                print('bad arg 2 on add')
++
++        elif match('^sub', args[0]):
++            if len(args) < 2:
++                return print('sub incomplete')
++            if match('[a-f]', args[1]):
++                rms = get_reg_num(args[1])
++                out += '[<->-]' # reset temp
++                out += '>'*rms # goto source
++                out += '[' + '<'*rms + '+<+>' + '>'*rms + '-]' # move source to temp
++                out += '<'*rms + '<' # goto temp2
++                out += '[' + '>'*rms + '>+<' + '<'*rms + '-]' # move temp2 to source
++                out += '>' # go back
++                out += '[' + '>' + '-' + '<' + '-]' # subtract acc by temp 
++
++            elif match('\d+', args[1]):
++                out += '>' # goto acc
++                out += '-'*int(args[1]) # subtract acc by source
++                out += '<' # go back
++
++            elif match('\'\w\'', args[1]):
++                m = match(r"'(\w)'", args[1])
++                out += '>' # goto acc
++                out += '-'*ord(m.group(1)) # subtract acc by source
++                out += '<' # go back
++
++            else:
++                print('bad arg 2 on sub')
++        
++        elif match('^push', args[0]):
++            out += '[<->-]' # reset temp
++            out += '>>' # go to b
++            out += '[<<+<+>>>-]' # move b to temp
++            out += '<<<' # go to temp2
++            out += '[>>>+<<<-]' # move temp2 to b
++            out += '>' # go to temp1
+ 
+         elif match('^print', args[0]):
+-            out += '.'
++            out += '>.<'
+ 
+     return out
+ 
+ 
+ program = '''
+-mov a 'a'
++mov a 161
++sub 55
+ print
++
++
++
+ mov a 10
+ print
+ '''
+-- 
+2.25.1
+

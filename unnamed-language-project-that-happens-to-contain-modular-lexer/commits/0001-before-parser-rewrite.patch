@@ -1,0 +1,642 @@
+From baec660fcbd1e3c4300dd2b11b170b9d80094eec Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Mon, 13 Jun 2022 21:24:27 +0200
+Subject: [PATCH] before parser rewrite
+
+---
+ ast.ts        | 163 ++++++++++++++++++++++++++++++++++++
+ main.ts       |  69 +++++-----------
+ parser.ts     | 225 ++++++++++++++------------------------------------
+ tokentypes.ts |  23 ++++++
+ 4 files changed, 269 insertions(+), 211 deletions(-)
+ create mode 100644 ast.ts
+ create mode 100644 tokentypes.ts
+
+diff --git a/ast.ts b/ast.ts
+new file mode 100644
+index 0000000..d9dc4fb
+--- /dev/null
++++ b/ast.ts
+@@ -0,0 +1,163 @@
++import { Span, Token, Position } from "./lexer.ts";
++import { TokenType } from "./tokentypes.ts";
++
++export enum TypeType {
++    TypeName,
++}
++
++export enum ExpressionType {
++    LetDeclaration,
++    MutDeclaration,
++    Function,
++    Assignment,
++    Addition,
++    Subtraction,
++    Multiplication,
++    Division,
++    Remainder,
++    IntLiteral,
++    CharLiteral,
++    StringLiteral,
++}
++
++export abstract class ParseNode {
++    protected constructor(public span: Span) {}
++}
++
++export abstract class TypeNode extends ParseNode {
++    protected constructor(public type: TypeType, span: Span) {
++        super(span);
++    }
++}
++
++export class TypeNameNode extends TypeNode {
++    public constructor(public value: Token<TokenType>) {
++        super(TypeType.TypeName, value.span);
++    }
++}
++
++export abstract class ExpressionNode extends ParseNode {
++    protected constructor(public type: ExpressionType, span: Span) {
++        super(span);
++    }
++}
++
++export class LetDeclarationNode extends ExpressionNode {
++    public constructor(
++        public target: Token<TokenType>,
++        public value: ExpressionNode,
++        begin: Position,
++    ) {
++        super(ExpressionType.LetDeclaration, new Span(begin, value.span.end));
++    }
++}
++
++export class MutDeclarationNode extends ExpressionNode {
++    public constructor(
++        public target: Token<TokenType>,
++        public value: ExpressionNode,
++        begin: Position,
++    ) {
++        super(ExpressionType.MutDeclaration, new Span(begin, value.span.end));
++    }
++}
++
++export class Function extends ExpressionNode {
++    public constructor(
++        public args: Token<TokenType>,
++        public body: ExpressionNode,
++        span: Span,
++    ) {
++        super(ExpressionType.Function, span);
++    }
++}
++
++export class AssignmentNode extends ExpressionNode {
++    public constructor(
++        public target: Token<TokenType>,
++        public value: ExpressionNode,
++    ) {
++        super(
++            ExpressionType.Assignment,
++            new Span(target.span.begin, value.span.end),
++        );
++    }
++}
++
++export class AdditionNode extends ExpressionNode {
++    public constructor(
++        public left: ExpressionNode,
++        public right: ExpressionNode,
++    ) {
++        super(
++            ExpressionType.Addition,
++            new Span(left.span.begin, right.span.end),
++        );
++    }
++}
++
++export class SubtractionNode extends ExpressionNode {
++    public constructor(
++        public left: ExpressionNode,
++        public right: ExpressionNode,
++    ) {
++        super(
++            ExpressionType.Subtraction,
++            new Span(left.span.begin, right.span.end),
++        );
++    }
++}
++
++export class MultiplicationNode extends ExpressionNode {
++    public constructor(
++        public left: ExpressionNode,
++        public right: ExpressionNode,
++    ) {
++        super(
++            ExpressionType.Multiplication,
++            new Span(left.span.begin, right.span.end),
++        );
++    }
++}
++
++export class DivisionNode extends ExpressionNode {
++    public constructor(
++        public left: ExpressionNode,
++        public right: ExpressionNode,
++    ) {
++        super(
++            ExpressionType.Division,
++            new Span(left.span.begin, right.span.end),
++        );
++    }
++}
++
++export class RemainderNode extends ExpressionNode {
++    public constructor(
++        public left: ExpressionNode,
++        public right: ExpressionNode,
++    ) {
++        super(
++            ExpressionType.Remainder,
++            new Span(left.span.begin, right.span.end),
++        );
++    }
++}
++
++export class IntLiteralNode extends ExpressionNode {
++    public constructor(public value: Token<TokenType>) {
++        super(ExpressionType.IntLiteral, value.span);
++    }
++}
++
++export class CharLiteralNode extends ExpressionNode {
++    public constructor(public value: Token<TokenType>) {
++        super(ExpressionType.CharLiteral, value.span);
++    }
++}
++
++export class StringLiteralNode extends ExpressionNode {
++    public constructor(public value: Token<TokenType>) {
++        super(ExpressionType.StringLiteral, value.span);
++    }
++}
+diff --git a/main.ts b/main.ts
+index c7eb37d..4ee6cb5 100644
+--- a/main.ts
++++ b/main.ts
+@@ -9,65 +9,41 @@ import {
+     ignoreSingleLineComment,
+     charLiteralRule,
+     stringLiteralRule,
+-ignorePatternRule
++    ignorePatternRule,
+ } from "./lexer.ts";
+ import { parse } from "./parser.ts";
+-
+-export enum TokenType {
+-    IntLiteral,
+-    HexLiteral,
+-    CharLiteral,
+-    StringLiteral,
+-    LetKeyword,
+-    Identifier,
+-    LParen,
+-    RParen,
+-    LBrace,
+-    RBrace,
+-    LBracket,
+-    RBracket,
+-    Equal,
+-    Plus,
+-    Minus,
+-    Asterisk,
+-    Slash,
+-    Percentage,
+-    Colon,
+-    // NewLine,
+-    // LineTerminator,
+-}
++import { TokenType } from "./tokentypes.ts";
+ 
+ const main = () => {
+-    if (Deno.args.length <= 0)
+-        throw new Error('no input file');
++    if (Deno.args.length <= 0) throw new Error("no input file");
+     const filename = Deno.args[0];
+     const text = Deno.readTextFileSync(filename);
+ 
+     const tokens = tokenize<TokenType>(text, [
+         hexRule(TokenType.HexLiteral),
+         intRule(TokenType.IntLiteral),
+-        charPatternRule(TokenType.LetKeyword, 'let'),
+-        charPatternRule(TokenType.LetKeyword, 'mut'),
++        charPatternRule(TokenType.LetKeyword, "let"),
++        charPatternRule(TokenType.LetKeyword, "mut"),
+         identifierRule(TokenType.Identifier),
+         ignoreSingleLineWhitespaceRule(),
+         ignoreSingleLineComment(),
+         ignoreMultiLineComment(),
+         charLiteralRule(TokenType.CharLiteral),
+         stringLiteralRule(TokenType.StringLiteral),
+-        charPatternRule(TokenType.LParen, '('),
+-        charPatternRule(TokenType.RParen, ')'),
+-        charPatternRule(TokenType.LBrace, '{'),
+-        charPatternRule(TokenType.RBrace, '}'),
+-        charPatternRule(TokenType.LBracket, '['),
+-        charPatternRule(TokenType.RBracket, ']'),
+-        charPatternRule(TokenType.Equal, '='),
+-        charPatternRule(TokenType.Plus, '+'),
+-        charPatternRule(TokenType.Minus, '-'),
+-        charPatternRule(TokenType.Asterisk, '*'),
+-        charPatternRule(TokenType.Slash, '/'),
+-        charPatternRule(TokenType.Percentage, '%'),
+-        charPatternRule(TokenType.Equal, '='),
+-        charPatternRule(TokenType.Colon, ':'),
++        charPatternRule(TokenType.LParen, "("),
++        charPatternRule(TokenType.RParen, ")"),
++        charPatternRule(TokenType.LBrace, "{"),
++        charPatternRule(TokenType.RBrace, "}"),
++        charPatternRule(TokenType.LBracket, "["),
++        charPatternRule(TokenType.RBracket, "]"),
++        charPatternRule(TokenType.Equal, "="),
++        charPatternRule(TokenType.Plus, "+"),
++        charPatternRule(TokenType.Minus, "-"),
++        charPatternRule(TokenType.Asterisk, "*"),
++        charPatternRule(TokenType.Slash, "/"),
++        charPatternRule(TokenType.Percentage, "%"),
++        charPatternRule(TokenType.Equal, "="),
++        charPatternRule(TokenType.Colon, ":"),
+         // charPatternRule(TokenType.NewLine, '\r\n'),
+         // charPatternRule(TokenType.NewLine, '\n'),
+         // charPatternRule(TokenType.LineTerminator, ';'),
+@@ -77,9 +53,8 @@ const main = () => {
+     // console.log(tokens)
+ 
+     const ast = parse(tokens);
+-    
+-    console.log(ast)
+ 
+-}
++    console.log(ast);
++};
+ 
+-main()
++main();
+diff --git a/parser.ts b/parser.ts
+index 58fbc11..4365f18 100644
+--- a/parser.ts
++++ b/parser.ts
+@@ -1,18 +1,31 @@
++import {
++    ExpressionNode,
++    AssignmentNode,
++    LetDeclarationNode,
++    AdditionNode,
++    SubtractionNode,
++    MultiplicationNode,
++    DivisionNode,
++    RemainderNode,
++    IntLiteralNode,
++    CharLiteralNode,
++    StringLiteralNode,
++} from "./ast.ts";
+ import { Position, Span, Token } from "./lexer.ts";
+-import { TokenType } from "./main.ts";
++import { TokenType } from "./tokentypes.ts";
+ 
+ export class ParserError extends Error {
+-    public constructor (message: string) {
+-        super (message);
+-        this.name = 'ParserError';
++    public constructor(message: string) {
++        super(message);
++        this.name = "ParserError";
+     }
+ 
+     public static fromPosition(pos: Position, message: string) {
+-        return new ParserError(`${message}, at ${pos}`)
++        return new ParserError(`${message}, at ${pos}`);
+     }
+ 
+     public static fromSpan(span: Span, message: string) {
+-        return new ParserError(`${message}, at ${span}`)
++        return new ParserError(`${message}, at ${span}`);
+     }
+ }
+ 
+@@ -20,22 +33,19 @@ export class Parser {
+     public index = 0;
+     private saves: number[] = [];
+ 
+-    public constructor (
+-        public tokens: Token<TokenType>[],
+-    ) {}
++    public constructor(public tokens: Token<TokenType>[]) {}
+ 
+     public step() {
+         if (this.index >= this.tokens.length)
+             throw ParserError.fromPosition(
+                 this.tokens[this.tokens.length - 1].span.end,
+-                'unexpected end of file'
++                "unexpected end of file",
+             );
+         this.index++;
+     }
+ 
+     public current(): Token<TokenType> | null {
+-        if (this.index >= this.tokens.length)
+-            return null;
++        if (this.index >= this.tokens.length) return null;
+         return this.tokens[this.index];
+     }
+ 
+@@ -44,178 +54,59 @@ export class Parser {
+     }
+ 
+     public recover() {
+-        const fail = () => { throw new ParserError('cant recover unsaved parser state'); }
++        const fail = () => {
++            throw new ParserError("cant recover unsaved parser state");
++        };
+         this.index = this.saves.pop() ?? fail();
+     }
+ }
+ 
+-export enum TypeType {
+-    TypeName,
+-}
+-
+-export enum ExpressionType {
+-    LetDeclaration,
+-    MutDeclaration,
+-    Function,
+-    Assignment,
+-    Addition,
+-    Subtraction,
+-    Multiplication,
+-    Division,
+-    Remainder,
+-    IntLiteral,
+-    CharLiteral,
+-    StringLiteral,
+-}
+-
+-export abstract class ParseNode {
+-    protected constructor (
+-        public span: Span,
+-    ) {}
+-}
+-
+-export abstract class TypeNode extends ParseNode {
+-    protected constructor (
+-        public type: TypeType,
+-        span: Span,
+-    ) { super (span); }
+-}
+-
+-export class TypeNameNode extends TypeNode {
+-    public constructor (
+-        public value: Token<TokenType>,
+-    ) { super (TypeType.TypeName, value.span); }
+-}
+-
+-export abstract class ExpressionNode extends ParseNode {
+-    protected constructor (
+-        public type: ExpressionType,
+-        span: Span,
+-    ) { super (span); }
+-}
+-
+-export class LetDeclarationNode extends ExpressionNode {
+-    public constructor (
+-        public target: Token<TokenType>,
+-        public value: ExpressionNode,
+-        begin: Position,
+-    ) { super (ExpressionType.LetDeclaration, new Span(begin, value.span.end)); }
+-}
+-
+-export class MutDeclarationNode extends ExpressionNode {
+-    public constructor (
+-        public target: Token<TokenType>,
+-        public value: ExpressionNode,
+-        begin: Position,
+-    ) { super (ExpressionType.MutDeclaration, new Span(begin, value.span.end)); }
+-}
+-
+-export class Function extends ExpressionNode {
+-    public constructor (
+-        public args: Token<TokenType>,
+-        public body: ExpressionNode,
+-        span: Span,
+-    ) { super (ExpressionType.Function, span); }
+-}
+-
+-export class AssignmentNode extends ExpressionNode {
+-    public constructor (
+-        public target: Token<TokenType>,
+-        public value: ExpressionNode,
+-    ) { super (ExpressionType.Assignment, new Span(target.span.begin, value.span.end)); }
+-}
+-
+-export class AdditionNode extends ExpressionNode {
+-    public constructor (
+-        public left: ExpressionNode,
+-        public right: ExpressionNode
+-    ) { super (ExpressionType.Addition, new Span(left.span.begin, right.span.end)); }
+-}
+-
+-export class SubtractionNode extends ExpressionNode {
+-    public constructor (
+-        public left: ExpressionNode,
+-        public right: ExpressionNode
+-    ) { super (ExpressionType.Subtraction, new Span(left.span.begin, right.span.end)); }
+-}
+-
+-export class MultiplicationNode extends ExpressionNode {
+-    public constructor (
+-        public left: ExpressionNode,
+-        public right: ExpressionNode
+-    ) { super (ExpressionType.Multiplication, new Span(left.span.begin, right.span.end)); }
+-}
+-
+-export class DivisionNode extends ExpressionNode {
+-    public constructor (
+-        public left: ExpressionNode,
+-        public right: ExpressionNode
+-    ) { super (ExpressionType.Division, new Span(left.span.begin, right.span.end)); }
+-}
+-
+-export class RemainderNode extends ExpressionNode {
+-    public constructor (
+-        public left: ExpressionNode,
+-        public right: ExpressionNode
+-    ) { super (ExpressionType.Remainder, new Span(left.span.begin, right.span.end)); }
+-}
+-
+-export class IntLiteralNode extends ExpressionNode {
+-    public constructor (
+-        public value: Token<TokenType>,
+-    ) { super (ExpressionType.IntLiteral, value.span); }
+-}
+-
+-export class CharLiteralNode extends ExpressionNode {
+-    public constructor (
+-        public value: Token<TokenType>,
+-    ) { super (ExpressionType.CharLiteral, value.span); }
+-}
+-
+-export class StringLiteralNode extends ExpressionNode {
+-    public constructor (
+-        public value: Token<TokenType>,
+-    ) { super (ExpressionType.StringLiteral, value.span); }
+-}
+-
+ export const parse = (tokens: Token<TokenType>[]): ExpressionNode[] => {
+     const self = new Parser(tokens);
++    return parseExpressions(self);
++};
++
++export const parseExpressions = (self: Parser): ExpressionNode[] => {
+     const expressions: ExpressionNode[] = [];
+     while (self.index < self.tokens.length) {
+         expressions.push(parseExpression(self));
+     }
+     return expressions;
+-}
++};
+ 
+ export const parseExpression = (self: Parser): ExpressionNode => {
+     if (self.current()!.type === TokenType.LetKeyword)
+         return parseLetDeclaration(self);
+-    else
+-        return parseAssignment(self);
+-}
++    else return parseAssignment(self);
++};
+ 
+ export const parseLetDeclaration = (self: Parser): ExpressionNode => {
+     const begin = self.current()!.span.begin;
+     self.step();
+     if (self.current()?.type !== TokenType.Identifier)
+-        throw ParserError.fromSpan(self.current()!.span, 'expected identifier');
+-    const {target, value} = parseAssignment(self) as AssignmentNode;
++        throw ParserError.fromSpan(self.current()!.span, "expected identifier");
++    const { target, value } = parseAssignment(self) as AssignmentNode;
+     return new LetDeclarationNode(target, value, begin);
+-}
++};
++
++export const parseFunctionDefinition = (self: Parser): ExpressionNode => {};
+ 
+ export const parseAssignment = (self: Parser): ExpressionNode => {
+     const target = self.current()!;
+     self.save();
+     self.step();
+-    if (target.type === TokenType.Identifier && self.current()?.type === TokenType.Equal) {
++    if (
++        target.type === TokenType.Identifier &&
++        self.current()?.type === TokenType.Equal
++    ) {
+         self.step();
+-        const value = parseAssignment(self);
++        const value = parseExpression(self);
+         return new AssignmentNode(target, value);
+     } else {
+         self.recover();
+         return parseAdditionAndSubtraction(self);
+     }
+-}
++};
+ 
+ export const parseAdditionAndSubtraction = (self: Parser): ExpressionNode => {
+     const left = parseMultiplicationDivisionAndRemainder(self);
+@@ -227,27 +118,27 @@ export const parseAdditionAndSubtraction = (self: Parser): ExpressionNode => {
+         self.step();
+         const right = parseAdditionAndSubtraction(self);
+         return new SubtractionNode(left, right);
+-    } else
+-        return left;
+-}
++    } else return left;
++};
+ 
+-export const parseMultiplicationDivisionAndRemainder = (self: Parser): ExpressionNode => {
++export const parseMultiplicationDivisionAndRemainder = (
++    self: Parser,
++): ExpressionNode => {
+     const left = parseValue(self);
+     if (self.current()?.type === TokenType.Asterisk) {
+         self.step();
+         const right = parseMultiplicationDivisionAndRemainder(self);
+-        return new MultiplicationNode(left, right)
++        return new MultiplicationNode(left, right);
+     } else if (self.current()?.type === TokenType.Slash) {
+         self.step();
+         const right = parseMultiplicationDivisionAndRemainder(self);
+-        return new DivisionNode(left, right)
++        return new DivisionNode(left, right);
+     } else if (self.current()?.type === TokenType.Percentage) {
+         self.step();
+         const right = parseMultiplicationDivisionAndRemainder(self);
+         return new RemainderNode(left, right);
+-    } else
+-        return left;
+-}
++    } else return left;
++};
+ 
+ export const parseValue = (self: Parser): ExpressionNode => {
+     if (self.current()?.type === TokenType.IntLiteral) {
+@@ -270,10 +161,16 @@ export const parseValue = (self: Parser): ExpressionNode => {
+         self.step();
+         const value = parseExpression(self);
+         if (self.current()?.type !== TokenType.RParen)
+-            throw ParserError.fromPosition(self.current()!.span.begin, `expected ')'`);
++            throw ParserError.fromPosition(
++                self.current()!.span.begin,
++                `expected ')'`,
++            );
+         self.step();
+         return value;
+     } else {
+-        throw ParserError.fromSpan(self.current()!.span, `unexpected token '${self.current()?.text}'`);
++        throw ParserError.fromSpan(
++            self.current()!.span,
++            `unexpected token '${self.current()?.text}'`,
++        );
+     }
+-}
++};
+diff --git a/tokentypes.ts b/tokentypes.ts
+new file mode 100644
+index 0000000..a0357d7
+--- /dev/null
++++ b/tokentypes.ts
+@@ -0,0 +1,23 @@
++export enum TokenType {
++    IntLiteral,
++    HexLiteral,
++    CharLiteral,
++    StringLiteral,
++    LetKeyword,
++    Identifier,
++    LParen,
++    RParen,
++    LBrace,
++    RBrace,
++    LBracket,
++    RBracket,
++    Equal,
++    Plus,
++    Minus,
++    Asterisk,
++    Slash,
++    Percentage,
++    Colon,
++    // NewLine,
++    // LineTerminator,
++}
+-- 
+2.25.1
+

@@ -1,0 +1,286 @@
+From 63b339a565ba990a4c9c258aede5cf4e0b011351 Mon Sep 17 00:00:00 2001
+From: Simon From <simonfromjakobsen@gmail.com>
+Date: Wed, 24 Nov 2021 02:48:55 +0100
+Subject: [PATCH] init
+
+---
+ README.md                                 | 102 +++++++++++++++++++---
+ examples/hello.mmm                        |   7 ++
+ examples/struct.mmm                       |  40 +++++++++
+ pymmm/__pycache__/testutil.cpython-39.pyc | Bin 0 -> 1394 bytes
+ pymmm/mmm.py                              |  17 ++++
+ pymmm/testutil.py                         |  36 ++++++++
+ 6 files changed, 190 insertions(+), 12 deletions(-)
+ create mode 100644 examples/hello.mmm
+ create mode 100644 examples/struct.mmm
+ create mode 100644 pymmm/__pycache__/testutil.cpython-39.pyc
+ create mode 100644 pymmm/mmm.py
+ create mode 100644 pymmm/testutil.py
+
+diff --git a/README.md b/README.md
+index fe61ff7..14edca0 100644
+--- a/README.md
++++ b/README.md
+@@ -1,18 +1,96 @@
+ # mamemalang
+ Manual Memory Management Programming Language
+ 
+-# Roadmap
++## Roadmap
+ 
+- - [ ] Examples
+- - [ ] Grammer spec
+- - [ ] AST spec
+- - [ ] Parser
+- - [ ] Interpreter
+- - [ ] Bytecode spec
+- - [ ] BC Compiler
+- - [ ] BC VM
+- - [ ] x86-64 Compiler
+- - [ ] Std library
+- - [ ] Self hosting
++ - [ ] Parser in Python
++ - [ ] Interpreter in Python
++ - [ ] BC Compiler in Python
++ - [ ] BC VM in Python
++ - [ ] BC VM in C
+ 
++## Memory Management
+ 
++No pointers.
++Primitives by value.
++Objects bt reference.
++
++### Manually
++
++The `allocate` function allocates a chunk the size of the given struct,
++and returns the reference. Note, the object is NOT constructed jet.
++
++```
++MyClass object = allocate(object);
++```
++
++Objects are constructed by calling the `constructor`.
++
++```
++object.constructor();
++```
++
++After using the object, it can be deallocated by calling `destroy` on it.
++This will first call the `destructor` of the object, then deallocate the object;
++
++```
++destroy(object);
++```
++
++With all together.
++
++```
++func myFunction() {
++    MyClass object = allocate(object);
++    object.constructor();
++
++    destroy(object);
++}
++```
++
++With some syntactic suger.
++
++```
++func myFunction() {
++    MyClass object = MyClass();
++
++    destroy(object);
++}
++```
++
++### Automatically
++
++Using the ownership model, the compiler can act like a garbage collecter.
++
++```
++func main() {
++    Person a = Person("Larry");
++    // `a` now owns the instance of Person aka. Larry
++
++    a.waveTo(); // we can reference Larry
++    a.xPos = 7; // and mutate Larry
++
++    
++    Person b = a;
++    // `b` now owns Larry
++    // `a` is no longer useable
++
++    b.waveTo(); // with `b`, we can reference Larry
++    b.xPos = 7; // with `b`, and mutate Larry
++
++    a.waveTo(); // with `a`, we CANNOT reference Larry
++    a.xPos = 7; // with `a`, and CANNOT mutate Larry
++
++    //Person& c = reference(b);
++    Person& c = &b;
++    // `b` still owns Larry
++    // `c` does not own, but has an immutable reference
++
++    b.waveTo(); // with `b`, we can reference Larry
++    b.xPos = 7; // with `b`, and mutate Larry
++
++    c.waveTo(); // with `c`, we CAN reference Larry
++    c.xPos = 7; // with `c`, and CANNOT mutate Larry
++
++}
++```
+diff --git a/examples/hello.mmm b/examples/hello.mmm
+new file mode 100644
+index 0000000..5c01bad
+--- /dev/null
++++ b/examples/hello.mmm
+@@ -0,0 +1,7 @@
++
++import "stdlib.mmm"
++
++int main() {
++    print("hello world\n");
++    return 0;
++}
+diff --git a/examples/struct.mmm b/examples/struct.mmm
+new file mode 100644
+index 0000000..9561809
+--- /dev/null
++++ b/examples/struct.mmm
+@@ -0,0 +1,40 @@
++
++struct Square {
++
++    int width;
++    int height;
++
++    constructor (width, height) {
++        this.with = width;
++        this.height = height;
++    }
++
++    destructor {
++
++    }
++
++}
++
++int area(Square this) {
++    return this.with * this.height;
++}
++
++int noSyntaxSuger() {
++    Square sqr = allocate(Square);
++    sqr.constructor(4, 5);
++
++    int area = area(sqr);
++    
++    destroy(Square);
++
++    return area;
++}
++
++int withSyntaxSuger() {
++    sqr = Square(4, 5);
++
++    int area = sqr.area();
++
++    return 0;
++} // automatic deallocation when not returned
++
+diff --git a/pymmm/__pycache__/testutil.cpython-39.pyc b/pymmm/__pycache__/testutil.cpython-39.pyc
+new file mode 100644
+index 0000000000000000000000000000000000000000..e7769528711d15e06ee144b2f1b7d231c628e8f8
+GIT binary patch
+literal 1394
+zcmZWpL2nyH6rMLTUawQf2`LCFAz>~^E1^0EPF017+PFfhOoUSkme6YJnWh_d*Y3=?
+z!q$cZ$pwiM7Y=Pia)h5WM>yrixfghETt^l>YiHkkJNw=@@B7x-=H>=Nd-BtH_N!p*
+zFACO8V(=MW_A6W-F~t-Vtb`E&`Mltz7ztnxm=a2!F(ps=NFK4Qp@o*Wn2uEAE>oMj
+zshY1q#j17I7{#iiZm9Mdj9MxhvSjNDYqJD=WarlD5<U4aw{A@7bwhwlFdw0#*$5OH
+zaV-=m{)z_xawM@yq?%Z~p#Y1we0->_yO&u#NVu0(R%#y^?PjJLQ^A#y&+)p4m)*vt
+zhMJ|U=D1=bECr#!(^)k(4Sb#mFRd<~nkEJz^E)#w^k09{dp0R`&*tT%>OIKafteiZ
+zv9rAro0nOURY$$)ye!L}LufOX7q_Q#AE#+v<t|MltYK;J3?f*(wSs?p^}IhOoGT;T
+z#9_d_Kxfge*#)~~z#g;enPd*;4%i6?wm5KH!6|a*gyL`RqGrePB|Bfm5@UAUSY>K3
+zU)TIcsA7j)(mRjYH^}`7|AAK<%lj_d#SBg;8u-Sz(3zRtL?C~j|J*&?A0Br5d!Ikt
+zzu(1p5z%SxbQe)SFZ7-672v+48Aj+kd)8{>@=3LC%)}TvrEg44Ub!${zmcZpM9m7F
+zre5mrbC(Dc)28MNZJtc5_Mig;%Y~-mg_%|4*tc<Ez@ZHti1D`#J0KzAi}v+^accto
+zBqAzECuwR(2)>=B&u3Y&OnG6QF*h)8sN`Bd;@(g%L*$V}0*ly6hKz61G=}Nn7wMOe
+z27?5`ss2YMy%@;cMW;sTeJ4!2hN?rvTmY$EiA!<99lsC`>8klDzeHkcqCgHjq_3fS
+z^$%LoFz;Xy-!yt!WMggKqbSOzQ(dWm2`6|hU(a*3cAPLiNeaD%Z&^|$<L~3#%m?W8
+z$3)%Ah$=dC!2K~gj@@V9c21y%3;c`--E&FebHcGxc!_@<=Yqr(WFrPMI`rSa{qje5
+zwu4@f&9Hm0HyomFD4)oHeL3<i+~P%{tArcc9svCpc?;Q03B4t_Z{WvBzxfbj`k0aG
+z4bLZbDYVGVr+IZ`=z9vISq^I}O|z<+xQujZQ4#N6H>5giU9ai)@!h3NKcx{_nqvpr
+LqO-Hjx1)anl%FIt
+
+literal 0
+HcmV?d00001
+
+diff --git a/pymmm/mmm.py b/pymmm/mmm.py
+new file mode 100644
+index 0000000..0bca3a8
+--- /dev/null
++++ b/pymmm/mmm.py
+@@ -0,0 +1,17 @@
++from sys import argv
++from testutil import run_tests, test
++
++@test
++def it_should_pass_the_test():
++    assert True
++
++@test
++def it_should_not_pass_the_test():
++    assert False
++
++if __name__ == '__main__':
++    assert len(argv) > 1, 'command not specified'
++    if argv[1] == 'test':
++        run_tests('-t' in argv or '--traceback' in argv)
++        exit()
++    print(argv)
+diff --git a/pymmm/testutil.py b/pymmm/testutil.py
+new file mode 100644
+index 0000000..4edd0d9
+--- /dev/null
++++ b/pymmm/testutil.py
+@@ -0,0 +1,36 @@
++from os import system
++from typing import List
++
++
++class TestCase:
++    def __init__(self, func, name: str) -> None:
++        self.func = func
++        self.name = name
++
++    def run(self, verbose = False):
++        try:
++            self.func()
++        except AssertionError as e:
++            system('clear')
++            print('❌ TEST FAILED ❌')
++            print(f'Test: {self.name}')
++            print(f"File: {self.func.__module__}")
++            if verbose:
++                raise e
++            else:
++                exit(1)
++
++TESTS_TO_RUN: List[TestCase] = []
++
++def test(func, name: str = None):
++    global TESTS_TO_RUN
++    id = name if name != None else func.__name__.replace('_', ' ', -1)
++    TESTS_TO_RUN.append(TestCase(func, id))
++    return func
++
++def run_tests(verbose = False):
++    global TESTS_TO_RUN
++    for test in TESTS_TO_RUN:
++        test.run(verbose)
++    print(f'💪 {len(TESTS_TO_RUN)} TESTS PASSED 💪')
++
+-- 
+2.25.1
+

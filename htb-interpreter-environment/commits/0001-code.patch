@@ -1,0 +1,73 @@
+From 97f3a83081a9b850ed2756520b70a22241aca5d6 Mon Sep 17 00:00:00 2001
+From: Simon From Jakobsen <sfja.skp@edu.mercantec.dk>
+Date: Tue, 30 Nov 2021 10:16:41 +0100
+Subject: [PATCH] code
+
+---
+ bin/shell.htb       |  2 +-
+ examples/import.htb |  8 ++++++++
+ lib/strings.htb     | 10 ++++++++--
+ 3 files changed, 17 insertions(+), 3 deletions(-)
+ create mode 100644 examples/import.htb
+
+diff --git a/bin/shell.htb b/bin/shell.htb
+index db967de..0cf71bf 100644
+--- a/bin/shell.htb
++++ b/bin/shell.htb
+@@ -1,5 +1,5 @@
+ 
+-run("lib/strings.htb")
++import("lib/strings.htb")
+ import("lib/lists.htb")
+ 
+ func exists(list, value)
+diff --git a/examples/import.htb b/examples/import.htb
+new file mode 100644
+index 0000000..7006f29
+--- /dev/null
++++ b/examples/import.htb
+@@ -0,0 +1,8 @@
++
++import("lib/strings.htb")
++
++
++func myFunc()
++    println("bruh")
++end
++
+diff --git a/lib/strings.htb b/lib/strings.htb
+index 373dfd3..ad26c74 100644
+--- a/lib/strings.htb
++++ b/lib/strings.htb
+@@ -4,7 +4,6 @@ func split(source, seperator)
+     let buffer = ""
+     for i = 0 to stringLength(source) do
+         let char = charAt(source, i)
+-        print(char)
+         if char == seperator and buffer != "" then
+             append(elements, buffer)
+             let buffer = ""
+@@ -12,12 +11,19 @@ func split(source, seperator)
+             let buffer = buffer + char
+         end
+     end
++    if buffer != "" then
++        append(elements, buffer)
++    end
+     return elements
+ end
+ 
+ func test()
+ 
+-    print(split("hello world !", " "))
++    let s = split("hello world !", " ")
++    println(length(s))
++    for i = 0 to length(s) do
++        println(s/i)
++    end
+ 
+ end
+ 
+-- 
+2.25.1
+

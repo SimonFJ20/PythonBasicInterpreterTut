@@ -1,0 +1,52 @@
+From f1860711181bf35224ae0b728d52bfd13f14c4d5 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Sat, 7 May 2022 20:49:25 +0200
+Subject: [PATCH] use chars_to_string
+
+---
+ lexer.c | 16 +++++++++++++---
+ 1 file changed, 13 insertions(+), 3 deletions(-)
+
+diff --git a/lexer.c b/lexer.c
+index e7ccc52..a1b7279 100644
+--- a/lexer.c
++++ b/lexer.c
+@@ -90,15 +90,14 @@ void delete_token(Token* self)
+ 
+ char* token_to_string(Token* self)
+ {
+-    char* value_str = calloc(self->length, sizeof(char));
+-    strncpy(value_str, self->value, self->length - 1);
++    char* value_str = chars_to_string((char*) self->value, self->length);
+ 
+     char* buffer = calloc(8192, sizeof(char));
+     snprintf(buffer, 8192, "Token(%s, '%s', %ld)", token_type_to_string(self->type), value_str, self->length);
+     buffer = realloc(buffer, strlen(buffer) * sizeof(char) + 1);
+ 
+     free(value_str);
+-    
++
+     return buffer;
+ }
+ 
+@@ -229,6 +228,17 @@ Token* lexer_make_name(Lexer* self)
+     return new_token(type, value, value_length);
+ }
+ 
++Token* lexer_make_equal_or_assign(Lexer* self)
++{
++    const char* value = &self->text[self->index];
++    lexer_next(self);
++    if (self->c == '=') {
++        lexer_next(self);
++        return new_token(TOKEN_TYPE_EQUAL, value, 2);
++    }
++    return new_token(TOKEN_TYPE_ASSIGN, value, 1);
++}
++
+ void lexer_next(Lexer* self)
+ {
+     self->c = self->text[++self->index];
+-- 
+2.25.1
+

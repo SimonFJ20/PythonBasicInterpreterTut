@@ -1,0 +1,11 @@
+
+//
+// Hello World Example
+//
+
+import "std"
+
+proc main()
+    print("Hello, world!")
+end
+

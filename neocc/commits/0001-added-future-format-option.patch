@@ -1,0 +1,28 @@
+From d95891c700484af75baf57c127260ddab57fb700 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Sat, 7 May 2022 20:41:04 +0200
+Subject: [PATCH] added future format option
+
+---
+ .clang-format | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/.clang-format b/.clang-format
+index b0ed321..fc6198a 100644
+--- a/.clang-format
++++ b/.clang-format
+@@ -3,4 +3,10 @@ BasedOnStyle:  WebKit
+ IndentWidth: 4
+ SpaceAfterCStyleCast: true
+ 
+-
++# can be used with clang-format version >=14
++# SpaceBeforeParens: Custom
++# SpaceBeforeParensOptions:
++#   AfterControlStatements: true
++#   AfterFunctionDeclarationName: false
++#   AfterFunctionDefinitionName: false
++#   BeforeNonEmptyParentheses: false
+-- 
+2.25.1
+

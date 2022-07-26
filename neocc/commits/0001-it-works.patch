@@ -1,0 +1,431 @@
+From b832f4638539fe10ed0b60088c41ed8719011f64 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Tue, 3 May 2022 15:11:41 +0200
+Subject: [PATCH] it works!!!
+
+---
+ .gitignore            |   1 +
+ a.out                 | Bin 0 -> 4800 bytes
+ compiler.c            |  81 ++++++++++++++++++++++++++++++++++++++++++
+ compiler.h            |  14 ++++++++
+ examples/helloworld.s |  20 +++++++++++
+ file.c                |  38 ++++++++++++++++++++
+ memutils.c            |   7 ----
+ neocc.c               |  12 +++++++
+ nodes.c               |  10 +++---
+ stringbuilder.c       |  60 +++++++++++++++++++++++++++++++
+ utils.h               |  22 ++++++++++++
+ 11 files changed, 253 insertions(+), 12 deletions(-)
+ create mode 100755 a.out
+ create mode 100644 compiler.c
+ create mode 100644 compiler.h
+ create mode 100644 examples/helloworld.s
+ create mode 100644 stringbuilder.c
+
+diff --git a/.gitignore b/.gitignore
+index 212e12e..9e939c8 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,3 +1,4 @@
+ neocc
+ *.o
+ compile_flags.txt
++*temp*
+\ No newline at end of file
+diff --git a/a.out b/a.out
+new file mode 100755
+index 0000000000000000000000000000000000000000..2bdc9a766e74d2f356649dbec577549a6a44eccc
+GIT binary patch
+literal 4800
+zcmeHLze~eV5Wd8;)uB+G6qh)-1_uWx$)a`;5u~Gplm>N3T9PN&N!R{Yg$_>s4=#m*
+zlYfEUz1+nTl!7=oT;RR$?tAy+_3QNR@#Or}bsUh-g=4T@C$v<#1B9Crfi@h0hkFwm
+zHrD$(LaWNK>?M~LgiaYubc0Oxf%^&Wlwlw!any^J&vkt#w2^`b)&me+Xa8z$2EWO(
+zIaq`4dUnyn-|I|?<M!aP&utV`0aZX1Pz6*0RX`O`1yli5Kow90RDpk~z{16Ay)}E?
+z$^3fOoy@w=Q+nFIJgvAb1$prPQ4cHM+b*=^J<kDq7F}r9_$}l+_==Wyztn3B?}tKJ
+zq<Mgiukrp5JeVXM1w%;Vy9}bJUldVc;@m)#3}O=_WCMVp7^f!gBbvO#Td}gCNrIc~
+zJ{aZ0QIeZ61SWYf_A-C4?P84<F8UkjlR1XZ0|uF6l&1hP&k#RAgF>4^h`u~mspcnq
+z&SfRq=1T91M8oI&DU&qwpe6mcncqNMV|y81Ie&kdM7!Rf#!BDiH+bH3xFY`(Km$G^
+
+literal 0
+HcmV?d00001
+
+diff --git a/compiler.c b/compiler.c
+new file mode 100644
+index 0000000..36c0a17
+--- /dev/null
++++ b/compiler.c
+@@ -0,0 +1,81 @@
++#include "compiler.h"
++#include "parser.h"
++#include "utils.h"
++#include <assert.h>
++#include <stdlib.h>
++
++Compiler* new_compiler(List* ast)
++{
++    static_assert(sizeof(Compiler) == 16, "incomplete construction of Compiler");
++    Compiler* self = calloc(1, sizeof(Compiler));
++    *self = (Compiler) {
++        .ast = ast,
++        .assembly = new_string_builder(),
++    };
++    return self;
++}
++
++void delete_compiler(Compiler* self)
++{
++    delete_string_builder(self->assembly);
++    free(self);
++}
++
++// forward definitions
++void compiler_make_statements(Compiler* self, List* statements);
++void compiler_make_statement(Compiler* self, StatementNode* node);
++void compiler_make_function_definition(Compiler* self, FuncDefNode* node);
++
++char* compiler_compile(Compiler* self)
++{
++    string_builder_write(self->assembly, ".global _start\n");
++    string_builder_write(self->assembly, ".text\n");
++    string_builder_write(self->assembly, "_start:\n");
++    string_builder_write(self->assembly, "    call main\n");
++    string_builder_write(self->assembly, "    jmp end\n");
++    compiler_make_statements(self, self->ast);
++    string_builder_write(self->assembly, "end:\n");
++    string_builder_write(self->assembly, "    mov %rax, %rbx\n");
++    string_builder_write(self->assembly, "    mov $1, %rax\n");
++    string_builder_write(self->assembly, "    int $0x80\n");
++
++    return string_builder_c_string(self->assembly);
++}
++
++void compiler_make_statements(Compiler* self, List* statements)
++{
++    for (int i = 0; i < statements->length(statements); i++)
++        compiler_make_statement(self, statements->get(statements, i));
++}
++
++void compiler_make_statement(Compiler* self, StatementNode* node)
++{
++    switch (node->type) {
++    case ST_FUNC_DEF:
++        return compiler_make_function_definition(self, (FuncDefNode*) node);
++    case ST_RETURN:
++    case ST_EXPRESSION:
++    case StatementNodeType_LAST:
++    default:
++        assert(!"unexpected StatementNodeType");
++    }
++}
++
++void compiler_make_function_definition(Compiler* self, FuncDefNode* node)
++{
++    string_builder_write_chars(self->assembly, (char*) node->target->value, node->target->length);
++    string_builder_write(self->assembly, ":\n");
++    string_builder_write(self->assembly, "    push %rbp\n");
++    string_builder_write(self->assembly, "    mov %rsp, %rbp\n");
++    //compiler_make_statements(self, node->body);
++    string_builder_write(self->assembly, "    pop %rbp\n");
++    string_builder_write(self->assembly, "    ret\n");
++}
++
++char* compile(List* ast)
++{
++    Compiler* compiler = new_compiler(ast);
++    char* result = compiler_compile(compiler);
++    delete_compiler(compiler);
++    return result;
++}
+diff --git a/compiler.h b/compiler.h
+new file mode 100644
+index 0000000..708ae7d
+--- /dev/null
++++ b/compiler.h
+@@ -0,0 +1,14 @@
++#pragma once
++
++#include "utils.h"
++
++typedef struct CompilerStruct {
++    List* ast;
++    StringBuilder* assembly;
++} Compiler;
++
++Compiler* new_compiler(List* ast);
++void delete_compiler(Compiler* self);
++char* compiler_compile(Compiler* self);
++
++char* compile(List* ast);
+diff --git a/examples/helloworld.s b/examples/helloworld.s
+new file mode 100644
+index 0000000..c8cd256
+--- /dev/null
++++ b/examples/helloworld.s
+@@ -0,0 +1,20 @@
++.global _start
++
++.data
++string1:
++    .ascii "Hello world!\n"
++    string1_len = . - string1
++
++.text
++_start:
++    mov $4, %rax
++    mov $1, %rbx
++    mov $string1, %rcx
++    mov $string1_len, %rdx
++    int $0x80
++
++exit:
++    mov $1, %rax
++    mov $0, %rbx
++    int $0x80
++    
+\ No newline at end of file
+diff --git a/file.c b/file.c
+index a78f629..b057f1c 100644
+--- a/file.c
++++ b/file.c
+@@ -1,4 +1,5 @@
+ #include "utils.h"
++#include <assert.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ 
+@@ -35,3 +36,40 @@ char* file_reader_read(FileReader* self)
+             content[i] = '\0';
+     return content;
+ }
++
++char* read_file(const char* path)
++{
++    FileReader* file = new_file_reader("examples/main.c");
++    char* content = file_reader_read(file);
++    delete_file_reader(file);
++    return content;
++}
++
++FileWriter* new_file_writer(const char* path)
++{
++    FileWriter* self = calloc(1, sizeof(FileWriter));
++    *self = (FileWriter) {
++        .fp = fopen(path, "w"),
++    };
++    assert(self->fp && "could not open file");
++    return self;
++}
++
++void delete_file_writer(FileWriter* self)
++{
++    fclose(self->fp);
++    free(self);
++}
++
++void file_writer_write(FileWriter* self, char* string)
++{
++    int error = fputs(string, self->fp);
++    assert(error != EOF && "could not write to file");
++}
++
++void write_file(const char* path, char* string)
++{
++    FileWriter* writer = new_file_writer(path);
++    file_writer_write(writer, string);
++    delete_file_writer(writer); 
++}
+diff --git a/memutils.c b/memutils.c
+index 0c42c77..8177d37 100644
+--- a/memutils.c
++++ b/memutils.c
+@@ -13,10 +13,3 @@ void delete_list_and_elements(List* list, void (*deletor)(void *))
+     list->delete(list);
+ }
+ 
+-char* read_file(const char* path)
+-{
+-    FileReader* file = new_file_reader("examples/main.c");
+-    char* content = file_reader_read(file);
+-    delete_file_reader(file);
+-    return content;
+-}
+diff --git a/neocc.c b/neocc.c
+index 3e81c58..2f48dce 100644
+--- a/neocc.c
++++ b/neocc.c
+@@ -1,5 +1,7 @@
++#include "compiler.h"
+ #include "parser.h"
+ #include "utils.h"
++#include <assert.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ 
+@@ -19,6 +21,16 @@ int main()
+         println_and_free(node->to_string(node));
+     }
+ 
++    printf("=== COMPILING(AST) -> ASSEMBLY ===\n");
++    char* assembly = compile(ast);
++    printf("%s\n", assembly);
++
++    write_file("temp.s", assembly);
++
++    int assemble_link_result = system("as temp.s -o temp.o && ld temp.o");
++    assert(assemble_link_result == 0 && "failed to assemble or link");
++
++    free(assembly);
+     delete_list_and_elements(ast, (void (*)(void*)) delete_node_inheriter);
+     delete_list_and_elements(tokens, (void (*)(void*)) delete_token);
+     free(content);
+diff --git a/nodes.c b/nodes.c
+index b143ed5..2a0a6e7 100644
+--- a/nodes.c
++++ b/nodes.c
+@@ -95,7 +95,7 @@ char* func_def_node_to_string(FuncDefNode* self)
+ 
+     char* buffer = calloc(8192, sizeof(char));
+     sprintf(buffer, "%s {target: %s, return_type: %s, params: [%s], body: [%s]}", type, target, return_type, params, body);
+-    buffer = realloc(buffer, strlen(buffer) * sizeof(char));
++    buffer = realloc(buffer, strlen(buffer) * sizeof(char) + 1);
+ 
+     free(target);
+     free(return_type);
+@@ -131,7 +131,7 @@ char* return_node_to_string(ReturnNode* self)
+ 
+     char* buffer = calloc(8192, sizeof(char));
+     sprintf(buffer, "%s {value: %s}", type, value);
+-    buffer = realloc(buffer, strlen(buffer) * sizeof(char));
++    buffer = realloc(buffer, strlen(buffer) * sizeof(char) + 1);
+ 
+     free(value);
+ 
+@@ -165,7 +165,7 @@ char* expression_statment_to_string(ExprStmtNode* self)
+ 
+     char* buffer = calloc(8192, sizeof(char));
+     sprintf(buffer, "%s {value: %s}", type, value);
+-    buffer = realloc(buffer, strlen(buffer) * sizeof(char));
++    buffer = realloc(buffer, strlen(buffer) * sizeof(char) + 1);
+ 
+     free(value);
+ 
+@@ -199,7 +199,7 @@ char* keyword_type_to_string(KeywordTypeNode* self)
+ 
+     char* buffer = calloc(8192, sizeof(char));
+     sprintf(buffer, "%s {value: %s}", type, token);
+-    buffer = realloc(buffer, strlen(buffer) * sizeof(char));
++    buffer = realloc(buffer, strlen(buffer) * sizeof(char) + 1);
+ 
+     free(token);
+ 
+@@ -234,7 +234,7 @@ char* int_node_to_string(IntNode* self)
+ 
+     char* buffer = calloc(8192, sizeof(char));
+     sprintf(buffer, "%s {token: %s}", type, token);
+-    buffer = realloc(buffer, strlen(buffer) * sizeof(char));
++    buffer = realloc(buffer, strlen(buffer) * sizeof(char) + 1);
+ 
+     free(token);
+ 
+diff --git a/stringbuilder.c b/stringbuilder.c
+new file mode 100644
+index 0000000..3e50a7b
+--- /dev/null
++++ b/stringbuilder.c
+@@ -0,0 +1,60 @@
++#include "utils.h"
++#include <assert.h>
++#include <stdlib.h>
++#include <string.h>
++
++// typedef struct StringBuilderStruct {
++//     size_t m_length;
++//     char* m_buffer;
++// } StringBuilder;
++
++StringBuilder* new_string_builder()
++{
++    static_assert(sizeof(StringBuilder) == 16, "incomplete construction of StringBuilder");
++    StringBuilder* self = calloc(1, sizeof(StringBuilder));
++    *self = (StringBuilder) {
++        .m_length = 0,
++        .m_buffer = calloc(1, sizeof(char)),
++    };
++    return self;
++}
++
++void delete_string_builder(StringBuilder* self)
++{
++    free(self->m_buffer);
++    free(self);
++}
++
++size_t string_builder_length(StringBuilder* self)
++{
++    return self->m_length;
++}
++
++char* string_builder_c_string(StringBuilder* self)
++{
++    char* buffer = calloc(1, self->m_length * sizeof(char) + 1);
++    memcpy(buffer, self->m_buffer, self->m_length);
++    return buffer;
++}
++
++char* string_builder_buffer(StringBuilder* self)
++{
++    return self->m_buffer;
++}
++
++void string_builder_write(StringBuilder* self, char* string)
++{
++    self->m_length += strlen(string);
++    self->m_buffer = realloc(self->m_buffer, self->m_length * sizeof(char) + 1);
++    strcat(self->m_buffer, string);
++}
++
++void string_builder_write_chars(StringBuilder* self, char* chars, size_t amount)
++{
++    size_t new_length = self->m_length + amount;
++    self->m_buffer = realloc(self->m_buffer, new_length * sizeof(char) + 1);
++    // memcpy(self->m_buffer + (self->m_length - 1), chars, amount);
++    for (int i = 0; i < amount; i++)
++        self->m_buffer[self->m_length + i] = chars[i];
++    self->m_length += amount;
++}
+diff --git a/utils.h b/utils.h
+index 454f6eb..1f4e173 100644
+--- a/utils.h
++++ b/utils.h
+@@ -38,6 +38,28 @@ void delete_file_reader(FileReader* self);
+ size_t file_reader_length(FileReader* self);
+ char* file_reader_read(FileReader* self);
+ 
++typedef struct FileWriterStruct {
++    FILE* fp;
++} FileWriter;
++
++FileWriter* new_file_writer(const char* path);
++void delete_file_writer(FileWriter* self);
++void file_writer_write(FileWriter* self, char* string);
++
++typedef struct StringBuilderStruct {
++    size_t m_length;
++    char* m_buffer;
++} StringBuilder;
++
++StringBuilder* new_string_builder();
++void delete_string_builder(StringBuilder* self);
++size_t string_builder_length(StringBuilder* self);
++char* string_builder_c_string(StringBuilder* self);
++char* string_builder_buffer(StringBuilder* self);
++void string_builder_write(StringBuilder* self, char* string);
++void string_builder_write_chars(StringBuilder* self, char* chars, size_t amount);
++
+ void println_and_free(char* string);
+ void delete_list_and_elements(List* list, void (*)(void*));
+ char* read_file(const char* path);
++void write_file(const char* path, char* string);
+-- 
+2.25.1
+

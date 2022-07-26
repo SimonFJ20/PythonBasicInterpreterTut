@@ -1,0 +1,23 @@
+From b548d5d99c3f499dc47c6a62310a9b30d47fa84d Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Mon, 9 May 2022 21:17:39 +0200
+Subject: [PATCH] added reference
+
+---
+ README.md | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/README.md b/README.md
+index 11b9ace..e375f0e 100644
+--- a/README.md
++++ b/README.md
+@@ -1,2 +1,6 @@
+ 
+ # neocc
++
++## References
++
++- [String hashing algorithm](https://cp-algorithms.com/string/string-hashing.html)
+-- 
+2.25.1
+

@@ -1,0 +1,52 @@
+From 26f148279162ea9288963b392a7a7bfe53535795 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Thu, 5 May 2022 01:51:35 +0200
+Subject: [PATCH] made mofe memory safe
+
+---
+ lexer.c | 16 ++++++++++------
+ 1 file changed, 10 insertions(+), 6 deletions(-)
+
+diff --git a/lexer.c b/lexer.c
+index 61cbafd..f0948fc 100644
+--- a/lexer.c
++++ b/lexer.c
+@@ -6,7 +6,7 @@
+ #include <stdlib.h>
+ #include <string.h>
+ 
+-List* tokenize(const char* text)
++List* tokenize(char* text)
+ {
+     Lexer* lexer = new_lexer(text);
+     List* result = lexer_tokenize(lexer);
+@@ -86,17 +86,21 @@ void delete_token(Token* self)
+ 
+ char* token_to_string(Token* self)
+ {
++    char* value_str = calloc(self->length, sizeof(char));
++    strncpy(value_str, self->value, self->length - 1);
+ 
+-    char value_str[64] = { 0 };
+-    strncpy(value_str, self->value, self->length);
++    char* buffer = calloc(8192, sizeof(char));
++    snprintf(buffer, 8192, "Token(%s, '%s', %ld)", token_type_to_string(self->type), value_str, self->length);
++    buffer = realloc(buffer, strlen(buffer) * sizeof(char) + 1);
+ 
+-    char* buffer = calloc(64, sizeof(char));
+-    sprintf(buffer, "Token(%s, '%s', %ld)", token_type_to_string(self->type), value_str, self->length);
++    free(value_str);
++    
+     return buffer;
+ }
+ 
+-Lexer* new_lexer(const char* text)
++Lexer* new_lexer(char* text)
+ {
++    static_assert(sizeof(Lexer) == 16, "incomplete construction of Lexer");
+     Lexer* self = calloc(1, sizeof(Lexer));
+     *self = (Lexer) {
+         .text = text,
+-- 
+2.25.1
+

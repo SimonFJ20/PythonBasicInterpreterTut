@@ -1,0 +1,28 @@
+From 8366a91044a5b5fc2f8b5ecf167b8ceeb589971d Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Sat, 7 May 2022 20:47:34 +0200
+Subject: [PATCH] removed unneccesarry comment
+
+---
+ stringbuilder.c | 5 -----
+ 1 file changed, 5 deletions(-)
+
+diff --git a/stringbuilder.c b/stringbuilder.c
+index c9af438..cfb073b 100644
+--- a/stringbuilder.c
++++ b/stringbuilder.c
+@@ -5,11 +5,6 @@
+ #include <string.h>
+ #include <stdarg.h>
+ 
+-// typedef struct StringBuilderStruct {
+-//     size_t m_length;
+-//     char* m_buffer;
+-// } StringBuilder;
+-
+ StringBuilder* new_string_builder()
+ {
+     static_assert(sizeof(StringBuilder) == 16, "incomplete construction of StringBuilder");
+-- 
+2.25.1
+

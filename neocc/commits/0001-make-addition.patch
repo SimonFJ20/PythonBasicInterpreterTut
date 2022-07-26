@@ -1,0 +1,49 @@
+From c941ad5f20eee9e8b086ce99bdba2b8a0d12ef75 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Mon, 9 May 2022 21:17:52 +0200
+Subject: [PATCH] make addition
+
+---
+ parser.c | 13 ++++++++++++-
+ parser.h |  1 +
+ 2 files changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/parser.c b/parser.c
+index 50720f5..56cf8b0 100644
+--- a/parser.c
++++ b/parser.c
+@@ -129,7 +129,18 @@ TypeNode* parser_make_type(Parser* self)
+ 
+ ExpressionNode* parser_make_expression(Parser* self)
+ {
+-    return parser_make_value(self);
++    return parser_make_addition(self);
++}
++
++ExpressionNode* parser_make_addition(Parser* self)
++{
++    ExpressionNode* left = parser_make_value(self);
++    if (self->t->type == TOKEN_TYPE_PLUS) {
++        parser_next(self);
++        ExpressionNode* right = parser_make_addition(self);
++        return (ExpressionNode*) new_binary_operation_node(BINARY_OPERATION_TYPE_ADD, left, right);
++    }
++    return left;
+ }
+ 
+ ExpressionNode* parser_make_value(Parser* self)
+diff --git a/parser.h b/parser.h
+index 36181b3..0805177 100644
+--- a/parser.h
++++ b/parser.h
+@@ -289,6 +289,7 @@ DeclStmtNode* parser_resume_declaration_statement(Parser* self, Token* target, T
+ TypeNode* parser_make_type(Parser* self);
+ ReturnNode* parser_make_return(Parser* self);
+ ExpressionNode* parser_make_expression(Parser* self);
++ExpressionNode* parser_make_addition(Parser* self);
+ ExpressionNode* parser_make_value(Parser* self);
+ void parser_skip_newline(Parser* self);
+ void check_and_skip_newline(Parser* self);
+-- 
+2.25.1
+

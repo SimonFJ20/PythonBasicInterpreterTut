@@ -1,0 +1,40 @@
+
+struct Square {
+
+    int width;
+    int height;
+
+    constructor (width, height) {
+        this.with = width;
+        this.height = height;
+    }
+
+    destructor {
+
+    }
+
+}
+
+int area(Square this) {
+    return this.with * this.height;
+}
+
+int noSyntaxSuger() {
+    Square sqr = allocate(Square);
+    sqr.constructor(4, 5);
+
+    int area = area(sqr);
+    
+    destroy(Square);
+
+    return area;
+}
+
+int withSyntaxSuger() {
+    sqr = Square(4, 5);
+
+    int area = sqr.area();
+
+    return 0;
+} // automatic deallocation when not returned
+

@@ -1,0 +1,66 @@
+From b89e1c8cfe02bb1f4ed4c70b8f453e01f8860532 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Mon, 9 May 2022 02:45:30 +0200
+Subject: [PATCH] fixed keyword matching
+
+---
+ lexer.c | 32 ++++++++++++++++----------------
+ 1 file changed, 16 insertions(+), 16 deletions(-)
+
+diff --git a/lexer.c b/lexer.c
+index a1b7279..bb70ad1 100644
+--- a/lexer.c
++++ b/lexer.c
+@@ -193,25 +193,25 @@ Token* lexer_make_number(Lexer* self)
+     return new_token(TOKEN_TYPE_INT_LITERAL, value, value_length);
+ }
+ 
+-#define CHECK_KEYWORD(identifier, length, type, keyword) \
++#define CHECK_KEYWORD(identifier, type, keyword) \
+     ({                                                   \
+-        if (strncmp(identifer, keyword, length) == 0)    \
++        if (strncmp(identifer, keyword, strlen(keyword)) == 0)    \
+             return type;                                 \
+     })
+ 
+-static inline TokenType identifier_or_kw_token_type(const char* identifer, size_t length)
+-{
+-    CHECK_KEYWORD(identifer, length, TOKEN_TYPE_KW_VOID, "void");
+-    CHECK_KEYWORD(identifer, length, TOKEN_TYPE_KW_INT, "int");
+-    CHECK_KEYWORD(identifer, length, TOKEN_TYPE_KW_IF, "if");
+-    CHECK_KEYWORD(identifer, length, TOKEN_TYPE_KW_ELSE, "else");
+-    CHECK_KEYWORD(identifer, length, TOKEN_TYPE_KW_FOR, "for");
+-    CHECK_KEYWORD(identifer, length, TOKEN_TYPE_KW_WHILE, "while");
+-    CHECK_KEYWORD(identifer, length, TOKEN_TYPE_KW_SWITCH, "switch");
+-    CHECK_KEYWORD(identifer, length, TOKEN_TYPE_KW_CASE, "case");
+-    CHECK_KEYWORD(identifer, length, TOKEN_TYPE_KW_RETURN, "return");
+-    CHECK_KEYWORD(identifer, length, TOKEN_TYPE_KW_CONTINUE, "continue");
+-    CHECK_KEYWORD(identifer, length, TOKEN_TYPE_KW_BREAK, "break");
++static inline TokenType identifier_or_kw_token_type(const char* identifer)
++{
++    CHECK_KEYWORD(identifer, TOKEN_TYPE_KW_VOID, "void");
++    CHECK_KEYWORD(identifer, TOKEN_TYPE_KW_INT, "int");
++    CHECK_KEYWORD(identifer, TOKEN_TYPE_KW_IF, "if");
++    CHECK_KEYWORD(identifer, TOKEN_TYPE_KW_ELSE, "else");
++    CHECK_KEYWORD(identifer, TOKEN_TYPE_KW_FOR, "for");
++    CHECK_KEYWORD(identifer, TOKEN_TYPE_KW_WHILE, "while");
++    CHECK_KEYWORD(identifer, TOKEN_TYPE_KW_SWITCH, "switch");
++    CHECK_KEYWORD(identifer, TOKEN_TYPE_KW_CASE, "case");
++    CHECK_KEYWORD(identifer, TOKEN_TYPE_KW_RETURN, "return");
++    CHECK_KEYWORD(identifer, TOKEN_TYPE_KW_CONTINUE, "continue");
++    CHECK_KEYWORD(identifer, TOKEN_TYPE_KW_BREAK, "break");
+     return TOKEN_TYPE_IDENTIFIER;
+ }
+ 
+@@ -224,7 +224,7 @@ Token* lexer_make_name(Lexer* self)
+         value_length++;
+         lexer_next(self);
+     }
+-    TokenType type = identifier_or_kw_token_type(value, value_length);
++    TokenType type = identifier_or_kw_token_type(value);
+     return new_token(type, value, value_length);
+ }
+ 
+-- 
+2.25.1
+

@@ -1,0 +1,24 @@
+From 190910b043437c7cbc1040d81fbdf016a2b9d279 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Tue, 3 May 2022 23:42:06 +0200
+Subject: [PATCH] updated to match temp.s
+
+---
+ .gitignore | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/.gitignore b/.gitignore
+index db4f00d..9abc2de 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -2,4 +2,4 @@ neocc
+ *.o
+ *.out
+ compile_flags.txt
+-*.temp.*
+\ No newline at end of file
++temp.*
+\ No newline at end of file
+-- 
+2.25.1
+

@@ -1,0 +1,279 @@
+From 5d0a9962f6f2b37ba56b208f71cea8c7a2104bb9 Mon Sep 17 00:00:00 2001
+From: Simon From <simonfromjakobsen@gmail.com>
+Date: Tue, 7 Sep 2021 01:43:35 +0200
+Subject: [PATCH] parser create
+
+---
+ src/lexer.ts  |  79 +++++++++++++++-----------
+ src/parser.ts | 149 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ src/style.css |   2 +-
+ 3 files changed, 197 insertions(+), 33 deletions(-)
+ create mode 100644 src/parser.ts
+
+diff --git a/src/lexer.ts b/src/lexer.ts
+index e0adf48..589213a 100644
+--- a/src/lexer.ts
++++ b/src/lexer.ts
+@@ -1,37 +1,37 @@
+ 
+ export enum TokenType {
+-    Int = 'Int',
+-    Float = 'Float',
+-    String = 'String',
+-    Plus = 'Plus',
+-    Minus = 'Minus',
+-    Multiply = 'Multiply',
+-    Divide = 'Divide',
+-    PlusAssign = 'PlusAssign',
+-    MinusAssign = 'MinusAssign',
+-    MultiplyAssign = 'MultiplyAssign',
+-    DivideAssign = 'DivideAssign',
+-    EqualAssign = 'EqualAssign',
+-    Increment = 'Increment',
+-    Decrement = 'Decrement',
+-    LParen = 'LParen',
+-    RParen = 'RParen',
+-    LBrace = 'LBrace',
+-    RBrace = 'RBrace',
+-    LSquare = 'LSquare',
+-    RSquare = 'RSquare',
+-    EqualCompare = 'EqualCompare',
+-    NotEqual = 'NotEqual',
+-    LessThan = 'LessThan',
+-    GreaterThan = 'GreaterThan',
+-    LessThanOrEqual = 'LessThanOrEqual',
+-    GreaterThanOrEqual = 'GreaterThanOrEqual',
+-    Identifier = 'Identifier',
+-    Keyword = 'Keyword',
+-    Comma = 'Comma',
+-    Colon = 'Colon',
+-    Newline = 'Newline',
+-    EndOfFile = 'EndOfFile',
++    Int                ,// = 'Int',
++    Float              ,// = 'Float',
++    String             ,// = 'String',
++    Plus               ,// = 'Plus',
++    Minus              ,// = 'Minus',
++    Multiply           ,// = 'Multiply',
++    Divide             ,// = 'Divide',
++    PlusAssign         ,// = 'PlusAssign',
++    MinusAssign        ,// = 'MinusAssign',
++    MultiplyAssign     ,// = 'MultiplyAssign',
++    DivideAssign       ,// = 'DivideAssign',
++    EqualAssign        ,// = 'EqualAssign',
++    Increment          ,// = 'Increment',
++    Decrement          ,// = 'Decrement',
++    LParen             ,// = 'LParen',
++    RParen             ,// = 'RParen',
++    LBrace             ,// = 'LBrace',
++    RBrace             ,// = 'RBrace',
++    LSquare            ,// = 'LSquare',
++    RSquare            ,// = 'RSquare',
++    EqualCompare       ,// = 'EqualCompare',
++    NotEqual           ,// = 'NotEqual',
++    LessThan           ,// = 'LessThan',
++    GreaterThan        ,// = 'GreaterThan',
++    LessThanOrEqual    ,// = 'LessThanOrEqual',
++    GreaterThanOrEqual ,// = 'GreaterThanOrEqual',
++    Identifier         ,// = 'Identifier',
++    Keyword            ,// = 'Keyword',
++    Comma              ,// = 'Comma',
++    Colon              ,// = 'Colon',
++    Newline            ,// = 'Newline',
++    EndOfFile          ,// = 'EndOfFile',
+ }
+ 
+ export const Keywords: string[] = [
+@@ -49,6 +49,21 @@ export const Keywords: string[] = [
+     'require',
+ ]
+ 
++export enum KeywordTypes {
++    Int         = 0,
++    Float       = 1,
++    String      = 2,
++    Bool        = 3,
++    Func        = 4,
++    If          = 5,
++    While       = 6,
++    For         = 7,
++    Continue    = 8,
++    Break       = 9,
++    Return      = 10,
++    Require     = 11,
++}
++
+ export class Token {
+     constructor (public type: TokenType, public value?: any) {}
+ }
+diff --git a/src/parser.ts b/src/parser.ts
+new file mode 100644
+index 0000000..ab1f409
+--- /dev/null
++++ b/src/parser.ts
+@@ -0,0 +1,149 @@
++import { Keywords, KeywordTypes, Token, TokenType } from "./lexer";
++
++class InvalidSyntaxError {
++    public name: string = 'Invalid Syntax'
++    constructor(public details: string) {
++
++    }
++    public toString = () => `\n${this.name}: ${this.details}\n`;
++}
++
++class ParseNode {
++
++}
++
++class ListNode extends ParseNode {
++    constructor (public nodes: ParseNode[]) { 
++        super();
++    }
++}
++
++class ParseResult {
++    public node?: ParseNode = undefined;
++    public error?: InvalidSyntaxError = undefined;
++    public lastRegisteredAdvanceCount: number = 0;
++    public advanceCount: number = 0;
++    public toReverseCount: number = 0;
++
++    public registerAdvance = () => {
++        this.lastRegisteredAdvanceCount = 1;
++        this.advanceCount++;
++    }
++
++    public register = (result: ParseResult) => {
++        this.lastRegisteredAdvanceCount = this.advanceCount;
++        this.advanceCount += result.advanceCount;
++        if (result.error)
++            this.error = result.error;
++        return result.node;
++    }
++
++    public tryRegister = (result: ParseResult) => {
++        if (result.error) {
++            this.toReverseCount = result.advanceCount;
++            return undefined;
++        }
++        return this.register(result);
++    }
++
++    public success = (node: ParseNode) => {
++        this.node = node;
++        return this;
++    }
++
++    public failure = (error: InvalidSyntaxError) => {
++        if (!this.error || this.lastRegisteredAdvanceCount === 0)
++            this.error = error;
++        return this;
++    }
++}
++
++export class Parser {
++    private tokens: Token[] = [];
++    private tokenIndex: number = 0;
++    private currentToken: Token | null = null;
++
++    private updateCurrentToken = () => {
++        if (this.tokenIndex >= 0 && this.tokenIndex < this.tokens.length)
++            this.currentToken = this.tokens[this.tokenIndex];
++    }
++
++    private advance = () => {
++        this.tokenIndex++;
++        this.updateCurrentToken();
++        return this.currentToken;
++    }
++
++    private reverse = (amount: number = 1) => {
++        this.tokenIndex -= amount;
++        this.updateCurrentToken();
++        return this.currentToken;
++    }
++
++    private makeStatement = (): ParseResult => {
++        const result = new ParseResult();
++
++        if (
++            this.currentToken?.type === TokenType.Keyword 
++            && this.currentToken.value === Keywords[KeywordTypes.Return]
++        ) {
++            result.registerAdvance();
++            this.advance();
++
++            // line 623
++        }
++
++        return result; // temp
++    }
++
++    private makeStatements = (): ParseResult => {
++        const result = new ParseResult();
++        const statements = [];
++
++        while (this.currentToken?.type === TokenType.Newline) {
++            result.registerAdvance();
++            this.advance();
++        }
++
++        const statement = result.register(this.makeStatement());
++        if (result.error)
++            return result;
++        if (statement)
++            statements.push(statement);
++
++        let multipleStatements = true;
++
++        while (true) {
++            let newlineCount = 0;
++            while (<TokenType>this.currentToken?.type === TokenType.Newline) {
++                result.registerAdvance();
++                this.advance();
++                newlineCount++;
++            }
++            if (newlineCount)
++                multipleStatements = false;
++            if (!multipleStatements)
++                break;
++            const statement = result.tryRegister(this.makeStatement());
++            if (!statement) {
++                this.reverse(result.toReverseCount)
++                multipleStatements = false;
++                continue;
++            }
++            statements.push(statement);
++        }
++        
++        return result.success(new ListNode(statements));
++    }
++
++    public parse = (tokens: Token[]) => {
++        this.tokens = tokens;
++        this.tokenIndex = -1;
++        this.advance();
++        const res = this.makeStatements();
++        if (!res.error && this.currentToken?.type !== TokenType.EndOfFile)
++            return res.failure(new InvalidSyntaxError('Token cannot appear after previous tokens'));
++        return res;
++    }
++
++}
+diff --git a/src/style.css b/src/style.css
+index 74994d8..93e65a8 100644
+--- a/src/style.css
++++ b/src/style.css
+@@ -13,7 +13,7 @@ body {
+ }
+ 
+ textarea {
+-    width: 50%;
++    width: 1000px;
+     height: 40%;
+     background-color: #282828;
+     color: rgb(200, 200, 200);
+-- 
+2.25.1
+

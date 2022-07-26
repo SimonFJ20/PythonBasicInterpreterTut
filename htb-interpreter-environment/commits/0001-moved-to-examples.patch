@@ -1,0 +1,17 @@
+From 70e483f4ec5ae302fab410912eca7a0b1442ab30 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Tue, 30 Nov 2021 00:01:31 +0100
+Subject: [PATCH] moved to examples/
+
+---
+ {core => examples}/example.htb | 0
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+ rename {core => examples}/example.htb (100%)
+
+diff --git a/core/example.htb b/examples/example.htb
+similarity index 100%
+rename from core/example.htb
+rename to examples/example.htb
+-- 
+2.25.1
+

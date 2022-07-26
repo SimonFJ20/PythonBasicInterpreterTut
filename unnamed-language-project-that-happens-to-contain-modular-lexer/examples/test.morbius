@@ -1,0 +1,6 @@
+
+let main = (args: string[]) {
+    let this_is_const = 5
+    let my_string = "hello world\n"
+    print(this_is_const)
+}

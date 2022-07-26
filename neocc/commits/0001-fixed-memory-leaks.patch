@@ -1,0 +1,245 @@
+From cc356884bb853de5f7bc8a20eb1678bd08fa9a3c Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Wed, 4 May 2022 01:16:52 +0200
+Subject: [PATCH] fixed memory leaks
+
+---
+ arraylist.c | 14 ++++++------
+ nodes.c     | 62 ++++++++++++++++++++++++++++-------------------------
+ 2 files changed, 41 insertions(+), 35 deletions(-)
+
+diff --git a/arraylist.c b/arraylist.c
+index 1b85ce1..cee11eb 100644
+--- a/arraylist.c
++++ b/arraylist.c
+@@ -6,7 +6,7 @@
+ ArrayList* new_array_list()
+ {
+     static_assert(sizeof(List) == 40, "incomplete implementation");
+-    ArrayList* self = calloc(1, sizeof(ArrayList));
++    ArrayList* self = _calloc(1, sizeof(ArrayList));
+     *self = (ArrayList) {
+         .delete = delete_array_list,
+         .length = array_list_length,
+@@ -21,7 +21,9 @@ ArrayList* new_array_list()
+ 
+ void delete_array_list(ArrayList* self)
+ {
+-    free(self);
++    if (self->m_elements)
++        _free(self->m_elements);
++    _free(self);
+ }
+ 
+ size_t array_list_length(ArrayList* self)
+@@ -41,14 +43,14 @@ void array_list_add(ArrayList* self, void* element)
+ {
+     self->m_length++;
+     if (!self->m_elements)
+-        self->m_elements = calloc(1, sizeof(void*));
++        self->m_elements = _calloc(1, sizeof(void*));
+     else
+-        self->m_elements = realloc(self->m_elements, sizeof(void*) * self->m_length);
++        self->m_elements = _realloc(self->m_elements, sizeof(void*) * self->m_length);
+     self->m_elements[self->m_length - 1] = element;
+ }
+ 
+-void array_list_delete_all(ArrayList* self, void (*free)(void* element))
++void array_list_delete_all(ArrayList* self, void (*_free)(void* element))
+ {
+     for (int i = 0; i < self->m_length; i++)
+-        free(self->m_elements[i]);
++        _free(self->m_elements[i]);
+ }
+diff --git a/nodes.c b/nodes.c
+index 2a0a6e7..a5000a8 100644
+--- a/nodes.c
++++ b/nodes.c
+@@ -56,7 +56,7 @@ FuncDefNode* new_func_def_node(
+     static_assert(sizeof(Node) == 16, "incomplete implementation of Node");
+     static_assert(sizeof(StatementNode) == 24, "incomplete implementation of StatementNode");
+     static_assert(sizeof(FuncDefNode) == 56, "incomplete construction of FuncDefNode");
+-    FuncDefNode* self = calloc(1, sizeof(FuncDefNode));
++    FuncDefNode* self = _calloc(1, sizeof(FuncDefNode));
+     *self = (FuncDefNode) {
+         .delete = delete_func_def_node,
+         .to_string = func_def_node_to_string,
+@@ -71,7 +71,10 @@ FuncDefNode* new_func_def_node(
+ 
+ void delete_func_def_node(FuncDefNode* self)
+ {
+-    free(self);
++    self->return_type->delete(self->return_type);
++    delete_list_and_elements(self->body, (void (*)(void*)) delete_node_inheriter);
++    delete_list_and_elements(self->params, (void (*)(void*)) delete_node_inheriter);
++    _free(self);
+ }
+ 
+ char* func_def_node_to_string(FuncDefNode* self)
+@@ -81,7 +84,7 @@ char* func_def_node_to_string(FuncDefNode* self)
+     char* return_type = self->return_type->to_string(self->return_type);
+     char* params = "<unimplemented>";
+ 
+-    char* body = calloc(8192, sizeof(char));
++    char* body = _calloc(8192, sizeof(char));
+     bool first = true;
+     for (int i = 0; i < self->body->length(self->body); i++) {
+         StatementNode* statement = self->body->get(self->body, i);
+@@ -93,13 +96,13 @@ char* func_def_node_to_string(FuncDefNode* self)
+         strcat(body, str);
+     }
+ 
+-    char* buffer = calloc(8192, sizeof(char));
++    char* buffer = _calloc(8192, sizeof(char));
+     sprintf(buffer, "%s {target: %s, return_type: %s, params: [%s], body: [%s]}", type, target, return_type, params, body);
+-    buffer = realloc(buffer, strlen(buffer) * sizeof(char) + 1);
++    buffer = _realloc(buffer, strlen(buffer) * sizeof(char) + 1);
+ 
+-    free(target);
+-    free(return_type);
+-    free(body);
++    _free(target);
++    _free(return_type);
++    _free(body);
+ 
+     return buffer;
+ }
+@@ -109,7 +112,7 @@ ReturnNode* new_return_node(ExpressionNode* value)
+     static_assert(sizeof(Node) == 16, "incomplete implementation of Node");
+     static_assert(sizeof(StatementNode) == 24, "incomplete implementation of StatementNode");
+     static_assert(sizeof(ReturnNode) == 32, "incomplete construction of ReturnNode");
+-    ReturnNode* self = calloc(1, sizeof(ReturnNode));
++    ReturnNode* self = _calloc(1, sizeof(ReturnNode));
+     *self = (ReturnNode) {
+         .delete = delete_return_node,
+         .to_string = return_node_to_string,
+@@ -121,7 +124,8 @@ ReturnNode* new_return_node(ExpressionNode* value)
+ 
+ void delete_return_node(ReturnNode* self)
+ {
+-    free(self);
++    self->value->delete(self->value);
++    _free(self);
+ }
+ 
+ char* return_node_to_string(ReturnNode* self)
+@@ -129,11 +133,11 @@ char* return_node_to_string(ReturnNode* self)
+     const char* type = statement_node_type_to_string(self->type);
+     char* value = self->value->to_string(self->value);
+ 
+-    char* buffer = calloc(8192, sizeof(char));
++    char* buffer = _calloc(8192, sizeof(char));
+     sprintf(buffer, "%s {value: %s}", type, value);
+-    buffer = realloc(buffer, strlen(buffer) * sizeof(char) + 1);
++    buffer = _realloc(buffer, strlen(buffer) * sizeof(char) + 1);
+ 
+-    free(value);
++    _free(value);
+ 
+     return buffer;
+ }
+@@ -143,7 +147,7 @@ ExprStmtNode* new_expression_statement_node(ExpressionNode* value)
+     static_assert(sizeof(Node) == 16, "incomplete implementation of Node");
+     static_assert(sizeof(StatementNode) == 24, "incomplete implementation of StatementNode");
+     static_assert(sizeof(ExprStmtNode) == 32, "incomplete construction of ExprStmtNode");
+-    ExprStmtNode* self = calloc(1, sizeof(ExprStmtNode));
++    ExprStmtNode* self = _calloc(1, sizeof(ExprStmtNode));
+     *self = (ExprStmtNode) {
+         .delete = delete_expression_statement_node,
+         .to_string = expression_statment_to_string,
+@@ -155,7 +159,7 @@ ExprStmtNode* new_expression_statement_node(ExpressionNode* value)
+ 
+ void delete_expression_statement_node(ExprStmtNode* self)
+ {
+-    free(self);
++    _free(self);
+ }
+ 
+ char* expression_statment_to_string(ExprStmtNode* self)
+@@ -163,21 +167,21 @@ char* expression_statment_to_string(ExprStmtNode* self)
+     const char* type = statement_node_type_to_string(self->type);
+     char* value = self->value->to_string(self->value);
+ 
+-    char* buffer = calloc(8192, sizeof(char));
++    char* buffer = _calloc(8192, sizeof(char));
+     sprintf(buffer, "%s {value: %s}", type, value);
+-    buffer = realloc(buffer, strlen(buffer) * sizeof(char) + 1);
++    buffer = _realloc(buffer, strlen(buffer) * sizeof(char) + 1);
+ 
+-    free(value);
++    _free(value);
+ 
+     return buffer;
+ }
+ 
+-KeywordTypeNode* new_keyword_type_token(Token* token)
++KeywordTypeNode* new_keyword_type_node(Token* token)
+ {
+     static_assert(sizeof(Node) == 16, "incomplete implementation of Node");
+     static_assert(sizeof(TypeNode) == 24, "incomplete implementation of TypeNode");
+     static_assert(sizeof(KeywordTypeNode) == 32, "incomplete construction of KeywordTypeNode");
+-    KeywordTypeNode* self = calloc(1, sizeof(KeywordTypeNode));
++    KeywordTypeNode* self = _calloc(1, sizeof(KeywordTypeNode));
+     *self = (KeywordTypeNode) {
+         .delete = delete_keyword_type_token,
+         .to_string = keyword_type_to_string,
+@@ -189,7 +193,7 @@ KeywordTypeNode* new_keyword_type_token(Token* token)
+ 
+ void delete_keyword_type_token(KeywordTypeNode* self)
+ {
+-    free(self);
++    _free(self);
+ }
+ 
+ char* keyword_type_to_string(KeywordTypeNode* self)
+@@ -197,11 +201,11 @@ char* keyword_type_to_string(KeywordTypeNode* self)
+     const char* type = type_node_type_to_string(self->type);
+     char* token = token_to_string(self->token);
+ 
+-    char* buffer = calloc(8192, sizeof(char));
++    char* buffer = _calloc(8192, sizeof(char));
+     sprintf(buffer, "%s {value: %s}", type, token);
+-    buffer = realloc(buffer, strlen(buffer) * sizeof(char) + 1);
++    buffer = _realloc(buffer, strlen(buffer) * sizeof(char) + 1);
+ 
+-    free(token);
++    _free(token);
+ 
+     return buffer;
+ }
+@@ -211,7 +215,7 @@ IntNode* new_int_node(Token* token)
+     static_assert(sizeof(Node) == 16, "incomplete implementation of Node");
+     static_assert(sizeof(ExpressionNode) == 24, "incomplete implementation of ExpressionNode");
+     static_assert(sizeof(IntNode) == 32, "incomplete construction of IntNode");
+-    IntNode* self = calloc(1, sizeof(IntNode));
++    IntNode* self = _calloc(1, sizeof(IntNode));
+     *self = (IntNode) {
+         .delete = delete_int_node,
+         .to_string = int_node_to_string,
+@@ -223,7 +227,7 @@ IntNode* new_int_node(Token* token)
+ 
+ void delete_int_node(IntNode* self)
+ {
+-    free(self);
++    _free(self);
+ }
+ 
+ char* int_node_to_string(IntNode* self)
+@@ -232,11 +236,11 @@ char* int_node_to_string(IntNode* self)
+     const char* type = expression_node_type_to_string(self->type);
+     char* token = token_to_string(self->token);
+ 
+-    char* buffer = calloc(8192, sizeof(char));
++    char* buffer = _calloc(8192, sizeof(char));
+     sprintf(buffer, "%s {token: %s}", type, token);
+-    buffer = realloc(buffer, strlen(buffer) * sizeof(char) + 1);
++    buffer = _realloc(buffer, strlen(buffer) * sizeof(char) + 1);
+ 
+-    free(token);
++    _free(token);
+ 
+     return buffer;
+ }
+-- 
+2.25.1
+

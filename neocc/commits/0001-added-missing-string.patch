@@ -1,0 +1,31 @@
+From c2f72985b79a0bd9d3a3e9d9a1abf77558894410 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Mon, 9 May 2022 21:41:26 +0200
+Subject: [PATCH] added missing string
+
+---
+ nodes.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/nodes.c b/nodes.c
+index 0b3fc31..98385e1 100644
+--- a/nodes.c
++++ b/nodes.c
+@@ -447,11 +447,12 @@ void delete_binary_operation_node(BinaryOperationNode* self)
+ char* binary_operation_to_string(BinaryOperationNode* self)
+ {
+     const char* node_type = expression_node_type_to_string(self->node_type);
++    const char* operation_type = binary_operation_type_to_string(self->operation_type);
+     char* left = self->left->to_string(self->left);
+-    char* right = self->right->to_string(self->right);
++    char* right = self->right->to_string(self->right);    
+ 
+     StringBuilder* sb = new_string_builder();
+-    string_builder_write_fmt(sb, "%s {assignment_type: %s, left: %s, right: %s}", node_type, left, right);
++    string_builder_write_fmt(sb, "%s {operation_type: %s, left: %s, right: %s}", node_type, operation_type, left, right);
+     char* result = string_builder_c_string(sb);
+     delete_string_builder(sb);
+ 
+-- 
+2.25.1
+

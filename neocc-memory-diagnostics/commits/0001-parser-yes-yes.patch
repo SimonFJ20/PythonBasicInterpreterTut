@@ -1,0 +1,424 @@
+From f5923b17edf49b9c9e75b058fefe1e7ca2badbb5 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Mon, 2 May 2022 15:16:47 +0200
+Subject: [PATCH] parser yes yes
+
+---
+ lexer.c  | 64 ++++++++++++++++++++++++++--------------
+ neocc.c  |  9 ++++++
+ nodes.c  | 65 +++++++++++++++++++++++++++++++++++++++++
+ parser.c | 89 +++++++++++++++++++++++++++++++++++++++++++++++---------
+ parser.h | 37 ++++++++++++++++++++---
+ 5 files changed, 225 insertions(+), 39 deletions(-)
+
+diff --git a/lexer.c b/lexer.c
+index 0b33436..2e60ca7 100644
+--- a/lexer.c
++++ b/lexer.c
+@@ -16,14 +16,34 @@ List* tokenize(const char* text)
+ 
+ const char* token_type_to_string(TokenType type)
+ {
+-    static_assert(TokenType_LAST == 11, "unexhaustive");
++    static_assert(TokenType_LAST == 21, "unexhaustive");
+     switch (type) {
+-    case TT_KEYWORD:
+-        return "TT_KEYWORD";
+     case TT_IDENTIFIER:
+         return "TT_IDENTIFIER";
+-    case TT_INT:
+-        return "TT_INT";
++    case TT_KW_VOID:
++        return "TT_KW_VOID";
++    case TT_KW_INT:
++        return "TT_KW_INT";
++    case TT_KW_IF:
++        return "TT_KW_IF";
++    case TT_KW_ELSE:
++        return "TT_KW_ELSE";
++    case TT_KW_FOR:
++        return "TT_KW_FOR";
++    case TT_KW_WHILE:
++        return "TT_KW_WHILE";
++    case TT_KW_SWITCH:
++        return "TT_KW_SWITCH";
++    case TT_KW_CASE:
++        return "TT_KW_CASE";
++    case TT_KW_RETURN:
++        return "TT_KW_RETURN";
++    case TT_KW_CONTINUE:
++        return "TT_KW_CONTINUE";
++    case TT_KW_BREAK:
++        return "TT_KW_BREAK";
++    case TT_INT_LITERAL:
++        return "TT_INT_LITERAL";
+     case TT_LPAREN:
+         return "TT_LPAREN";
+     case TT_RPAREN:
+@@ -161,29 +181,29 @@ Token* lexer_make_number(Lexer* self)
+         value_length++;
+         lexer_next(self);
+     }
+-    return new_token(TT_INT, value, value_length);
++    return new_token(TT_INT_LITERAL, value, value_length);
+ }
+ 
+-#define CHECK_KEYWORD(identifier, length, keyword)    \
++#define CHECK_KEYWORD(identifier, length, type, keyword)    \
+     ({                                                \
+         if (strncmp(identifer, keyword, length) == 0) \
+-            return true;                              \
++            return type;                              \
+     })
+ 
+-static bool is_keyword(const char* identifer, size_t length)
++static inline TokenType identifier_or_kw_token_type(const char* identifer, size_t length)
+ {
+-    CHECK_KEYWORD(identifer, length, "void");
+-    CHECK_KEYWORD(identifer, length, "int");
+-    CHECK_KEYWORD(identifer, length, "if");
+-    CHECK_KEYWORD(identifer, length, "else");
+-    CHECK_KEYWORD(identifer, length, "for");
+-    CHECK_KEYWORD(identifer, length, "while");
+-    CHECK_KEYWORD(identifer, length, "switch");
+-    CHECK_KEYWORD(identifer, length, "case");
+-    CHECK_KEYWORD(identifer, length, "return");
+-    CHECK_KEYWORD(identifer, length, "continue");
+-    CHECK_KEYWORD(identifer, length, "break");
+-    return false;
++    CHECK_KEYWORD(identifer, length, TT_KW_VOID, "void");
++    CHECK_KEYWORD(identifer, length, TT_KW_INT, "int");
++    CHECK_KEYWORD(identifer, length, TT_KW_IF, "if");
++    CHECK_KEYWORD(identifer, length, TT_KW_ELSE, "else");
++    CHECK_KEYWORD(identifer, length, TT_KW_FOR, "for");
++    CHECK_KEYWORD(identifer, length, TT_KW_WHILE, "while");
++    CHECK_KEYWORD(identifer, length, TT_KW_SWITCH, "switch");
++    CHECK_KEYWORD(identifer, length, TT_KW_CASE, "case");
++    CHECK_KEYWORD(identifer, length, TT_KW_RETURN, "return");
++    CHECK_KEYWORD(identifer, length, TT_KW_CONTINUE, "continue");
++    CHECK_KEYWORD(identifer, length, TT_KW_BREAK, "break");
++    return TT_IDENTIFIER;
+ }
+ 
+ Token* lexer_make_name(Lexer* self)
+@@ -195,7 +215,7 @@ Token* lexer_make_name(Lexer* self)
+         value_length++;
+         lexer_next(self);
+     }
+-    TokenType type = is_keyword(value, value_length) ? TT_KEYWORD : TT_IDENTIFIER;
++    TokenType type = identifier_or_kw_token_type(value, value_length);
+     return new_token(type, value, value_length);
+ }
+ 
+diff --git a/neocc.c b/neocc.c
+index a7e8b00..ff545a3 100644
+--- a/neocc.c
++++ b/neocc.c
+@@ -9,8 +9,17 @@ int main()
+     char* content = file_reader_read(file);
+ 
+     List* tokens = tokenize(content);
++    printf("=== TOKENIZING(TEXT) -> TOKENS ===\n");
+     for (int i = 0; i < tokens->length(tokens); i++)
+         printf("%s\n", token_to_string(tokens->get(tokens, i)));
++
++    printf("=== PARSING(TOKENS) -> AST ===\n");
++    List* ast = parse(tokens);
++    for (int i = 0; i < ast->length(ast); i++) {
++        StatementNode* node = (StatementNode*) ast->get(ast, i);
++        printf("%s\n", node->to_string(node));
++    }
++
+     tokens->delete(tokens);
+     free(content);
+ }
+diff --git a/nodes.c b/nodes.c
+index 9d1d439..8c84a32 100644
+--- a/nodes.c
++++ b/nodes.c
+@@ -3,6 +3,7 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
++#include <assert.h>
+ 
+ const char* statement_node_type_to_string(StatementNodeType type)
+ {
+@@ -33,6 +34,8 @@ const char* expression_node_type_to_string(ExpressionNodeType type)
+ const char* type_node_type_to_string(TypeNodeType type)
+ {
+     switch (type) {
++    case TNT_KEYWORD:
++        return "TNT_KEYWORD";
+     case TypeNodeType_LAST:
+         return "TypeNodeType_LAST";
+     }
+@@ -123,6 +126,68 @@ char* return_node_to_string(ReturnNode* self)
+     return buffer;
+ }
+ 
++ExprStmtNode* new_expression_statement_node(ExpressionNode* value)
++{
++    static_assert(sizeof(Node) == 16, "incomplete implementation of Node");
++    static_assert(sizeof(StatementNode) == 24, "incomplete implementation of StatementNode");
++    static_assert(sizeof(ExprStmtNode) == 32, "incomplete construction of ExprStmtNode");
++    ExprStmtNode* self = calloc(1, sizeof(ExprStmtNode));
++    *self = (ExprStmtNode) {
++        .delete = delete_expression_statement_node,
++        .to_string = expression_statment_to_string,
++        .type = ST_EXPRESSION,
++        .value = value,
++    };
++    return self;
++}
++
++void delete_expression_statement_node(ExprStmtNode* self)
++{
++    free(self);
++}
++
++char* expression_statment_to_string(ExprStmtNode* self)
++{
++    const char* type = statement_node_type_to_string(self->type);
++    char* value = self->value->to_string(self->value);
++
++    char* buffer = calloc(8192, sizeof(char));
++    sprintf(buffer, "%s {value: %s}", type, value);
++    buffer = realloc(buffer, strlen(buffer) * sizeof(char));
++    return buffer;
++}
++
++KeywordTypeNode* new_keyword_type_token(Token* token)
++{
++    static_assert(sizeof(Node) == 16, "incomplete implementation of Node");
++    static_assert(sizeof(TypeNode) == 24, "incomplete implementation of TypeNode");
++    static_assert(sizeof(KeywordTypeNode) == 32, "incomplete construction of KeywordTypeNode");
++    KeywordTypeNode* self = calloc(1, sizeof(KeywordTypeNode));
++    *self = (KeywordTypeNode) {
++        .delete = delete_keyword_type_token,
++        .to_string = keyword_type_to_string,
++        .type = TNT_KEYWORD,
++        .token = token,
++    };
++    return self;
++}
++
++void delete_keyword_type_token(KeywordTypeNode* self)
++{
++    free(self);
++}
++
++char* keyword_type_to_string(KeywordTypeNode* self)
++{
++    const char* type = type_node_type_to_string(self->type);
++    char* token = token_to_string(self->token);
++
++    char* buffer = calloc(8192, sizeof(char));
++    sprintf(buffer, "%s {value: %s}", type, token);
++    buffer = realloc(buffer, strlen(buffer) * sizeof(char));
++    return buffer;
++}
++
+ IntNode* new_int_node(Token* token)
+ {
+     static_assert(sizeof(Node) == 16, "incomplete implementation of Node");
+diff --git a/parser.c b/parser.c
+index ab88265..068da8e 100644
+--- a/parser.c
++++ b/parser.c
+@@ -22,12 +22,6 @@ void delete_parser(Parser* self)
+     free(self);
+ }
+ 
+-// FIXME forward declarations, please move to parser.h
+-void parser_next(Parser* self);
+-List* parser_make_statements(Parser* self);
+-StatementNode* parser_make_statement(Parser* self);
+-
+-
+ List* parser_parse(Parser* self)
+ {
+     return parser_make_statements(self);
+@@ -36,17 +30,84 @@ List* parser_parse(Parser* self)
+ List* parser_make_statements(Parser* self)
+ {
+     List* statements = (List*) new_array_list();
+-
+-    while (!self->done && self->t->type != TT_RBRACE) {
++    while (!self->done && self->t->type != TT_RBRACE)
+         statements->add(statements, parser_make_statement(self));
+-    }
+-
++    if (self->t->type == TT_RBRACE)
++        parser_next(self);
+     return statements;
+ }
+ 
+ StatementNode* parser_make_statement(Parser* self)
+ {
+-    assert(false);
++    StatementNode* result;
++    switch (self->t->type) {
++    case TT_KW_RETURN:
++        result = (StatementNode*) parser_make_return(self);
++        if (self->t->type != TT_EOL)
++            assert(!"expected ';'");
++        parser_skip_newline(self);
++        break;
++    case TT_KW_VOID:
++    case TT_KW_INT:
++        result = parser_make_declaration_definition_or_initialization(self);
++        break;
++    default:
++        printf("\n* CHECK(%s) *\n\n", token_to_string(self->t));
++        assert(!"unexpected token type");
++    }
++    return result;
++}
++
++ReturnNode* parser_make_return(Parser* self)
++{
++    parser_next(self);
++    ExpressionNode* value = parser_make_expression(self);
++    return new_return_node(value);
++}
++
++StatementNode* parser_make_declaration_definition_or_initialization(Parser* self)
++{
++    TypeNode* type = parser_make_type(self);
++    if (self->t->type != TT_IDENTIFIER)
++        assert(!"unexpected token, expected identifier");
++    Token* target = self->t;
++    parser_next(self);
++    if (self->t->type != TT_LPAREN)
++        assert(!"unexpected token, expected '(', declarations not implemented btw");
++    parser_next(self);
++    if (self->t->type != TT_RPAREN)
++        assert(!"unexpected token, expected ')', parameters not implemented btw");
++    parser_next(self);
++    if (self->t->type != TT_LBRACE)
++        assert(!"unexpected token, expected '{'");
++    parser_next(self);
++    List* body = parser_make_statements(self);
++    return (StatementNode*) new_func_def_node(target, type, (List*) new_array_list(), body);
++}
++
++TypeNode* parser_make_type(Parser* self)
++{
++    switch (self->t->type) {
++    case TT_KW_VOID:
++        parser_next(self);
++        return (TypeNode*) new_keyword_type_token(self->t);
++    case TT_KW_INT:
++        parser_next(self);
++        return (TypeNode*) new_keyword_type_token(self->t);
++    default:
++        assert(!"unexpected token type");
++    }
++}
++
++ExpressionNode* parser_make_expression(Parser* self)
++{
++    if (self->t->type == TT_INT_LITERAL) {
++        Token* token = self->t;
++        parser_next(self);
++        return (ExpressionNode*) new_int_node(token);
++    } else {
++        assert(!"unexpected token type");
++    }
+ }
+ 
+ void parser_skip_newline(Parser* self)
+@@ -58,12 +119,14 @@ void parser_skip_newline(Parser* self)
+ void parser_next(Parser* self)
+ {
+     self->index++;
+-    self->done = self->index < self->tokens->length(self->tokens) || self->t->type == TT_EOF;
++    self->done = self->index >= self->tokens->length(self->tokens) || self->t->type == TT_EOF;
+     self->t = self->done ? NULL : self->tokens->get(self->tokens, self->index);
+ }
+ 
+ List* parse(List* tokens)
+ {
+     Parser* parser = new_parser(tokens);
+-    return parser_parse(parser);
++    List* ast = parser_parse(parser);
++    free(parser);
++    return ast;
+ }
+diff --git a/parser.h b/parser.h
+index 80d49da..f1ebd09 100644
+--- a/parser.h
++++ b/parser.h
+@@ -2,12 +2,21 @@
+ 
+ #include "utils.h"
+ #include <stdbool.h>
+-#include <stdlib.h>
+ 
+ typedef enum TokenTypeEnum {
+-    TT_KEYWORD,
+     TT_IDENTIFIER,
+-    TT_INT,
++    TT_KW_VOID,
++    TT_KW_INT,
++    TT_KW_IF,
++    TT_KW_ELSE,
++    TT_KW_FOR,
++    TT_KW_WHILE,
++    TT_KW_SWITCH,
++    TT_KW_CASE,
++    TT_KW_RETURN,
++    TT_KW_CONTINUE,
++    TT_KW_BREAK,
++    TT_INT_LITERAL,
+     TT_LPAREN,
+     TT_RPAREN,
+     TT_LBRACE,
+@@ -85,6 +94,7 @@ typedef struct ExpressionNodeStruct {
+ } ExpressionNode;
+ 
+ typedef enum TypeNodeTypeEnum {
++    TNT_KEYWORD,
+     TypeNodeType_LAST,
+ } TypeNodeType;
+ 
+@@ -93,9 +103,20 @@ const char* type_node_type_to_string(TypeNodeType type);
+ typedef struct TypeNodeStruct {
+     void (*delete)(struct TypeNodeStruct* self);
+     char* (*to_string)(struct TypeNodeStruct* self);
+-    ExpressionNodeType type;
++    TypeNodeType type;
+ } TypeNode;
+ 
++typedef struct KeywordTypeNodeStruct {
++    void (*delete)(struct KeywordTypeNodeStruct* self);
++    char* (*to_string)(struct KeywordTypeNodeStruct* self);
++    TypeNodeType type;
++    Token* token;
++} KeywordTypeNode;
++
++KeywordTypeNode* new_keyword_type_token(Token* token);
++void delete_keyword_type_token(KeywordTypeNode* self);
++char* keyword_type_to_string(KeywordTypeNode* self);
++
+ typedef struct FuncDefNodeStruct {
+     void (*delete)(struct FuncDefNodeStruct* self);
+     char* (*to_string)(struct FuncDefNodeStruct* self);
+@@ -157,5 +178,13 @@ typedef struct ParserStruct {
+ Parser* new_parser(List* tokens);
+ void delete_parser(Parser* self);
+ List* parser_parse(Parser* self);
++void parser_next(Parser* self);
++List* parser_make_statements(Parser* self);
++StatementNode* parser_make_statement(Parser* self);
++StatementNode* parser_make_declaration_definition_or_initialization(Parser* self);
++TypeNode* parser_make_type(Parser* self);
++ReturnNode* parser_make_return(Parser* self);
++ExpressionNode* parser_make_expression(Parser* self);
++void parser_skip_newline(Parser* self);
+ 
+ List* parse(List* tokens);
+-- 
+2.25.1
+

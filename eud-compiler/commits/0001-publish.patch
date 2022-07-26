@@ -1,0 +1,90 @@
+From c979c8ae2d17037c9ee72e916a274486facec3a6 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Tue, 19 Apr 2022 18:00:30 +0200
+Subject: [PATCH] publish
+
+---
+ .gitignore |   2 ++
+ Makefile   |   2 +-
+ list.o     | Bin 3320 -> 0 bytes
+ main.o     | Bin 1488 -> 0 bytes
+ 4 files changed, 3 insertions(+), 1 deletion(-)
+ create mode 100644 .gitignore
+ delete mode 100644 list.o
+ delete mode 100644 main.o
+
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..7209ced
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,2 @@
++*.o
++euc
+diff --git a/Makefile b/Makefile
+index dd645fd..cbc91ac 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,5 +1,5 @@
+ 
+-OUT = bl
++OUT = euc
+ 
+ CFLAGS = -std=c17 -Wall -Werror
+ LFLAGS = 
+diff --git a/list.o b/list.o
+deleted file mode 100644
+index 452aa1c4a9387dfb21d3c848329323f32c564438..0000000000000000000000000000000000000000
+GIT binary patch
+literal 0
+HcmV?d00001
+
+literal 3320
+zcmcgtU1%It6uz^m=^E3r);<*4!XQ?S*fq(EG^p%0ZaaY*OMXBkbvwH|n?!ea;_R$$
+z#9(1n973Rd5g&XIL?}KLA0$$#F-1dtDuO=w&=(;Pg^K%-heABx{h7VFZcq?BaPOS^
+zo%5Z0=A3(H-pQRildvqN#A45}&Pt(-HSh1}8Lnp7L3V&mJJGL`PV2WLH&TRt1L`Ks
+zPL$hpmT7EY#e|wk#`^Mw?OQiNCT_}!mbS@*2JtooA4{oUHaw%oUE!TcIxFWbu1DvS
+zG4|eCW8en1($iTNZYkkK2~FR1qSV$aF{@jomBZi3j74rgtCWaN=_LeN#-wb%z0>2g
+zHj|Ep-6(#-NIhz_TT5-$EG*~RPVsiU_o?;Z>8~C^omTGS8%FD~_I<2vtis02qrDlg
+zTM7X`;`>_^mTetZv6rXY1Ggz0xkYjMy9-KLDQ~Lh4%exkduRI8|DI`lKr+b->e$$H
+zY{VH`&Lnxi<L*Sc?TuU;)!G`S*CDT61)`cb#UGuO{-5B&dujc^4_~5{Yg=)1h(}GO
+z=3GZjZrvp3%6vUc7ukHR<TY)-5!!y)F8GaFsg6*LWhW<d6I0o#u@}efGug3ox#vgh
+z6ZJkfq<Q2-sgJR<qoX7C<7daG2kfDt^l*BR^Y+nf(?I*l#uCh01E$21YjrmdOM~^+
+z1hbkc>uCS}<Yh7*BOC+rET-(i)cc9i1HHLcPn~>Vdj>ek6PT3UBO@(gp8-yC9h0&r
+zzT^(DzYUz^Lrk&#N^JiaILYUjV*6*Y{cGSPhcGGo3!VLc0Zy`rN!b&jZ~)dtP?vq|
+zkDV?i*3<Qi#t7$^Z5IVKIHdXW8WQ#(4SeBDIYI#Zl^?GuVYtlQ{0F4}EIlE-#`GMf
+z(anE^aKwLDHlEj<u+w|^kL`hv%Q&kt4(|<NFH5|TAcgDVS?0RMLW%QUz$7m~&3iKs
+zl@;Ae#V@jwSMfqmK;^*mxL@8al~~{j4|wO@kSzrBwXn>*=6ooe0<Y@7Aqf?)HXF_f
+zJoNK!5V&Gzb>49&(6xIzLZ*-t3Gn?i6n>F(h>3qHV2<l?{?u^%>QtNwSud2KN5f|f
+z95zVVz>f)-)g_L69-yJ(FKKwchJT^qeHwnxh_B-G%08()RX!;LSNR;5xS7vm8m{Lv
+zqv3i!S2SF&r%gFSV3sa?o#Ar_SNG<kfvfv*$-vb;_{6}~xn47Hb*}FixH{J?U0<w*
+zZh@X*Af9td3%rV(4!vf`(j_-^S-McKvvlB#MbWQTy&BnSe(0s?n|-n#y2aPzdbZX`
+zF9iOA7lez%K_qW3Uk===Co}nP51Z&X3cW^{j9mY&7o9M9Y+~=Dq@nkj7!k@<8St7U
+z;H*N$cM*c`9pq6Oz|}be203X00{+|nPZExpru)C;4-psp8?VU*Wxy=ibW!;$>=Y^B
+zi@&cz8GBvwAL>9{gD*rqPis0i$mw14g(R+c%6Ebke6P&>KahMgFEjsFiHn#fe^v6g
+z$)=0R$0_XA|CglWRY^ww@jX<0)&FjLgK`Z)NiNA3#y13z$w$m?r5cpyFC@DzX8rI#
+N?#AcIlI@@Pe*yHZJ?H=c
+
+diff --git a/main.o b/main.o
+deleted file mode 100644
+index 7d6881fefdc9a48b3da4fb356da44ea18c674a2d..0000000000000000000000000000000000000000
+GIT binary patch
+literal 0
+HcmV?d00001
+
+literal 1488
+zcmbtSPiqrV5T8wItJu`EdJyYjPokg?<Ei#gQiE*{B2vgj5ZR_%qh_;V_Z1T_dJ=jl
+z^rQ6HW5Gkef?q)B)w@vVmz`-}9_vL1W@qL%e|P46dH!Of5(K0a&>CG@iW0r5T<Xn<
+z+N1@lQK!BCvwd&{NPGYE4DuMCH{W}4zn_Mm(yYHjwApH{hW9sLb{>R{hIwKhBL+0X
+z95SN<yQxCK2{5HVY@O+rID*ex6pZS@^8DP@Lw4R}91OaH&-z0BTcuT-?Qj6>zYyxq
+z(693{ceQjAMAgZ((;4Wo<it;AV64VmpAIdoBziwEU4o$Dp3Nm@P9)Y{W&V9$&<(+{
+z8|+H)P;kUMCn7TWII+<-OPdw4r&<>GBV*%{C9@ORh|G4LlgZM;=%z^$57;+IZEW}^
+zk8&GzKZ^ZsuxEx@I*c<r<{VUtdvABMD2Zi~{}Umn<0i9SnWosfS9R;VP<xpb?5L@L
+zNW2k{KD_I!1Jbu~8&0Ns%)qgGmtMPuqx=0IvJW-?HNU~Rs5x~@wzdB}>n{2IpRyB}
+z{-?(7igHr{k(#ga8RM$Ep<~x@bU${BeR#wE{9h%<pG)^IZu-CqYWn#{60o9yBK>^4
+z!m|6H$e?;>-2WQ0<||&-8?DapVLB`X;ST8I=cA^7d!&q{{}K#`1inBPSu4x`A%XTH
+IvQYf|KkFD}6#xJL
+
+-- 
+2.25.1
+

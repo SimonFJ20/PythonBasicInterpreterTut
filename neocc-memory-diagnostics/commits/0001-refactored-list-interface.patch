@@ -1,0 +1,152 @@
+From b9cd0ada2de7caf83706987174f03d0dab248d0d Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Thu, 5 May 2022 00:01:16 +0200
+Subject: [PATCH] refactored list interface
+
+---
+ arraylist.c           | 10 +++++++++-
+ neocc.c               |  4 ++--
+ nodes.c               |  4 ++--
+ memutils.c => utils.c | 14 +++++++++-----
+ utils.h               |  8 +++++++-
+ 5 files changed, 29 insertions(+), 11 deletions(-)
+ rename memutils.c => utils.c (52%)
+
+diff --git a/arraylist.c b/arraylist.c
+index 4102d1c..9dbeb90 100644
+--- a/arraylist.c
++++ b/arraylist.c
+@@ -5,13 +5,15 @@
+ 
+ ArrayList* new_array_list()
+ {
+-    static_assert(sizeof(List) == 40, "incomplete implementation");
++    static_assert(sizeof(List) == 48, "incomplete implementation of List");
++    static_assert(sizeof(ArrayList) == 64, "incomplete construction of ArrayList");
+     ArrayList* self = calloc(1, sizeof(ArrayList));
+     *self = (ArrayList) {
+         .delete = delete_array_list,
+         .length = array_list_length,
+         .get = array_list_get,
+         .add = array_list_add,
++        .free_all = array_list_free_all,
+         .delete_all = array_list_delete_all,
+         .m_length = 0,
+         .m_elements = NULL,
+@@ -48,6 +50,12 @@ void array_list_add(ArrayList* self, void* element)
+     self->m_elements[self->m_length - 1] = element;
+ }
+ 
++void array_list_free_all(ArrayList* self)
++{
++    for (int i = 0; i < self->m_length; i++)
++        free(self->m_elements[i]);
++}
++
+ void array_list_delete_all(ArrayList* self, void (*deletor)(void* element))
+ {
+     for (int i = 0; i < self->m_length; i++)
+diff --git a/neocc.c b/neocc.c
+index b16bb53..0487b2b 100644
+--- a/neocc.c
++++ b/neocc.c
+@@ -33,7 +33,7 @@ int main(int argc, char** argv)
+     assert(assemble_link_result == 0 && "failed to assemble or link");
+ 
+     free(assembly);
+-    delete_list_and_elements(ast, (void (*)(void*)) delete_node_inheriter);
+-    delete_list_and_elements(tokens, (void (*)(void*)) delete_token);
++    list_delete_all_and_self(ast, (void (*)(void*)) delete_node_inheriter);
++    list_delete_all_and_self(tokens, (void (*)(void*)) delete_token);
+     free(content);
+ }
+diff --git a/nodes.c b/nodes.c
+index 88ba2b1..ec93159 100644
+--- a/nodes.c
++++ b/nodes.c
+@@ -72,8 +72,8 @@ FuncDefNode* new_func_def_node(
+ void delete_func_def_node(FuncDefNode* self)
+ {
+     self->return_type->delete(self->return_type);
+-    delete_list_and_elements(self->params, (void (*)(void*)) delete_node_inheriter);
+-    delete_list_and_elements(self->body, (void (*)(void*)) delete_node_inheriter);
++    list_delete_all_and_self(self->params, (void (*)(void*)) delete_node_inheriter);
++    list_delete_all_and_self(self->body, (void (*)(void*)) delete_node_inheriter);
+     free(self);
+ }
+ 
+diff --git a/memutils.c b/utils.c
+similarity index 52%
+rename from memutils.c
+rename to utils.c
+index 8177d37..35ece67 100644
+--- a/memutils.c
++++ b/utils.c
+@@ -1,15 +1,19 @@
+ #include "utils.h"
+ 
+-
+-void println_and_free(char* string)
++void list_free_all_and_self(List* list)
+ {
+-    printf("%s\n", string);
+-    free(string);
++    list->free_all(list);
++    list->delete(list);
+ }
+ 
+-void delete_list_and_elements(List* list, void (*deletor)(void *))
++void list_delete_all_and_self(List* list, void (*deletor)(void *))
+ {
+     list->delete_all(list, deletor);
+     list->delete(list);
+ }
+ 
++void println_and_free(char* string)
++{
++    printf("%s\n", string);
++    free(string);
++}
+diff --git a/utils.h b/utils.h
+index 1f4e173..0080a4b 100644
+--- a/utils.h
++++ b/utils.h
+@@ -9,14 +9,19 @@ typedef struct ListStruct {
+     size_t (*length)(struct ListStruct* self);
+     void* (*get)(struct ListStruct* self, int index);
+     void (*add)(struct ListStruct* self, void* element);
++    void (*free_all)(struct ListStruct* self);
+     void (*delete_all)(struct ListStruct* self, void (*)(void*));
+ } List;
+ 
++void list_free_all_and_self(List* list);
++void list_delete_all_and_self(List* list, void (*deletor)(void *));
++
+ typedef struct ArrayListStruct {
+     void (*delete)(struct ArrayListStruct* self);
+     size_t (*length)(struct ArrayListStruct* self);
+     void* (*get)(struct ArrayListStruct* self, int index);
+     void (*add)(struct ArrayListStruct* self, void* element);
++    void (*free_all)(struct ArrayListStruct* self);
+     void (*delete_all)(struct ArrayListStruct* self, void (*)(void*));
+     size_t m_length;
+     void** m_elements;
+@@ -27,6 +32,7 @@ void delete_array_list(ArrayList* self);
+ size_t array_list_length(ArrayList* self);
+ void* array_list_get(ArrayList* self, int index);
+ void array_list_add(ArrayList* self, void* element);
++void array_list_free_all(ArrayList* self);
+ void array_list_delete_all(ArrayList* self, void (*)(void*));
+ 
+ typedef struct FileReaderStruct {
+@@ -60,6 +66,6 @@ void string_builder_write(StringBuilder* self, char* string);
+ void string_builder_write_chars(StringBuilder* self, char* chars, size_t amount);
+ 
+ void println_and_free(char* string);
+-void delete_list_and_elements(List* list, void (*)(void*));
++void list_delete_all_and_self(List* list, void (*)(void*));
+ char* read_file(const char* path);
+ void write_file(const char* path, char* string);
+-- 
+2.25.1
+

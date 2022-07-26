@@ -1,0 +1,52 @@
+From ad38d5c565a800c39b31905f5a941842bb79ec40 Mon Sep 17 00:00:00 2001
+From: Simon From Jakobsen <sfja.skp@edu.mercantec.dk>
+Date: Mon, 29 Nov 2021 17:27:41 +0100
+Subject: [PATCH] changed filenames and removed .vscode
+
+---
+ .gitignore                       | 3 ++-
+ bin/{shell.hb => shell.htb}      | 0
+ core/{example.hb => example.htb} | 0
+ examples/{hello.hb => hello.htb} | 0
+ examples/{lists.hb => lists.htb} | 0
+ lib/{lists.hb => lists.htb}      | 0
+ 6 files changed, 2 insertions(+), 1 deletion(-)
+ rename bin/{shell.hb => shell.htb} (100%)
+ rename core/{example.hb => example.htb} (100%)
+ rename examples/{hello.hb => hello.htb} (100%)
+ rename examples/{lists.hb => lists.htb} (100%)
+ rename lib/{lists.hb => lists.htb} (100%)
+
+diff --git a/.gitignore b/.gitignore
+index ed8ebf5..7b62f12 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1 +1,2 @@
+-__pycache__
+\ No newline at end of file
++__pycache__
++.vscode
+\ No newline at end of file
+diff --git a/bin/shell.hb b/bin/shell.htb
+similarity index 100%
+rename from bin/shell.hb
+rename to bin/shell.htb
+diff --git a/core/example.hb b/core/example.htb
+similarity index 100%
+rename from core/example.hb
+rename to core/example.htb
+diff --git a/examples/hello.hb b/examples/hello.htb
+similarity index 100%
+rename from examples/hello.hb
+rename to examples/hello.htb
+diff --git a/examples/lists.hb b/examples/lists.htb
+similarity index 100%
+rename from examples/lists.hb
+rename to examples/lists.htb
+diff --git a/lib/lists.hb b/lib/lists.htb
+similarity index 100%
+rename from lib/lists.hb
+rename to lib/lists.htb
+-- 
+2.25.1
+

@@ -1,0 +1,25 @@
+From 806a4c829b0ffa4019042c20bafd3d3bd3d29654 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Sat, 7 May 2022 20:46:55 +0200
+Subject: [PATCH] use passed path
+
+---
+ file.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/file.c b/file.c
+index 442e998..65583c1 100644
+--- a/file.c
++++ b/file.c
+@@ -39,7 +39,7 @@ char* file_reader_read(FileReader* self)
+ 
+ char* read_file(const char* path)
+ {
+-    FileReader* file = new_file_reader("examples/main.c");
++    FileReader* file = new_file_reader(path);
+     char* content = file_reader_read(file);
+     delete_file_reader(file);
+     return content;
+-- 
+2.25.1
+

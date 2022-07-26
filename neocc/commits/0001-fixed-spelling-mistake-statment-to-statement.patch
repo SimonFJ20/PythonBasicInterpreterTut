@@ -1,0 +1,48 @@
+From 84a01487772acc686a8d0376069066f339420be6 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Tue, 10 May 2022 02:09:45 +0200
+Subject: [PATCH] fixed spelling mistake statment to statement
+
+---
+ nodes.c  | 4 ++--
+ parser.h | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/nodes.c b/nodes.c
+index 98385e1..f103eb9 100644
+--- a/nodes.c
++++ b/nodes.c
+@@ -301,7 +301,7 @@ ExprStmtNode* new_expression_statement_node(ExpressionNode* value)
+     ExprStmtNode* self = calloc(1, sizeof(ExprStmtNode));
+     *self = (ExprStmtNode) {
+         .delete = delete_expression_statement_node,
+-        .to_string = expression_statment_to_string,
++        .to_string = expression_statement_to_string,
+         .node_type = STATEMENT_TYPE_EXPRESSION,
+         .value = value,
+     };
+@@ -314,7 +314,7 @@ void delete_expression_statement_node(ExprStmtNode* self)
+     free(self);
+ }
+ 
+-char* expression_statment_to_string(ExprStmtNode* self)
++char* expression_statement_to_string(ExprStmtNode* self)
+ {
+     const char* type = statement_node_type_to_string(self->node_type);
+     char* value = self->value->to_string(self->value);
+diff --git a/parser.h b/parser.h
+index 0805177..b99ec8e 100644
+--- a/parser.h
++++ b/parser.h
+@@ -197,7 +197,7 @@ typedef struct ExprStmtNode {
+ 
+ ExprStmtNode* new_expression_statement_node(ExpressionNode* value);
+ void delete_expression_statement_node(ExprStmtNode* self);
+-char* expression_statment_to_string(ExprStmtNode* self);
++char* expression_statement_to_string(ExprStmtNode* self);
+ 
+ typedef struct KeywordTypeNode {
+     void (*delete)(struct KeywordTypeNode* self);
+-- 
+2.25.1
+

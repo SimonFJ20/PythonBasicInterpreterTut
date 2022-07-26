@@ -1,0 +1,108 @@
+From 637f65fe25efb916b1bb8073de631f3c771b51a0 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Tue, 30 Nov 2021 02:09:57 +0100
+Subject: [PATCH] string utils
+
+---
+ core/htb_interpreter.py | 57 +++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 55 insertions(+), 2 deletions(-)
+
+diff --git a/core/htb_interpreter.py b/core/htb_interpreter.py
+index 910e97f..69c72d9 100644
+--- a/core/htb_interpreter.py
++++ b/core/htb_interpreter.py
+@@ -211,7 +211,19 @@ class String(Value):
+             return String(self.value * other.value).set_context(self.context), None
+         else:
+             return None, Value.illegal_operation(self, other)
+-    
++
++    def get_comparison_eq(self, other):
++        if isinstance(other, String):
++            return Number(int(self.value == other.value)).set_context(self.context), None
++        else:
++            return None, Value.illegal_operation(self, other)
++        
++    def get_comparison_ne(self, other):
++        if isinstance(other, String):
++            return Number(int(self.value != other.value)).set_context(self.context), None
++        else:
++            return None, Value.illegal_operation(self, other)
++
+     def is_true(self):
+         return len(self.value) > 0
+ 
+@@ -399,7 +411,7 @@ class BuiltInFunction(BaseFunction):
+     def execute_println(self, exec_ctx):
+         print(str(exec_ctx.symbol_table.get('value')))
+         return RTResult().success(Number.null)
+-    execute_print.arg_names = ['value']
++    execute_println.arg_names = ['value']
+ 
+     def execute_input(self, exec_ctx):
+         text = input()
+@@ -521,6 +533,43 @@ class BuiltInFunction(BaseFunction):
+         return RTResult().success(Number(len(list_.elements)))
+     execute_len.arg_names = ['list']
+ 
++    def execute_strlen(self, exec_ctx):
++        s = exec_ctx.symbol_table.get('string')
++
++        if not isinstance(s, String):
++            return RTResult().failure(RTError(
++                self.pos_start, self.pos_end,
++                'Argument must be a string',
++                exec_ctx
++            ))
++
++        return RTResult().success(Number(len(s.value)))
++    execute_strlen.arg_names = ['string']
++
++    def execute_char_at(self, exec_ctx):
++        s = exec_ctx.symbol_table.get('source')
++        i = exec_ctx.symbol_table.get('index')
++
++        if not isinstance(s, String):
++            return RTResult().failure(RTError(
++                self.pos_start, self.pos_end,
++                'First argument must be a string',
++                exec_ctx
++            ))
++
++        if not isinstance(i, Number):
++            return RTResult().failure(RTError(
++                self.pos_start, self.pos_end,
++                'Second argument must be a number',
++                exec_ctx
++            ))
++
++        char = s.value[i.value]
++        if not len(s.value) > i.value:
++            char = Number.null
++        return RTResult().success(String(char))
++    execute_char_at.arg_names = ['source', 'index']
++
+     def execute_run(self, exec_ctx):
+         fn = exec_ctx.symbol_table.get('fn')
+ 
+@@ -568,6 +617,8 @@ BuiltInFunction.append      = BuiltInFunction("append")
+ BuiltInFunction.pop         = BuiltInFunction("pop")
+ BuiltInFunction.extend      = BuiltInFunction("extend")
+ BuiltInFunction.len         = BuiltInFunction("len")
++BuiltInFunction.strlen      = BuiltInFunction("strlen")
++BuiltInFunction.char_at     = BuiltInFunction("char_at")
+ BuiltInFunction.run         = BuiltInFunction("run")
+ 
+ class Interpreter:
+@@ -846,6 +897,8 @@ def global_symbol_table() -> SymbolTable:
+     table.set('pop', BuiltInFunction.pop)
+     table.set('extend', BuiltInFunction.extend)
+     table.set('length', BuiltInFunction.len)
++    table.set('stringLength', BuiltInFunction.strlen)
++    table.set('charAt', BuiltInFunction.char_at)
+     table.set('run', BuiltInFunction.run)
+     table.set('import', BuiltInFunction.run)
+     return table
+-- 
+2.25.1
+

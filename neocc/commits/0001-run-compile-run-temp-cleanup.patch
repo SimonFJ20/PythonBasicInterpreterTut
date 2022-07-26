@@ -1,0 +1,27 @@
+From 54e24535f08457dda39c18fad2abf199b94b182c Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Tue, 3 May 2022 23:48:50 +0200
+Subject: [PATCH] run -> compile + run + temp cleanup
+
+---
+ Makefile | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/Makefile b/Makefile
+index 78a696b..2251764 100644
+--- a/Makefile
++++ b/Makefile
+@@ -13,6 +13,10 @@ HEADERS = $(wildcard *.h)
+ 
+ all: $(EXECUTABLE)
+ 
++run: $(EXECUTABLE)
++	./neocc examples/main.c
++	$(RM) temp.o temp.s
++
+ $(EXECUTABLE): $(OFILES)
+ 	$(LD) -o $@ $(CFLAGS) $(LFLAGS) $^
+ 
+-- 
+2.25.1
+

@@ -1,0 +1,293 @@
+From ef435e817e6546edb8f3b6b8f4de5ded00fcf888 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Tue, 3 May 2022 12:47:56 +0200
+Subject: [PATCH] parser works but leaks
+
+---
+ arraylist.c |  9 ++++++++-
+ lexer.c     |  4 +---
+ memutils.c  | 22 ++++++++++++++++++++++
+ neocc.c     | 10 +++++-----
+ nodes.c     | 23 ++++++++++++++++++++++-
+ parser.c    | 14 +++++++-------
+ parser.h    |  2 ++
+ utils.h     |  7 +++++++
+ 8 files changed, 74 insertions(+), 17 deletions(-)
+ create mode 100644 memutils.c
+
+diff --git a/arraylist.c b/arraylist.c
+index ffecaba..1b85ce1 100644
+--- a/arraylist.c
++++ b/arraylist.c
+@@ -5,13 +5,14 @@
+ 
+ ArrayList* new_array_list()
+ {
+-    static_assert(sizeof(List) == 32, "incomplete implementation");
++    static_assert(sizeof(List) == 40, "incomplete implementation");
+     ArrayList* self = calloc(1, sizeof(ArrayList));
+     *self = (ArrayList) {
+         .delete = delete_array_list,
+         .length = array_list_length,
+         .get = array_list_get,
+         .add = array_list_add,
++        .delete_all = array_list_delete_all,
+         .m_length = 0,
+         .m_elements = NULL,
+     };
+@@ -45,3 +46,9 @@ void array_list_add(ArrayList* self, void* element)
+         self->m_elements = realloc(self->m_elements, sizeof(void*) * self->m_length);
+     self->m_elements[self->m_length - 1] = element;
+ }
++
++void array_list_delete_all(ArrayList* self, void (*free)(void* element))
++{
++    for (int i = 0; i < self->m_length; i++)
++        free(self->m_elements[i]);
++}
+diff --git a/lexer.c b/lexer.c
+index 2e60ca7..61cbafd 100644
+--- a/lexer.c
++++ b/lexer.c
+@@ -16,7 +16,6 @@ List* tokenize(const char* text)
+ 
+ const char* token_type_to_string(TokenType type)
+ {
+-    static_assert(TokenType_LAST == 21, "unexhaustive");
+     switch (type) {
+     case TT_IDENTIFIER:
+         return "TT_IDENTIFIER";
+@@ -133,8 +132,7 @@ List* lexer_tokenize(Lexer* self)
+         }
+     }
+ 
+-    Token* t = new_token(TT_EOF, self->text + self->index, 1);
+-    tokens->add(tokens, t);
++    tokens->add(tokens, new_token(TT_EOF, self->text + self->index, 1));
+     return tokens;
+ }
+ 
+diff --git a/memutils.c b/memutils.c
+new file mode 100644
+index 0000000..0c42c77
+--- /dev/null
++++ b/memutils.c
+@@ -0,0 +1,22 @@
++#include "utils.h"
++
++
++void println_and_free(char* string)
++{
++    printf("%s\n", string);
++    free(string);
++}
++
++void delete_list_and_elements(List* list, void (*deletor)(void *))
++{
++    list->delete_all(list, deletor);
++    list->delete(list);
++}
++
++char* read_file(const char* path)
++{
++    FileReader* file = new_file_reader("examples/main.c");
++    char* content = file_reader_read(file);
++    delete_file_reader(file);
++    return content;
++}
+diff --git a/neocc.c b/neocc.c
+index ff545a3..3e81c58 100644
+--- a/neocc.c
++++ b/neocc.c
+@@ -5,21 +5,21 @@
+ 
+ int main()
+ {
+-    FileReader* file = new_file_reader("examples/main.c");
+-    char* content = file_reader_read(file);
++    char* content = read_file("examples/main.c");
+ 
+     List* tokens = tokenize(content);
+     printf("=== TOKENIZING(TEXT) -> TOKENS ===\n");
+     for (int i = 0; i < tokens->length(tokens); i++)
+-        printf("%s\n", token_to_string(tokens->get(tokens, i)));
++        println_and_free(token_to_string(tokens->get(tokens, i)));
+ 
+     printf("=== PARSING(TOKENS) -> AST ===\n");
+     List* ast = parse(tokens);
+     for (int i = 0; i < ast->length(ast); i++) {
+         StatementNode* node = (StatementNode*) ast->get(ast, i);
+-        printf("%s\n", node->to_string(node));
++        println_and_free(node->to_string(node));
+     }
+ 
+-    tokens->delete(tokens);
++    delete_list_and_elements(ast, (void (*)(void*)) delete_node_inheriter);
++    delete_list_and_elements(tokens, (void (*)(void*)) delete_token);
+     free(content);
+ }
+diff --git a/nodes.c b/nodes.c
+index 8c84a32..b143ed5 100644
+--- a/nodes.c
++++ b/nodes.c
+@@ -1,9 +1,14 @@
+ #include "parser.h"
+ #include "utils.h"
++#include <assert.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+-#include <assert.h>
++
++void delete_node_inheriter(Node* self)
++{
++    self->delete(self);
++}
+ 
+ const char* statement_node_type_to_string(StatementNodeType type)
+ {
+@@ -91,7 +96,11 @@ char* func_def_node_to_string(FuncDefNode* self)
+     char* buffer = calloc(8192, sizeof(char));
+     sprintf(buffer, "%s {target: %s, return_type: %s, params: [%s], body: [%s]}", type, target, return_type, params, body);
+     buffer = realloc(buffer, strlen(buffer) * sizeof(char));
++
++    free(target);
++    free(return_type);
+     free(body);
++
+     return buffer;
+ }
+ 
+@@ -123,6 +132,9 @@ char* return_node_to_string(ReturnNode* self)
+     char* buffer = calloc(8192, sizeof(char));
+     sprintf(buffer, "%s {value: %s}", type, value);
+     buffer = realloc(buffer, strlen(buffer) * sizeof(char));
++
++    free(value);
++
+     return buffer;
+ }
+ 
+@@ -154,6 +166,9 @@ char* expression_statment_to_string(ExprStmtNode* self)
+     char* buffer = calloc(8192, sizeof(char));
+     sprintf(buffer, "%s {value: %s}", type, value);
+     buffer = realloc(buffer, strlen(buffer) * sizeof(char));
++
++    free(value);
++
+     return buffer;
+ }
+ 
+@@ -185,6 +200,9 @@ char* keyword_type_to_string(KeywordTypeNode* self)
+     char* buffer = calloc(8192, sizeof(char));
+     sprintf(buffer, "%s {value: %s}", type, token);
+     buffer = realloc(buffer, strlen(buffer) * sizeof(char));
++
++    free(token);
++
+     return buffer;
+ }
+ 
+@@ -217,5 +235,8 @@ char* int_node_to_string(IntNode* self)
+     char* buffer = calloc(8192, sizeof(char));
+     sprintf(buffer, "%s {token: %s}", type, token);
+     buffer = realloc(buffer, strlen(buffer) * sizeof(char));
++
++    free(token);
++
+     return buffer;
+ }
+diff --git a/parser.c b/parser.c
+index 068da8e..812cbf8 100644
+--- a/parser.c
++++ b/parser.c
+@@ -52,7 +52,6 @@ StatementNode* parser_make_statement(Parser* self)
+         result = parser_make_declaration_definition_or_initialization(self);
+         break;
+     default:
+-        printf("\n* CHECK(%s) *\n\n", token_to_string(self->t));
+         assert(!"unexpected token type");
+     }
+     return result;
+@@ -87,13 +86,13 @@ StatementNode* parser_make_declaration_definition_or_initialization(Parser* self
+ 
+ TypeNode* parser_make_type(Parser* self)
+ {
+-    switch (self->t->type) {
++    Token* token = self->t;
++    parser_next(self);
++    switch (token->type) {
+     case TT_KW_VOID:
+-        parser_next(self);
+-        return (TypeNode*) new_keyword_type_token(self->t);
++        return (TypeNode*) new_keyword_type_token(token);
+     case TT_KW_INT:
+-        parser_next(self);
+-        return (TypeNode*) new_keyword_type_token(self->t);
++        return (TypeNode*) new_keyword_type_token(token);
+     default:
+         assert(!"unexpected token type");
+     }
+@@ -119,8 +118,9 @@ void parser_skip_newline(Parser* self)
+ void parser_next(Parser* self)
+ {
+     self->index++;
+-    self->done = self->index >= self->tokens->length(self->tokens) || self->t->type == TT_EOF;
++    self->done = self->index >= self->tokens->length(self->tokens);
+     self->t = self->done ? NULL : self->tokens->get(self->tokens, self->index);
++    self->done = self->t->type == TT_EOF || self->done;
+ }
+ 
+ List* parse(List* tokens)
+diff --git a/parser.h b/parser.h
+index f1ebd09..aad36e6 100644
+--- a/parser.h
++++ b/parser.h
+@@ -65,6 +65,8 @@ typedef struct NodeStruct {
+     char* (*to_string)(struct NodeStruct* self);
+ } Node;
+ 
++void delete_node_inheriter(Node* self);
++
+ typedef enum StatementNodeTypeEnum {
+     ST_FUNC_DEF,
+     ST_RETURN,
+diff --git a/utils.h b/utils.h
+index 8d96cea..454f6eb 100644
+--- a/utils.h
++++ b/utils.h
+@@ -9,6 +9,7 @@ typedef struct ListStruct {
+     size_t (*length)(struct ListStruct* self);
+     void* (*get)(struct ListStruct* self, int index);
+     void (*add)(struct ListStruct* self, void* element);
++    void (*delete_all)(struct ListStruct* self, void (*)(void*));
+ } List;
+ 
+ typedef struct ArrayListStruct {
+@@ -16,6 +17,7 @@ typedef struct ArrayListStruct {
+     size_t (*length)(struct ArrayListStruct* self);
+     void* (*get)(struct ArrayListStruct* self, int index);
+     void (*add)(struct ArrayListStruct* self, void* element);
++    void (*delete_all)(struct ArrayListStruct* self, void (*)(void*));
+     size_t m_length;
+     void** m_elements;
+ } ArrayList;
+@@ -25,6 +27,7 @@ void delete_array_list(ArrayList* self);
+ size_t array_list_length(ArrayList* self);
+ void* array_list_get(ArrayList* self, int index);
+ void array_list_add(ArrayList* self, void* element);
++void array_list_delete_all(ArrayList* self, void (*)(void*));
+ 
+ typedef struct FileReaderStruct {
+     FILE* fp;
+@@ -34,3 +37,7 @@ FileReader* new_file_reader(const char* path);
+ void delete_file_reader(FileReader* self);
+ size_t file_reader_length(FileReader* self);
+ char* file_reader_read(FileReader* self);
++
++void println_and_free(char* string);
++void delete_list_and_elements(List* list, void (*)(void*));
++char* read_file(const char* path);
+-- 
+2.25.1
+
