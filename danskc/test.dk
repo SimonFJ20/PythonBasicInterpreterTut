@@ -1,0 +1,17 @@
+KOMMENTER
+funktion hello(a, b)
+    tilbagesend a + b
+slut
+
+hvis a == 4 så
+    print("hello world\n")
+ellers
+    let b = "bruh moment"
+    let c = 4
+    hello(3, c)
+slut
+FÆRDIG
+
+mens a <= 4 så
+    tilbagesend
+slut
