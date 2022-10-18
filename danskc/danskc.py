@@ -465,14 +465,12 @@ class Parser:
     def parse_binary(self) -> Expr:
         expr_stack: List[Expr] = []
         op_stack: List[BinaryOperations] = []
-        print("sussing in 'parse_unary' 1")
         expr_stack.append(self.parse_unary())
         last_prec = 5
         while not self.done():
             op = self.maybe_parse_binary_op()
             if not op: break
             prec = self.binary_op_precedence(op)
-            print("sussing in 'parse_unary' 2")
             right = self.parse_unary()
             while prec <= last_prec and len(expr_stack) > 1:
                 right_ = expr_stack.pop()
