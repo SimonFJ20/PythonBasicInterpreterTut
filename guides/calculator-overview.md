@@ -110,5 +110,7 @@ const multiply = (left: Expr, right: Expr): Multiply => ({ type: "multiply", lef
 const number = (value: number): Number => ({ type: "number", value }) 
 ```
 
+`%token%` is a token/terminal.
+
 ![image](https://user-images.githubusercontent.com/28040410/196953116-61106cd4-cdba-4cd6-962f-b9fd1aea5cf7.png)
 
