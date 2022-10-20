@@ -35,8 +35,8 @@ tokens: Token[] == [
 
 These are made using 'lexer rules':
 ```
-/\s/    => _            /* whitespace */
-/\d+/   => number       /* integer/number */
+/\s/    => _            /* ignore whitespace */
+/\d+/   => number       /* multiple digits of integer/number */
 "+"     => plus
 "*"     => asterisk
 "("     => lparen
