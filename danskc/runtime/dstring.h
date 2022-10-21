@@ -17,12 +17,12 @@ void destruct_string(String* string);
 String* new_string();
 void delete_string(String* string);
 String* string_from(const char* value);
-String* string_clone(String* other);
-size_t string_size(String* string);
+String* string_clone(const String* other);
+size_t string_size(const String* string);
 char string_at(String* string, size_t index);
 void string_add_char(String* string, char value);
 String* string_add(String* string, String* other);
-const char* string_as_cstr(String* string);
-uint64_t string_hash(String* string);
+const char* string_as_cstr(const String* string);
+uint64_t string_hash(const String* string);
 
 #endif

@@ -13,6 +13,8 @@ void construct_array(Array* array)
 
 void destruct_array(Array* array)
 {
+    if (array->size != 0)
+        PANIC("cannot destruct non-empty array");
     free(array->ptr);
 }
 
@@ -27,6 +29,20 @@ void delete_array(Array* array)
 {
     destruct_array(array);
     free(array);
+}
+
+void array_destruct_deep(Array* array, void (*destructor)(void* value))
+{
+    array_destruct_values(array, destructor);
+    destruct_array(array);
+}
+
+void array_destruct_values(Array* array, void (*destructor)(void* value))
+{
+    while (array->size) {
+        array->size--;
+        destructor(array->ptr[array->size]);
+    }
 }
 
 size_t array_size(const Array* array)
@@ -67,8 +83,36 @@ void array_add(Array* array, size_t amount, void** values)
         array->capacity = array->size + amount + (amount % ARRAY_ELEMENT_CHUNK);
         array->ptr = realloc(array->ptr, sizeof(void*) * array->capacity);
     }
-    for (int i = 0; i < amount; i++) {
+    for (size_t i = 0; i < amount; i++) {
         array->ptr[array->size] = values[i];
         array->size++;
     }
+}
+
+void array_insert_at(Array* array, void* value, size_t index)
+{
+    if (index > array->size)
+        PANIC("index out of bounds");
+    Array buffer;
+    construct_array(&buffer);
+    while (array->size > index)
+        array_push(&buffer, array_pop(array));
+    array_push(array, value);
+    for (size_t i = 0; i < array_size(&buffer); i++)
+        array_push(array, array_pop(&buffer));
+    destruct_array(&buffer);
+}
+
+void array_remove_and_shift_at(Array* array, size_t index)
+{
+    if (index >= array->size)
+        PANIC("index out of bounds");
+    Array buffer;
+    construct_array(&buffer);
+    while (array->size > index)
+        array_push(&buffer, array_pop(array));
+    array_pop(array);
+    for (size_t i = 0; i < array_size(&buffer); i++)
+        array_push(array, array_pop(&buffer));
+    destruct_array(&buffer);
 }

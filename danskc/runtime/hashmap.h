@@ -12,14 +12,15 @@ typedef struct HashMapPair {
 } HashMapPair;
 
 typedef struct HashMap {
-    Array* pairs; // <HashMapPair>
+    Array* pairs; // Array<HashMapPair>
 } HashMap;
 
 void construct_hashmap(HashMap* hashmap);
 void destruct_hashmap(HashMap* hashmap);
 HashMap* new_hashmap();
-void delete_hashmap();
-void set(String* key, Object* value);
-void get(String* key);
+void delete_hashmap(HashMap* hashmap);
+void hashmap_set(HashMap* hashmap, const String* key, void* value);
+void* hashmap_get_maybe(const HashMap* hashmap, const String* key);
+void hashmap_delete(HashMap* hashmap, const String* key);
 
 #endif

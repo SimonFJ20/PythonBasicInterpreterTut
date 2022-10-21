@@ -45,7 +45,7 @@ String* string_from(const char* value)
     return string;
 }
 
-String* string_clone(String* other)
+String* string_clone(const String* other)
 {
     String* string = calloc(1, sizeof(String));
     *string = (String) {
@@ -57,7 +57,7 @@ String* string_clone(String* other)
     return string;
 }
 
-size_t string_size(String* string)
+size_t string_size(const String* string)
 {
     return string->size;
 }
@@ -86,7 +86,7 @@ String* string_add(String* string, String* other)
         string->capacity += other->size + (other->size % STRING_CHAR_CHUNK);
         string->value = realloc(string->value, string->capacity);
     }
-    for (int i = 0; i < other->size; i++) {
+    for (size_t i = 0; i < other->size; i++) {
         string->value[string->size] = other->value[i];
         string->size++;
     }
@@ -94,15 +94,15 @@ String* string_add(String* string, String* other)
     return string;
 }
 
-const char* string_as_cstr(String* string)
+const char* string_as_cstr(const String* string)
 {
     return string->value;
 }
 
-uint64_t string_hash(String* string)
+uint64_t string_hash(const String* string)
 {
     uint64_t hash = STRING_MAGIC_HASH_VALUE;
-    for (int i = 0; i < string->value[i]; i++)
-        hash = ((hash << 5) + hash) + i;
+    for (size_t i = 0; i < string->size; i++)
+        hash = ((hash << 5) + hash) + string->value[i];
     return hash;
 }

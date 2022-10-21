@@ -1,5 +1,9 @@
 
-CFLAGS=-Wall
+CFLAGS=-Wall -g
+LFLAGS=
+
+LD=clang
+CC=gcc
 
 TARGET=danskr
 
@@ -8,10 +12,10 @@ HFILES=$(wildcard *.h)
 OFILES=$(patsubst %.c, %.o, $(CFILES))
 
 $(TARGET): $(OFILES)
-	gcc -o $@ $^
+	$(LD) -o $@ $^ $(LFLAGS)
 
-%.o: %.c $(HEADERS)
-	gcc -o $@ $< -c $(CFLAGS)
+%.o: %.c $(HFILES)
+	$(CC) -o $@ $< -c $(CFLAGS)
 
 .PHONY: clean
 
