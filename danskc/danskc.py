@@ -841,7 +841,7 @@ class Parser:
             return self.stepAndReturn(Bool(True))
         else:
             raise Exception(f"expected value, got {self.current()}")
-            
+
 
 def main() -> None:
     with open("test.dk") as file:

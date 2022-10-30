@@ -1,0 +1,54 @@
+
+line -> label? operation?
+
+label -> Name ":"
+
+operation -> Name (operand ("," operand):*):?
+
+operand ->
+    | "(" expression ")"
+    | "[" expression "]"
+    | atom
+
+expression ->
+    | "(" expression ")"
+    | "!" expression
+    | atom "**" expression
+    | atom "*" expression
+    | atom "/" expression
+    | atom "%" expression
+    | atom "+" expression
+    | atom "-" expression
+    | atom "<<" expression
+    | atom ">>" expression
+    | atom "&" expression
+    | atom "^" expression
+    | atom "|" expression
+    | atom
+
+atom ->
+    | Name
+    | Int
+    | Hex
+
+Name:       /[a-zA-Z_][a-zA-Z0-9_]*/
+Int:        /0|[1-9][0-9]*/
+Hex:        /0[xX][0-9a-fA-F]+/
+Power:      "**"
+Plus:       "+"
+Minus:      "-"
+Asterisk:   "*"
+Slash:      "/"
+Percent:    "%"
+Exclamantion: "!"
+Ampersand:  "&"
+Hat:  "^"
+Pipe:       "|"
+DoubleLT:   "<<"
+DoubleGT:   ">>"
+LParen:     "("
+RParen:     ")"
+LBracket:   "["
+RBracket:   "]"
+Comma:      ","
+Colon:      ":"
