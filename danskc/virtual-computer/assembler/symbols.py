@@ -1,11 +1,26 @@
-from typing import Dict, List
+from typing import Dict, List, Optional, cast
 from assembler.parser import Line
+from assembler.spec import PROGRAM_START, instruction_size
 
 class SymbolTable:
     def __init__(self, global_symbols: Dict[str, int], local_symbols: Dict[str, List[int]]) -> None:
         self.global_symbols = global_symbols
         self.local_symbols = local_symbols
+
+    def is_defined(self, name: str) -> bool:
+        return name in self.global_symbols or name in self.local_symbols
     
+    def get(self, name: str, lc: int) -> int:
+        assert self.is_defined(name)
+        if name.startswith("."):
+            closest: Optional[int] = None
+            for l in self.local_symbols[name]:
+                if not closest or abs(closest - lc) > abs(l - lc):
+                    closest = l
+            assert closest != None
+            return cast(int, closest)    
+        else:
+            return self.global_symbols[name]
 
 class SymbolTableBuilder:
     def __init__(self) -> None:
@@ -25,20 +40,9 @@ class SymbolTableBuilder:
             raise Exception(f"multiple defitions of symbol \"{name}\"")
         self.global_symbols[name] = lc
 
-def instruction_size(operator: str) -> int:
-    if operator == "noop":
-        return 1
-    elif operator in ["jmp", "jnz"]:
-        return 2
-    elif operator in ["mov", "and", "or", "xor", "add", "sub", "mul", "div", "mod", "shl", "cmp", "lt", "load", "store"]:
-        return 3
-    else:
-        raise Exception(f"unknown instruction \"{operator}\"")
-
-
 def find_symbols(lines: List[Line]) -> SymbolTable:
     symbols = SymbolTableBuilder()
-    lc = 0
+    lc = PROGRAM_START
     for line in lines:
         if line.label:
             if line.label.startswith("."):

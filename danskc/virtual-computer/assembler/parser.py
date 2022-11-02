@@ -55,14 +55,14 @@ def tokenize(line: str) -> List[Token]:
         elif line[i] in "123456789":
             value = line[i]
             i += 1
-            while line[i] in DIGITS:
+            while i < len(line) and line[i] in DIGITS:
                 value += line[i]
                 i += 1
             tokens.append(Token(TokenType.Int, value))
         elif line[i] == "0":
             value = line[i]
             i += 1
-            if line[i] in "xX":
+            if i < len(line) and line[i] in "xX":
                 i += 1
                 while line[i] in HEX_DIGITS:
                     value += line[i]
@@ -144,6 +144,9 @@ class Atom:
     def __init__(self) -> None:
         self.atom_type: AtomType
 
+    def __str__(self) -> str:
+        raise NotImplementedError()
+
     def to_json(self) -> str:
         raise NotImplementedError()
 
@@ -152,6 +155,9 @@ class Name(Atom):
         super().__init__()
         self.atom_type = AtomType.Name
         self.value = value
+
+    def __str__(self) -> str:
+        return f"{self.value}"
 
     def to_json(self) -> str:
         return f'''{{
@@ -166,6 +172,9 @@ class Int(Atom):
         self.atom_type = AtomType.Int
         self.value = int(value)
 
+    def __str__(self) -> str:
+        return f"{self.value}"
+
     def to_json(self) -> str:
         return f'''{{
             "type": "atom",
@@ -178,6 +187,9 @@ class Hex(Atom):
         super().__init__()
         self.atom_type = AtomType.Hex
         self.value = int(value, 16)
+
+    def __str__(self) -> str:
+        return f"{self.value}"
 
     def to_json(self) -> str:
         return f'''{{
@@ -195,6 +207,9 @@ class Expr:
     def __init__(self) -> None:
         self.expr_type: ExprType
 
+    def __str__(self) -> str:
+        raise NotImplementedError()
+
     def to_json(self) -> str:
         raise NotImplementedError()
 
@@ -210,6 +225,20 @@ class BinaryType(Enum):
     Xor = auto()
     ShiftLeft = auto()
     ShiftRight = auto()
+
+    def chars(self):
+        if self == BinaryType.Add: return "+"
+        elif self == BinaryType.Subtract: return "-"
+        elif self == BinaryType.Multiply: return "*"
+        elif self == BinaryType.Divide: return "/"
+        elif self == BinaryType.Modolus: return "%"
+        elif self == BinaryType.Power: return "**"
+        elif self == BinaryType.And: return "&"
+        elif self == BinaryType.Or: return "|"
+        elif self == BinaryType.Xor: return "^"
+        elif self == BinaryType.ShiftLeft: return "<<"
+        elif self == BinaryType.ShiftRight: return ">>"
+        else: raise Exception("unexhaustive map")
 
     def json_name(self):
         if self == BinaryType.Add: return "add"
@@ -233,6 +262,9 @@ class Binary(Expr):
         self.binary_type = binary_type
         super().__init__()
 
+    def __str__(self) -> str:
+        return f"({self.left} {self.binary_type.chars()} {self.right})"
+
     def to_json(self) -> str:
         return f'''{{
             "type": "expr",
@@ -248,6 +280,9 @@ class Not(Expr):
         self.expr_type = ExprType.Not
         self.value = value
 
+    def __str__(self) -> str:
+        return f"(~{self.value})"
+
     def to_json(self) -> str:
         return f'''{{
             "type": "expr",
@@ -260,6 +295,9 @@ class AtomExpr(Expr):
         super().__init__()
         self.expr_type = ExprType.Atom
         self.value = value
+
+    def __str__(self) -> str:
+        return f"{self.value}"
 
     def to_json(self) -> str:
         return f'''{{
@@ -277,14 +315,20 @@ class Operand:
     def __init__(self) -> None:
         self.operand_type: OperandType
 
+    def __str__(self) -> str:
+        raise NotImplementedError()
+
     def to_json(self) -> str:
         raise NotImplementedError()
 
-class EpxrOperand(Operand):
+class ExprOperand(Operand):
     def __init__(self, value: Expr) -> None:
         super().__init__()
         self.operand_type = OperandType.Expr
         self.value = value
+
+    def __str__(self) -> str:
+        return f"({self.value})"
 
     def to_json(self) -> str:
         return f'''{{
@@ -299,6 +343,9 @@ class DerefOperand(Operand):
         self.operand_type = OperandType.Deref
         self.value = value
 
+    def __str__(self) -> str:
+        return f"[{self.value}]"
+
     def to_json(self) -> str:
         return f'''{{
             "type": "operand",
@@ -312,6 +359,9 @@ class AtomOperand(Operand):
         self.operand_type = OperandType.Atom
         self.value = value
 
+    def __str__(self) -> str:
+        return f"{self.value}"
+
     def to_json(self) -> str:
         return f'''{{
             "type": "operand",
@@ -324,6 +374,9 @@ class Operation:
         self.operator = operator
         self.operands = operands
 
+    def __str__(self) -> str:
+        return f"{self.operator} {', '.join(str(o) for o in self.operands)}"
+
     def to_json(self) -> str:
         operands = ", ".join([o.to_json() for o in self.operands])
         return f'''{{
@@ -333,9 +386,10 @@ class Operation:
         }}'''
 
 class Line:
-    def __init__(self, label: Optional[str], operation: Optional[Operation]) -> None:
+    def __init__(self, label: Optional[str], operation: Optional[Operation], line_number: int) -> None:
         self.label = label
         self.operation = operation
+        self.line_number = line_number
 
     def to_json(self) -> str:
         label = f"\"{self.label}\"" if self.label else 'null'
@@ -343,7 +397,8 @@ class Line:
         return f'''{{
             "type": "line",
             "label": {label},
-            "operation": {operation}
+            "operation": {operation},
+            "lineNumbr": {self.line_number}
         }}'''
 
 class Parser:
@@ -372,10 +427,10 @@ class Parser:
         return (self.i >= len(self.tokens) 
             or self.current().type == TokenType.EOF)
 
-    def parse_line(self) -> Line:
+    def parse_line(self, line_number: int) -> Line:
         label = self.maybe_parse_label()
         operation = self.maybe_parse_operation()
-        return Line(label, operation)
+        return Line(label, operation, line_number)
 
     def maybe_parse_label(self) -> Optional[str]:
         if self.current_is(TokenType.Name):
@@ -406,11 +461,8 @@ class Parser:
 
     def parse_operand(self) -> Operand:
         if self.current_is(TokenType.LParen):
-            self.step()
             value = self.parse_expression()
-            self.assert_current(TokenType.RParen)
-            self.step()
-            return EpxrOperand(value)
+            return ExprOperand(value)
         elif self.current_is(TokenType.LBracket):
             self.step()
             value = self.parse_expression()
@@ -421,18 +473,12 @@ class Parser:
             return AtomOperand(self.parse_atom())
 
     def parse_expression(self) -> Expr:
-        if self.current_is(TokenType.LParen):
-            self.step()
-            value = self.parse_expression()
-            self.assert_current(TokenType.RParen)
-            self.step()
-            return value
-        elif self.current_is(TokenType.Exclamation):
+        if self.current_is(TokenType.Exclamation):
             self.step()
             value = self.parse_expression()
             return Not(value)
         else:
-            left = AtomExpr(self.parse_atom())
+            left = self.parse_group()
             if self.current_is(TokenType.DoubleAsterisk):
                 return self.make_binary(left, BinaryType.Power)
             elif self.current_is(TokenType.Asterisk):
@@ -463,6 +509,16 @@ class Parser:
         right = self.parse_expression()
         return Binary(left, right, binary_type)
 
+    def parse_group(self) -> Expr:
+        if self.current_is(TokenType.LParen):
+            self.step()
+            value = self.parse_expression()
+            self.assert_current(TokenType.RParen)
+            self.step()
+            return value
+        else:
+            return AtomExpr(self.parse_atom())
+
     def parse_atom(self) -> Atom:
         if self.current_is(TokenType.Name):
             value = self.current().value
@@ -480,10 +536,10 @@ class Parser:
             raise Exception(f"expected atom, got {self.current()}")
 
 def parse_lines(text: str) -> List[Line]:
-    lines = [line for line in text.split("\n") if line != ""]
     parsed_lines: List[Line] = []
-    for line in lines:
+    for i, line in enumerate(text.split("\n")):
+        if line == "": continue
         tokens = tokenize(line)
         if len(tokens) <= 1: continue
-        parsed_lines.append(Parser(tokens).parse_line())
+        parsed_lines.append(Parser(tokens).parse_line(i))
     return parsed_lines
