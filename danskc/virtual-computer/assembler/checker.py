@@ -7,7 +7,7 @@ from assembler.symbols import SymbolTable, find_symbols
 
 
 def checker_error(message: str, line_number: int) -> None:
-    raise Exception(f"checker error on line {line_number}:\n{message}\n")
+    raise Exception(f"checker error on line {line_number + 1}:\n{message}\n")
 
 def check_operand_count(operation: Operation, line_number: int, expected_count: int) -> None:
     if len(operation.operands) != expected_count:
@@ -90,11 +90,11 @@ def check_operation(operation: Operation, symbols: SymbolTable, line_number: int
 
     elif operation.operator == "jmp":
         check_operand_count(operation, line_number, 1)
-        check_address(operation, 0, symbols, line_number)
+        check_address_or_value(operation, 0, symbols, line_number)
 
     elif operation.operator == "jnz":
         check_operand_count(operation, line_number, 2)
-        check_address(operation, 0, symbols, line_number)
+        check_address_or_value(operation, 0, symbols, line_number)
         check_address(operation, 1, symbols, line_number)
 
     elif operation.operator == "mov":
