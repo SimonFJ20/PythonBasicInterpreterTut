@@ -60,7 +60,7 @@ clear_screen:
     load r1, r5 ; m
     lt ra, r1
     xor ra, [iv + 1]
-    jnz loop_break, ra
+    jnz .loop_break, ra
 
     ; vram_offset[i] = ' '
     load ra, r6 ; i
