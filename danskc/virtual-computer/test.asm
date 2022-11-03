@@ -20,20 +20,17 @@ _entry:
     mov [iv + 2], ra
     add ra, r1
     mov [iv + 3], ra
-    add ra, r1
-    mov [iv + 1], ra
 
     ; initialize stack
     mov r6, (2 ** 12)
+    mov r7, r6
 
     ; call main
     mov r5, ._entry_return
     store r6, r5
-    mov r5, main
-    jmp r5
+    jmp main
 ._entry_return:
-    mov r5, _exit
-    jmp r5
+    jmp _exit
 
 vram_offset: noop
 vram_size: noop
@@ -43,7 +40,7 @@ clear_screen:
     add r6, [iv + 1]
     store r6, r7
     mov r7, r6
-    ; allocate stack frame
+    ; allocate locals
     add r6, [iv + 2]
     
     ; let i = 0
@@ -62,10 +59,8 @@ clear_screen:
     sub r5, [iv + 1]
     load r1, r5 ; m
     lt ra, r1
-    xor ra, [iv + 0]
-    mov ra, 1
-    mov r5, .loop_break 
-    jnz r5, ra
+    xor ra, [iv + 1]
+    jnz loop_break, ra
 
     ; vram_offset[i] = ' '
     load ra, r6 ; i
@@ -79,9 +74,10 @@ clear_screen:
     add ra, [iv + 1]
     store r6, ra
 
-    mov r5, .loop_continue
-    jmp r5
+    jmp .loop_continue
 .loop_break:
+    ; deallocate locals
+    sub r6, [iv + 2]
     ; return
     load r7, r6
     sub r6, [iv + 1]
@@ -98,11 +94,10 @@ main:
     mov [vram_offset], (2 ** 11)
     mov [vram_size], (80 * 24)
 
-    sub r6, [iv + 1]
+    add r6, [iv + 1]
     mov r5, .main_return
     store r6, r5
-    mov r5, clear_screen
-    jmp r5
+    jmp clear_screen
 
 .main_return:
     ; return
