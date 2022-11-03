@@ -95,12 +95,11 @@ clear_screen_optimised:
     mov r2, 0
     ; let m = vram_size
     mov r3, vram_size
+    sub r3, 1
 
 .loop_continue_2:
-    ; i < m
-    mov ra, r2 ; i
-    lt ra, r3
-    xor ra, [iv + 1]
+    mov ra, r3 ; m
+    lt ra, r2 ; m < i
     jnz .loop_break_2, ra
 
     ; vram_offset[i] = ' '
