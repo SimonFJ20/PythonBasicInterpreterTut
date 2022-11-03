@@ -91,10 +91,11 @@ clear_screen_optimised:
     store r6, r7
     mov r7, r6
     
-    ; let i = 0
-    mov r2, 0
-    ; let m = vram_size
+    ; let i = vram_offset
+    mov r2, vram_offset
+    ; let m = vram_offset + vram_size
     mov r3, vram_size
+    add r3, vram_offset
     sub r3, 1
 
 .loop_continue_2:
@@ -103,10 +104,8 @@ clear_screen_optimised:
     jnz .loop_break_2, ra
 
     ; vram_offset[i] = ' '
-    mov r5, [vram_offset]
-    add r5, r2
     mov ra, 32
-    store r5, ra
+    store r2, ra
 
     ; i++
     add r2, [iv + 1]
