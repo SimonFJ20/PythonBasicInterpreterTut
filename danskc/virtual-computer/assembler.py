@@ -9,7 +9,7 @@ def assemble(text: str, debug: bool) -> str:
     symbols = find_symbols(lines)
     lines = [line for line in lines if line.operation]
     check_lines(lines, symbols)
-    return generate_lines(lines, symbols)
+    return generate_lines(lines, symbols, debug)
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
