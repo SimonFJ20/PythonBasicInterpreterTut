@@ -4,7 +4,7 @@ from assembler.checker import check_lines
 from assembler.generator import generate_lines
 
 
-def assemble(text: str) -> str:
+def assemble(text: str, debug: bool) -> str:
     lines = parse_lines(text)
     symbols = find_symbols(lines)
     lines = [line for line in lines if line.operation]

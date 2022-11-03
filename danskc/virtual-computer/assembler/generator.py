@@ -64,15 +64,16 @@ def generate_operation(operation: Operation, symbols: SymbolTable, lc: int) -> s
     operands = " ".join(map(lambda operand: generate_operand(operand, symbols, lc), operation.operands))
     return f"{operator} {operands}"
 
-def generate_operations(operations: List[Operation], symbols: SymbolTable) -> str:
+def generate_operations(operations: List[Operation], symbols: SymbolTable, debug: bool) -> str:
     generated_lines: List[str] = []
     lc = PROGRAM_START
     for operation in operations:
-        generated_lines.append(f"; {lc}: {operation}")
+        if debug:
+            generated_lines.append(f"; {lc}: {operation}")
         generated_lines.append(generate_operation(operation, symbols, lc))
         lc += instruction_size(operation.operator)
     return "\n".join(generated_lines)
 
-def generate_lines(lines: List[Line], symbols: SymbolTable) -> str:
+def generate_lines(lines: List[Line], symbols: SymbolTable, debug: bool) -> str:
     operations = [line.operation for line in lines if line.operation]
-    return generate_operations(operations, symbols)
+    return generate_operations(operations, symbols, debug)
