@@ -15,8 +15,8 @@ if __name__ == "__main__":
     from argparse import ArgumentParser
     argparser = ArgumentParser()
     argparser.add_argument("file")
+    argparser.add_argument("--debug", action="store_true")
     args = argparser.parse_args()
     with open(args.file) as file:
-        # print(assemble(file.read()), end="", flush=True)
-        print(assemble(file.read()))
+        print(assemble(file.read(), args.debug))
     
