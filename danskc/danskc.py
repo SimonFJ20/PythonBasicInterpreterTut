@@ -1,5 +1,5 @@
 from __future__ import annotations
-from parser import Parser, statements_to_string
+from parser_ import Parser, statements_to_string
 from tokenizer import tokenize
 
 
