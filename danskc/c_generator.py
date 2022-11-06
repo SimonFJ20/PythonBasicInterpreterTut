@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections import namedtuple
+from enum import Enum, auto
 from typing import Dict, List, Tuple, cast
 from parser_ import (
     StatementType,
@@ -58,13 +58,82 @@ class GlobalTableBuilder:
 def build_global_table(ast: List[Statement]) -> GlobalTable:
     table = GlobalTableBuilder()
     for i, statement in enumerate(ast):
-        if statement.statement_type() == StatementType.Func:
-            table.declare_func_at(i, cast(Func, statement))
-        elif statement.statement_type() == StatementType.Let:
+        if statement.statement_type() == StatementType.Let:
             table.declare_let_at(i, cast(Let, statement))
+        elif statement.statement_type() == StatementType.Func:
+            table.declare_func_at(i, cast(Func, statement))
     return table.build()
 
 
 def generate_program(ast: List[Statement]) -> str:
     global_table = build_global_table(ast)
-    return "int main(){((int*)0)=0;}"
+    return "int main(){*((int*)0)=0;}"
+
+
+def generate_top_level_statements(
+    nodes: List[Statement], global_table: GlobalTable
+) -> str:
+    return "\n\n".join(
+        [generate_top_level_statement(node, global_table) for node in nodes]
+    )
+
+
+def generate_top_level_statement(node: Statement, global_table: GlobalTable) -> str:
+    if node.statement_type() == StatementType.Let:
+        return generate_top_level_let(cast(Let, node), global_table)
+    elif node.statement_type() == StatementType.Func:
+        return generate_top_level_func(cast(Func, node), global_table)
+    else:
+        raise Exception(
+            f"statement type {node.statement_type()} not allowed in top level"
+        )
+
+
+def generate_top_level_let(node: Let, global_table: GlobalTable) -> str:
+    raise NotImplementedError()
+
+class TypeType(Enum):
+    Name = auto(),
+
+class Type:
+    def __init__(self) -> None:
+        pass
+
+    def type_type(self) -> TypeType:
+        raise NotImplementedError()
+
+    def is_compatible(self, other: Type) -> bool:
+        raise NotImplementedError()
+
+class NameType(Type):
+    def __init__(self, value: str) -> None:
+        super().__init__()
+        self.value = value
+
+    def type_type(self) -> TypeType:
+        return TypeType.Name
+
+    def is_compatible(self, other: Type) -> bool:
+        if other.type_type() == TypeType.Name:
+            return cast(NameType, other).value == self.value
+        else:
+            raise NotImplementedError()
+
+class Local:
+    def __init__(self, name: str, valuetype: Type, scopedepth: int) -> None:
+        self.name = name
+        self.valuetype = valuetype
+        self.scopedepth = scopedepth
+
+class LocalTable:
+    def __init__(self, global_table: GlobalTable) -> None:
+        self.global_table = global_table
+        self.local_table: Dict[str, Local] = {}
+        self.depth = 0
+
+    def define_local(self, name: str, valuetype: Type) -> None:
+        if name in self.local_table and self.local_table[name].scopedepth == self.depth:
+            raise Exception(f'multiple definitions of local "{name}"')
+
+def generate_top_level_func(node: Func, global_table: GlobalTable) -> str:
+
