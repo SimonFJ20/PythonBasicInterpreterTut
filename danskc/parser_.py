@@ -4,7 +4,7 @@ from typing import Any, List, Optional, Tuple
 from tokenizer import Token, TokenTypes
 
 
-class StatementType(Enum):
+class ParsedStatementTypes(Enum):
     Expr = auto()
     Let = auto()
     If = auto()
@@ -14,58 +14,61 @@ class StatementType(Enum):
     Return = auto()
 
 
-class Statement:
+class ParsedStatement:
     def __init__(self) -> None:
         pass
 
-    def statement_type(self) -> StatementType:
+    def statement_type(self) -> ParsedStatementTypes:
         raise NotImplementedError()
 
     def __str__(self) -> str:
         raise NotImplementedError()
 
 
-def statements_to_string(statements: List[Statement]) -> str:
+def statements_to_string(statements: List[ParsedStatement]) -> str:
     statements_ = "\n".join(str(statement) for statement in statements)
     return f"[ {statements_} ]"
 
 
-class ExprStatement(Statement):
-    def __init__(self, value: Expr) -> None:
+class ParsedExprStatement(ParsedStatement):
+    def __init__(self, value: ParsedExpr) -> None:
         super().__init__()
         self.value = value
 
-    def statement_type(self) -> StatementType:
-        return StatementType.Expr
+    def statement_type(self) -> ParsedStatementTypes:
+        return ParsedStatementTypes.Expr
 
     def __str__(self) -> str:
         return f"ExprStatement {{ value: {self.value} }}"
 
 
-class Let(Statement):
-    def __init__(self, subject: str, value: Expr) -> None:
+class ParsedLet(ParsedStatement):
+    def __init__(self, subject: str, value: ParsedExpr) -> None:
         super().__init__()
         self.subject = subject
         self.value = value
 
-    def statement_type(self) -> StatementType:
-        return StatementType.Let
+    def statement_type(self) -> ParsedStatementTypes:
+        return ParsedStatementTypes.Let
 
     def __str__(self) -> str:
         return f"Let {{ subject: {self.subject}, value: {self.value} }}"
 
 
-class If(Statement):
+class ParsedIf(ParsedStatement):
     def __init__(
-        self, condition: Expr, truthy: List[Statement], falsy: List[Statement]
+        self,
+        condition: ParsedExpr,
+        truthy: List[ParsedStatement],
+        falsy: List[ParsedStatement],
     ) -> None:
         super().__init__()
         self.condition = condition
         self.truthy = truthy
         self.falsy = falsy
 
-    def statement_type(self) -> StatementType:
-        return StatementType.If
+    def statement_type(self) -> ParsedStatementTypes:
+        return ParsedStatementTypes.If
 
     def __str__(self) -> str:
         truthy = ", ".join(str(statement) for statement in self.truthy)
@@ -73,40 +76,42 @@ class If(Statement):
         return f"If {{ condition: {self.condition}, truthy: [ {truthy} ], falsy: [ {falsy} ] }}"
 
 
-class While(Statement):
-    def __init__(self, condition: Expr, body: List[Statement]) -> None:
+class ParsedWhile(ParsedStatement):
+    def __init__(self, condition: ParsedExpr, body: List[ParsedStatement]) -> None:
         super().__init__()
         self.condition = condition
         self.body = body
 
-    def statement_type(self) -> StatementType:
-        return StatementType.While
+    def statement_type(self) -> ParsedStatementTypes:
+        return ParsedStatementTypes.While
 
     def __str__(self) -> str:
         body = ", ".join(str(statement) for statement in self.body)
         return f"If {{ condition: {self.condition}, body: [ {body} ] }}"
 
 
-class Break(Statement):
+class ParsedBreak(ParsedStatement):
     def __init__(self) -> None:
         super().__init__()
 
-    def statement_type(self) -> StatementType:
-        return StatementType.While
+    def statement_type(self) -> ParsedStatementTypes:
+        return ParsedStatementTypes.While
 
     def __str__(self) -> str:
         return f"Break"
 
 
-class Func(Statement):
-    def __init__(self, subject: str, args: List[str], body: List[Statement]) -> None:
+class ParsedFunc(ParsedStatement):
+    def __init__(
+        self, subject: str, args: List[str], body: List[ParsedStatement]
+    ) -> None:
         super().__init__()
         self.subject = subject
         self.args = args
         self.body = body
 
-    def statement_type(self) -> StatementType:
-        return StatementType.While
+    def statement_type(self) -> ParsedStatementTypes:
+        return ParsedStatementTypes.While
 
     def __str__(self) -> str:
         args = ", ".join(f'"{arg}"' for arg in self.args)
@@ -114,19 +119,19 @@ class Func(Statement):
         return f"Func {{ subject: {self.subject}, args: [ {args} ], body: [ {body} ] }}"
 
 
-class Return(Statement):
-    def __init__(self, value: Optional[Expr]) -> None:
+class ParsedReturn(ParsedStatement):
+    def __init__(self, value: Optional[ParsedExpr]) -> None:
         super().__init__()
         self.value = value
 
-    def statement_type(self) -> StatementType:
-        return StatementType.Expr
+    def statement_type(self) -> ParsedStatementTypes:
+        return ParsedStatementTypes.Expr
 
     def __str__(self) -> str:
         return f"Return {{ value: {self.value} }}"
 
 
-class ExprType(Enum):
+class ParsedExprTypes(Enum):
     Id = auto()
     Int = auto()
     Float = auto()
@@ -143,109 +148,109 @@ class ExprType(Enum):
     Assign = auto()
 
 
-class Expr:
+class ParsedExpr:
     def __init__(self) -> None:
         pass
 
-    def expr_type(self) -> ExprType:
+    def expr_type(self) -> ParsedExprTypes:
         raise NotImplementedError()
 
     def __str__(self) -> str:
         raise NotImplementedError()
 
 
-class Id(Expr):
+class ParsedId(ParsedExpr):
     def __init__(self, value: str) -> None:
         super().__init__()
         self.value = value
 
-    def expr_type(self) -> ExprType:
-        return ExprType.Id
+    def expr_type(self) -> ParsedExprTypes:
+        return ParsedExprTypes.Id
 
     def __str__(self) -> str:
         return f'Id {{ value: "{self.value}" }}'
 
 
-class Int(Expr):
+class ParsedInt(ParsedExpr):
     def __init__(self, value: int) -> None:
         super().__init__()
         self.value = value
 
-    def expr_type(self) -> ExprType:
-        return ExprType.Int
+    def expr_type(self) -> ParsedExprTypes:
+        return ParsedExprTypes.Int
 
     def __str__(self) -> str:
         return f"Int {{ value: {self.value} }}"
 
 
-class Float(Expr):
+class ParsedFloat(ParsedExpr):
     def __init__(self, value: float) -> None:
         super().__init__()
         self.value = value
 
-    def expr_type(self) -> ExprType:
-        return ExprType.Float
+    def expr_type(self) -> ParsedExprTypes:
+        return ParsedExprTypes.Float
 
     def __str__(self) -> str:
         return f"Float {{ value: {self.value} }}"
 
 
-class Char(Expr):
+class ParsedChar(ParsedExpr):
     def __init__(self, value: str) -> None:
         super().__init__()
         self.value = value
 
-    def expr_type(self) -> ExprType:
-        return ExprType.Char
+    def expr_type(self) -> ParsedExprTypes:
+        return ParsedExprTypes.Char
 
     def __str__(self) -> str:
         return f"Char {{ value: '{self.value}' }}"
 
 
-class String(Expr):
+class ParsedString(ParsedExpr):
     def __init__(self, value: str) -> None:
         super().__init__()
         self.value = value
 
-    def expr_type(self) -> ExprType:
-        return ExprType.String
+    def expr_type(self) -> ParsedExprTypes:
+        return ParsedExprTypes.String
 
     def __str__(self) -> str:
         return f'String {{ value: "{self.value}" }}'
 
 
-class Bool(Expr):
+class ParsedBool(ParsedExpr):
     def __init__(self, value: bool) -> None:
         super().__init__()
         self.value = value
 
-    def expr_type(self) -> ExprType:
-        return ExprType.Bool
+    def expr_type(self) -> ParsedExprTypes:
+        return ParsedExprTypes.Bool
 
     def __str__(self) -> str:
         return f"Bool {{ value: {'true' if self.value else 'false'} }}"
 
 
-class Array(Expr):
-    def __init__(self, values: List[Expr]) -> None:
+class ParsedArray(ParsedExpr):
+    def __init__(self, values: List[ParsedExpr]) -> None:
         super().__init__()
         self.values = values
 
-    def expr_type(self) -> ExprType:
-        return ExprType.Array
+    def expr_type(self) -> ParsedExprTypes:
+        return ParsedExprTypes.Array
 
     def __str__(self) -> str:
         values = ", ".join(str(value) for value in self.values)
         return f"Array {{ values: [ {values} ] }}"
 
 
-class Object(Expr):
-    def __init__(self, values: List[Tuple[str, Expr]]) -> None:
+class ParsedObject(ParsedExpr):
+    def __init__(self, values: List[Tuple[str, ParsedExpr]]) -> None:
         super().__init__()
         self.values = values
 
-    def expr_type(self) -> ExprType:
-        return ExprType.Object
+    def expr_type(self) -> ParsedExprTypes:
+        return ParsedExprTypes.Object
 
     def __str__(self) -> str:
         values = ", ".join(
@@ -254,64 +259,64 @@ class Object(Expr):
         return f"Object {{ values: [ {values} ] }}"
 
 
-class Accessing(Expr):
-    def __init__(self, subject: Expr, value: str) -> None:
+class ParsedAccessing(ParsedExpr):
+    def __init__(self, subject: ParsedExpr, value: str) -> None:
         super().__init__()
         self.subject = subject
         self.value = value
 
-    def expr_type(self) -> ExprType:
-        return ExprType.Accessing
+    def expr_type(self) -> ParsedExprTypes:
+        return ParsedExprTypes.Accessing
 
     def __str__(self) -> str:
         return f"Accessing {{ subject: {self.subject}, value: {self.value} }}"
 
 
-class Indexing(Expr):
-    def __init__(self, subject: Expr, value: Expr) -> None:
+class ParsedIndexing(ParsedExpr):
+    def __init__(self, subject: ParsedExpr, value: ParsedExpr) -> None:
         super().__init__()
         self.subject = subject
         self.value = value
 
-    def expr_type(self) -> ExprType:
-        return ExprType.Indexing
+    def expr_type(self) -> ParsedExprTypes:
+        return ParsedExprTypes.Indexing
 
     def __str__(self) -> str:
         return f"Indexing {{ subject: {self.subject}, value: {self.value} }}"
 
 
-class Call(Expr):
-    def __init__(self, subject: Expr, args: List[Expr]) -> None:
+class ParsedCall(ParsedExpr):
+    def __init__(self, subject: ParsedExpr, args: List[ParsedExpr]) -> None:
         super().__init__()
         self.subject = subject
         self.args = args
 
-    def expr_type(self) -> ExprType:
-        return ExprType.Call
+    def expr_type(self) -> ParsedExprTypes:
+        return ParsedExprTypes.Call
 
     def __str__(self) -> str:
         args = ", ".join(str(arg) for arg in self.args)
         return f"Call {{ subject: {self.subject}, args: [ {args} ] }}"
 
 
-class UnaryOperations(Enum):
+class ParsedUnaryOperations(Enum):
     Not = auto()
 
 
-class Unary(Expr):
-    def __init__(self, subject: Expr, operation: UnaryOperations) -> None:
+class ParsedUnary(ParsedExpr):
+    def __init__(self, subject: ParsedExpr, operation: ParsedUnaryOperations) -> None:
         super().__init__()
         self.subject = subject
         self.operation = operation
 
-    def expr_type(self) -> ExprType:
-        return ExprType.Unary
+    def expr_type(self) -> ParsedExprTypes:
+        return ParsedExprTypes.Unary
 
     def __str__(self) -> str:
         return f"Unary {{ subject: {self.subject}, operation: {self.operation} }}"
 
 
-class BinaryOperations(Enum):
+class ParsedBinaryOperations(Enum):
     Add = auto()
     Subtract = auto()
     Multiply = auto()
@@ -323,35 +328,39 @@ class BinaryOperations(Enum):
     GTE = auto()
 
 
-class Binary(Expr):
-    def __init__(self, left: Expr, right: Expr, operation: BinaryOperations) -> None:
+class ParsedBinary(ParsedExpr):
+    def __init__(
+        self, left: ParsedExpr, right: ParsedExpr, operation: ParsedBinaryOperations
+    ) -> None:
         super().__init__()
         self.left = left
         self.right = right
         self.operation = operation
 
-    def expr_type(self) -> ExprType:
-        return ExprType.Binary
+    def expr_type(self) -> ParsedExprTypes:
+        return ParsedExprTypes.Binary
 
     def __str__(self) -> str:
         return f"Binary {{ left: {self.left}, right: {self.right}, operation: {self.operation} }}"
 
 
-class AssignOperations(Enum):
+class ParsedAssignOperations(Enum):
     Assign = auto()
     Increment = auto()
     Decrement = auto()
 
 
-class Assign(Expr):
-    def __init__(self, subject: Expr, value: Expr, operation: AssignOperations) -> None:
+class ParsedAssign(ParsedExpr):
+    def __init__(
+        self, subject: ParsedExpr, value: ParsedExpr, operation: ParsedAssignOperations
+    ) -> None:
         super().__init__()
         self.subject = subject
         self.value = value
         self.operation = operation
 
-    def expr_type(self) -> ExprType:
-        return ExprType.Assign
+    def expr_type(self) -> ParsedExprTypes:
+        return ParsedExprTypes.Assign
 
     def __str__(self) -> str:
         return f"Unary {{ subject: {self.subject}, value: {self.value}, operation: {self.operation} }}"
@@ -382,8 +391,8 @@ class Parser:
         if self.current_type() != tt:
             raise Exception(f"expected '{tt}', got {self.current()}")
 
-    def parse_statements(self) -> List[Statement]:
-        statements: List[Statement] = []
+    def parse_statements(self) -> List[ParsedStatement]:
+        statements: List[ParsedStatement] = []
         while not self.done() and self.current_type() == TokenTypes.Semicolon:
             self.step()
         while not self.done() and self.current_type() not in [
@@ -395,7 +404,7 @@ class Parser:
                 self.step()
         return statements
 
-    def parse_statement(self) -> Statement:
+    def parse_statement(self) -> ParsedStatement:
         if self.done():
             return self.parse_expr_statement()
         elif self.current_type() == TokenTypes.KwFunktion:
@@ -413,7 +422,7 @@ class Parser:
         else:
             return self.parse_expr_statement()
 
-    def parse_func(self) -> Func:
+    def parse_func(self) -> ParsedFunc:
         self.step()
         self.expect(TokenTypes.Id)
         subject = self.current().value
@@ -434,9 +443,9 @@ class Parser:
         body = self.parse_statements()
         self.expect(TokenTypes.KwSlut)
         self.step()
-        return Func(subject, args, body)
+        return ParsedFunc(subject, args, body)
 
-    def parse_return(self) -> Return:
+    def parse_return(self) -> ParsedReturn:
         self.step()
         if not self.done() and self.current_type() in [
             TokenTypes.Semicolon,
@@ -448,11 +457,11 @@ class Parser:
             TokenTypes.KwLad,
             TokenTypes.KwSlut,
         ]:
-            return Return(None)
+            return ParsedReturn(None)
         else:
-            return Return(self.parse_expr())
+            return ParsedReturn(self.parse_expr())
 
-    def parse_while(self) -> While:
+    def parse_while(self) -> ParsedWhile:
         self.step()
         condition = self.parse_expr()
         self.expect(TokenTypes.KwSå)
@@ -460,13 +469,13 @@ class Parser:
         body = self.parse_statements()
         self.expect(TokenTypes.KwSlut)
         self.step()
-        return While(condition, body)
+        return ParsedWhile(condition, body)
 
-    def parse_break(self) -> Break:
+    def parse_break(self) -> ParsedBreak:
         self.step()
-        return Break()
+        return ParsedBreak()
 
-    def parse_if(self) -> If:
+    def parse_if(self) -> ParsedIf:
         self.step()
         condition = self.parse_expr()
         self.expect(TokenTypes.KwSå)
@@ -474,21 +483,21 @@ class Parser:
         truthy = self.parse_statements()
         if self.current_type() == TokenTypes.KwSlut:
             self.step()
-            return If(condition, truthy, [])
+            return ParsedIf(condition, truthy, [])
         elif self.current_type() == TokenTypes.KwEllers:
             self.step()
             if self.current_type() == TokenTypes.KwHvis:
                 elsecase = self.parse_if()
-                return If(condition, truthy, [elsecase])
+                return ParsedIf(condition, truthy, [elsecase])
             else:
                 falsy = self.parse_statements()
                 self.expect(TokenTypes.KwSlut)
                 self.step()
-                return If(condition, truthy, falsy)
+                return ParsedIf(condition, truthy, falsy)
         else:
             raise Exception(f"expected 'ellers' or 'slut', got {self.current()}")
 
-    def parse_let(self) -> Let:
+    def parse_let(self) -> ParsedLet:
         self.step()
         self.expect(TokenTypes.Id)
         subject = self.current().value
@@ -496,12 +505,12 @@ class Parser:
         self.expect(TokenTypes.Assign)
         self.step()
         value = self.parse_expr()
-        return Let(subject, value)
+        return ParsedLet(subject, value)
 
-    def parse_expr_statement(self) -> ExprStatement:
-        return ExprStatement(self.parse_expr())
+    def parse_expr_statement(self) -> ParsedExprStatement:
+        return ParsedExprStatement(self.parse_expr())
 
-    def parse_expr(self) -> Expr:
+    def parse_expr(self) -> ParsedExpr:
         if self.current_type() == TokenTypes.LBrace:
             return self.parse_object()
         elif self.current_type() == TokenTypes.LBracket:
@@ -509,9 +518,9 @@ class Parser:
         else:
             return self.parse_assignment()
 
-    def parse_object(self) -> Object:
+    def parse_object(self) -> ParsedObject:
         self.step()
-        values: List[Tuple[str, Expr]] = []
+        values: List[Tuple[str, ParsedExpr]] = []
         while not self.done() and self.current_type() != TokenTypes.RBrace:
             self.expect(TokenTypes.Id)
             key = self.current().value
@@ -525,11 +534,11 @@ class Parser:
                 break
         self.expect(TokenTypes.RBrace)
         self.step()
-        return Object(values)
+        return ParsedObject(values)
 
-    def parse_array(self) -> Array:
+    def parse_array(self) -> ParsedArray:
         self.step()
-        values: List[Expr] = []
+        values: List[ParsedExpr] = []
         while not self.done() and self.current_type() != TokenTypes.RBracket:
             values.append(self.parse_expr())
             if self.current_type() == TokenTypes.Comma:
@@ -538,27 +547,33 @@ class Parser:
                 break
         self.expect(TokenTypes.RBracket)
         self.step()
-        return Array(values)
+        return ParsedArray(values)
 
-    def parse_assignment(self) -> Expr:
+    def parse_assignment(self) -> ParsedExpr:
         subject = self.parse_binary()
         if self.done():
             return subject
         elif self.current_type() == TokenTypes.Assign:
             self.step()
-            return Assign(subject, self.parse_assignment(), AssignOperations.Assign)
+            return ParsedAssign(
+                subject, self.parse_assignment(), ParsedAssignOperations.Assign
+            )
         elif self.current_type() == TokenTypes.PlusAssign:
             self.step()
-            return Assign(subject, self.parse_assignment(), AssignOperations.Increment)
+            return ParsedAssign(
+                subject, self.parse_assignment(), ParsedAssignOperations.Increment
+            )
         elif self.current_type() == TokenTypes.MinusAssign:
             self.step()
-            return Assign(subject, self.parse_assignment(), AssignOperations.Decrement)
+            return ParsedAssign(
+                subject, self.parse_assignment(), ParsedAssignOperations.Decrement
+            )
         else:
             return subject
 
-    def parse_binary(self) -> Expr:
-        expr_stack: List[Expr] = []
-        op_stack: List[BinaryOperations] = []
+    def parse_binary(self) -> ParsedExpr:
+        expr_stack: List[ParsedExpr] = []
+        op_stack: List[ParsedBinaryOperations] = []
         expr_stack.append(self.parse_unary())
         last_prec = 5
         while not self.done():
@@ -576,72 +591,72 @@ class Parser:
                     op_stack.append(op_)
                     break
                 left = expr_stack.pop()
-                expr_stack.append(Binary(left, right_, op_))
+                expr_stack.append(ParsedBinary(left, right_, op_))
             expr_stack.append(right)
             op_stack.append(op)
         while len(expr_stack) > 1:
             right = expr_stack.pop()
             left = expr_stack.pop()
             op = op_stack.pop()
-            expr_stack.append(Binary(left, right, op))
+            expr_stack.append(ParsedBinary(left, right, op))
         return expr_stack[0]
 
-    def maybe_parse_binary_op(self) -> Optional[BinaryOperations]:
+    def maybe_parse_binary_op(self) -> Optional[ParsedBinaryOperations]:
         if self.current_type() == TokenTypes.Plus:
-            return self.stepAndReturn(BinaryOperations.Add)
+            return self.stepAndReturn(ParsedBinaryOperations.Add)
         elif self.current_type() == TokenTypes.Minus:
-            return self.stepAndReturn(BinaryOperations.Subtract)
+            return self.stepAndReturn(ParsedBinaryOperations.Subtract)
         elif self.current_type() == TokenTypes.Asterisk:
-            return self.stepAndReturn(BinaryOperations.Multiply)
+            return self.stepAndReturn(ParsedBinaryOperations.Multiply)
         elif self.current_type() == TokenTypes.EQ:
-            return self.stepAndReturn(BinaryOperations.EQ)
+            return self.stepAndReturn(ParsedBinaryOperations.EQ)
         elif self.current_type() == TokenTypes.NE:
-            return self.stepAndReturn(BinaryOperations.NE)
+            return self.stepAndReturn(ParsedBinaryOperations.NE)
         elif self.current_type() == TokenTypes.LT:
-            return self.stepAndReturn(BinaryOperations.LT)
+            return self.stepAndReturn(ParsedBinaryOperations.LT)
         elif self.current_type() == TokenTypes.LTE:
-            return self.stepAndReturn(BinaryOperations.LTE)
+            return self.stepAndReturn(ParsedBinaryOperations.LTE)
         elif self.current_type() == TokenTypes.GT:
-            return self.stepAndReturn(BinaryOperations.GT)
+            return self.stepAndReturn(ParsedBinaryOperations.GT)
         elif self.current_type() == TokenTypes.GTE:
-            return self.stepAndReturn(BinaryOperations.GTE)
+            return self.stepAndReturn(ParsedBinaryOperations.GTE)
         else:
             return None
 
-    def binary_op_precedence(self, op: BinaryOperations) -> int:
-        if op == BinaryOperations.Add:
+    def binary_op_precedence(self, op: ParsedBinaryOperations) -> int:
+        if op == ParsedBinaryOperations.Add:
             return 3
-        elif op == BinaryOperations.Subtract:
+        elif op == ParsedBinaryOperations.Subtract:
             return 3
-        elif op == BinaryOperations.Multiply:
+        elif op == ParsedBinaryOperations.Multiply:
             return 4
-        elif op == BinaryOperations.EQ:
+        elif op == ParsedBinaryOperations.EQ:
             return 1
-        elif op == BinaryOperations.NE:
+        elif op == ParsedBinaryOperations.NE:
             return 1
-        elif op == BinaryOperations.LT:
+        elif op == ParsedBinaryOperations.LT:
             return 2
-        elif op == BinaryOperations.LTE:
+        elif op == ParsedBinaryOperations.LTE:
             return 2
-        elif op == BinaryOperations.GT:
+        elif op == ParsedBinaryOperations.GT:
             return 2
-        elif op == BinaryOperations.GTE:
+        elif op == ParsedBinaryOperations.GTE:
             return 2
         else:
             raise Exception(f"unexhaustive match, got {op}")
 
-    def parse_unary(self) -> Expr:
+    def parse_unary(self) -> ParsedExpr:
         if not self.done() and self.current_type() == TokenTypes.KwIkke:
             self.step()
-            return Unary(self.parse_unary(), UnaryOperations.Not)
+            return ParsedUnary(self.parse_unary(), ParsedUnaryOperations.Not)
         else:
             return self.parse_call()
 
-    def parse_call(self) -> Expr:
+    def parse_call(self) -> ParsedExpr:
         subject = self.parse_indexing()
         if not self.done() and self.current_type() == TokenTypes.LParen:
             self.step()
-            args: List[Expr] = []
+            args: List[ParsedExpr] = []
             if self.current_type() not in [TokenTypes.RParen, TokenTypes.Comma]:
                 args.append(self.parse_expr())
                 while self.current_type() == TokenTypes.Comma:
@@ -651,33 +666,33 @@ class Parser:
                     args.append(self.parse_expr())
             self.expect(TokenTypes.RParen)
             self.step()
-            return Call(subject, args)
+            return ParsedCall(subject, args)
         else:
             return subject
 
-    def parse_indexing(self) -> Expr:
+    def parse_indexing(self) -> ParsedExpr:
         subject = self.parse_accessing()
         if not self.done() and self.current_type() == TokenTypes.LBracket:
             self.step()
             value = self.parse_expr()
             self.expect(TokenTypes.RBracket)
             self.step()
-            return Indexing(subject, value)
+            return ParsedIndexing(subject, value)
         else:
             return subject
 
-    def parse_accessing(self) -> Expr:
+    def parse_accessing(self) -> ParsedExpr:
         subject = self.parse_group()
         if not self.done() and self.current_type() == TokenTypes.Dot:
             self.step()
             self.expect(TokenTypes.Id)
             value = self.current().value
             self.step()
-            return Accessing(subject, value)
+            return ParsedAccessing(subject, value)
         else:
             return subject
 
-    def parse_group(self) -> Expr:
+    def parse_group(self) -> ParsedExpr:
         if not self.done() and self.current_type() == TokenTypes.LParen:
             self.step()
             expr = self.parse_expr()
@@ -686,22 +701,22 @@ class Parser:
             return expr
         return self.parse_value()
 
-    def parse_value(self) -> Expr:
+    def parse_value(self) -> ParsedExpr:
         if self.done():
             raise Exception(f"expected value")
         elif self.current_type() == TokenTypes.Id:
-            return self.stepAndReturn(Id(self.current().value))
+            return self.stepAndReturn(ParsedId(self.current().value))
         elif self.current_type() == TokenTypes.Int:
-            return self.stepAndReturn(Int(int(self.current().value)))
+            return self.stepAndReturn(ParsedInt(int(self.current().value)))
         elif self.current_type() == TokenTypes.Float:
-            return self.stepAndReturn(Float(float(self.current().value)))
+            return self.stepAndReturn(ParsedFloat(float(self.current().value)))
         elif self.current_type() == TokenTypes.Char:
-            return self.stepAndReturn(Char(self.current().value))
+            return self.stepAndReturn(ParsedChar(self.current().value))
         elif self.current_type() == TokenTypes.String:
-            return self.stepAndReturn(String(self.current().value))
+            return self.stepAndReturn(ParsedString(self.current().value))
         elif self.current_type() == TokenTypes.KwFalsk:
-            return self.stepAndReturn(Bool(False))
+            return self.stepAndReturn(ParsedBool(False))
         elif self.current_type() == TokenTypes.KwSand:
-            return self.stepAndReturn(Bool(True))
+            return self.stepAndReturn(ParsedBool(True))
         else:
             raise Exception(f"expected value, got {self.current()}")

@@ -2,33 +2,33 @@ from __future__ import annotations
 from enum import Enum, auto
 from typing import Dict, List, Tuple, cast
 from parser_ import (
-    StatementType,
-    Statement,
-    ExprStatement,
-    Let,
-    If,
-    While,
-    Return,
-    ExprType,
-    Expr,
-    Func,
-    Id,
-    Int,
-    Float,
-    Char,
-    String,
-    Bool,
-    Array,
-    Object,
-    Accessing,
-    Indexing,
-    Call,
-    UnaryOperations,
-    Unary,
-    BinaryOperations,
-    Binary,
-    AssignOperations,
-    Assign,
+    ParsedStatementTypes,
+    ParsedStatement,
+    ParsedExprStatement,
+    ParsedLet,
+    ParsedIf,
+    ParsedWhile,
+    ParsedReturn,
+    ParsedExprTypes,
+    ParsedExpr,
+    ParsedFunc,
+    ParsedId,
+    ParsedInt,
+    ParsedFloat,
+    ParsedChar,
+    ParsedString,
+    ParsedBool,
+    ParsedArray,
+    ParsedObject,
+    ParsedAccessing,
+    ParsedIndexing,
+    ParsedCall,
+    ParsedUnaryOperations,
+    ParsedUnary,
+    ParsedBinaryOperations,
+    ParsedBinary,
+    ParsedAssignOperations,
+    ParsedAssign,
 )
 
 
@@ -41,12 +41,12 @@ class GlobalTableBuilder:
     def __init__(self) -> None:
         self.indices: Dict[str, int] = {}
 
-    def declare_let_at(self, i: int, node: Let) -> None:
+    def declare_let_at(self, i: int, node: ParsedLet) -> None:
         if node.subject in self.indices:
             raise Exception(f'multiple definitions of symbol "{node.subject}"')
         self.indices[node.subject] = i
 
-    def declare_func_at(self, i: int, node: Func) -> None:
+    def declare_func_at(self, i: int, node: ParsedFunc) -> None:
         if node.subject in self.indices:
             raise Exception(f'multiple definitions of symbol "{node.subject}"')
         self.indices[node.subject] = i
@@ -55,41 +55,41 @@ class GlobalTableBuilder:
         return GlobalTable(self.indices)
 
 
-def build_global_table(ast: List[Statement]) -> GlobalTable:
+def build_global_table(ast: List[ParsedStatement]) -> GlobalTable:
     table = GlobalTableBuilder()
     for i, statement in enumerate(ast):
-        if statement.statement_type() == StatementType.Let:
-            table.declare_let_at(i, cast(Let, statement))
-        elif statement.statement_type() == StatementType.Func:
-            table.declare_func_at(i, cast(Func, statement))
+        if statement.statement_type() == ParsedStatementTypes.Let:
+            table.declare_let_at(i, cast(ParsedLet, statement))
+        elif statement.statement_type() == ParsedStatementTypes.Func:
+            table.declare_func_at(i, cast(ParsedFunc, statement))
     return table.build()
 
 
-def generate_program(ast: List[Statement]) -> str:
+def generate_program(ast: List[ParsedStatement]) -> str:
     global_table = build_global_table(ast)
     return "int main(){*((int*)0)=0;}"
 
 
 def generate_top_level_statements(
-    nodes: List[Statement], global_table: GlobalTable
+    nodes: List[ParsedStatement], global_table: GlobalTable
 ) -> str:
     return "\n\n".join(
         [generate_top_level_statement(node, global_table) for node in nodes]
     )
 
 
-def generate_top_level_statement(node: Statement, global_table: GlobalTable) -> str:
-    if node.statement_type() == StatementType.Let:
-        return generate_top_level_let(cast(Let, node), global_table)
-    elif node.statement_type() == StatementType.Func:
-        return generate_top_level_func(cast(Func, node), global_table)
+def generate_top_level_statement(node: ParsedStatement, global_table: GlobalTable) -> str:
+    if node.statement_type() == ParsedStatementTypes.Let:
+        return generate_top_level_let(cast(ParsedLet, node), global_table)
+    elif node.statement_type() == ParsedStatementTypes.Func:
+        return generate_top_level_func(cast(ParsedFunc, node), global_table)
     else:
         raise Exception(
             f"statement type {node.statement_type()} not allowed in top level"
         )
 
 
-def generate_top_level_let(node: Let, global_table: GlobalTable) -> str:
+def generate_top_level_let(node: ParsedLet, global_table: GlobalTable) -> str:
     raise NotImplementedError()
 
 class TypeType(Enum):
@@ -135,5 +135,5 @@ class LocalTable:
         if name in self.local_table and self.local_table[name].scopedepth == self.depth:
             raise Exception(f'multiple definitions of local "{name}"')
 
-def generate_top_level_func(node: Func, global_table: GlobalTable) -> str:
+def generate_top_level_func(node: ParsedFunc, global_table: GlobalTable) -> str:
 
