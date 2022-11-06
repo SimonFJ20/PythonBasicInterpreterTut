@@ -1,5 +1,5 @@
 from __future__ import annotations
-from parser_ import Parser, statements_to_string
+from parser_ import Parser, parsed_statements_to_string
 from tokenizer import tokenize
 
 
@@ -13,7 +13,7 @@ def main() -> None:
             print(token)
         ast = parser.parse_statements()
         print("=== AST ===")
-        print(statements_to_string(ast))
+        print(parsed_statements_to_string(ast))
 
 
 if __name__ == "__main__":

@@ -1,16 +1,17 @@
 KOMMENTER
-funktion hello(a, b)
+funktion hello(a: heltal, b: heltal) -> heltal
     tilbagesend a + b
 slut
+FÆRDIG
 
 hvis a == 4 så
     print("hello world\n")
 ellers
-    let b = "bruh moment"
-    let c = 4
+    lad b: text = "bruh moment"
+    lad c: heltal = 4
     hello(3, c)
 slut
-FÆRDIG
+
 
 mens a <= 4 så
     tilbagesend

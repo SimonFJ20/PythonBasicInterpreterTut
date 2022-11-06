@@ -30,6 +30,7 @@ class TokenTypes(Enum):
     Dot = auto()
     Comma = auto()
     Colon = auto()
+    ThinArrow = auto()
     Semicolon = auto()
     Plus = auto()
     Minus = auto()
@@ -227,6 +228,9 @@ def tokenize(text: str) -> List[Token]:
         elif chars_match(text[i:], ":"):
             tokens.append(Token(TokenTypes.Colon, text[i], line))
             i += 1
+        elif chars_match(text[i:], "->"):
+            tokens.append(Token(TokenTypes.ThinArrow, text[i : i + 2], line))
+            i += 2
         elif chars_match(text[i:], ";"):
             tokens.append(Token(TokenTypes.Semicolon, text[i], line))
             i += 1

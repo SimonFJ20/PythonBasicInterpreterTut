@@ -25,7 +25,7 @@ class ParsedStatement:
         raise NotImplementedError()
 
 
-def statements_to_string(statements: List[ParsedStatement]) -> str:
+def parsed_statements_to_string(statements: List[ParsedStatement]) -> str:
     statements_ = "\n".join(str(statement) for statement in statements)
     return f"[ {statements_} ]"
 
@@ -43,9 +43,10 @@ class ParsedExprStatement(ParsedStatement):
 
 
 class ParsedLet(ParsedStatement):
-    def __init__(self, subject: str, value: ParsedExpr) -> None:
+    def __init__(self, subject: str, value_type: ParsedType, value: ParsedExpr) -> None:
         super().__init__()
         self.subject = subject
+        self.value_type = value_type
         self.value = value
 
     def statement_type(self) -> ParsedStatementTypes:
@@ -103,20 +104,30 @@ class ParsedBreak(ParsedStatement):
 
 class ParsedFunc(ParsedStatement):
     def __init__(
-        self, subject: str, args: List[str], body: List[ParsedStatement]
+        self,
+        subject: str,
+        params: List[ParsedParam],
+        return_type: ParsedType,
+        body: List[ParsedStatement],
     ) -> None:
         super().__init__()
         self.subject = subject
-        self.args = args
+        self.params = params
+        self.return_type = return_type
         self.body = body
 
     def statement_type(self) -> ParsedStatementTypes:
         return ParsedStatementTypes.While
 
     def __str__(self) -> str:
-        args = ", ".join(f'"{arg}"' for arg in self.args)
+        params = ", ".join(str(param) for param in self.params)
         body = ", ".join(str(statement) for statement in self.body)
-        return f"Func {{ subject: {self.subject}, args: [ {args} ], body: [ {body} ] }}"
+        return f"""Func {{
+            subject: {self.subject},
+            params: [ {params} ],
+            return_type: {self.return_type},
+            body: [ {body} ]
+        }}"""
 
 
 class ParsedReturn(ParsedStatement):
@@ -129,6 +140,42 @@ class ParsedReturn(ParsedStatement):
 
     def __str__(self) -> str:
         return f"Return {{ value: {self.value} }}"
+
+
+class ParsedTypeTypes(Enum):
+    Id = auto()
+
+
+class ParsedParam:
+    def __init__(self, subject: str, value_type: ParsedType) -> None:
+        self.subject = subject
+        self.value_type = value_type
+
+    def __str__(self) -> str:
+        return f"Param {{ subject: {self.subject}, value_type: {self.value_type} }}"
+
+
+class ParsedType:
+    def __init__(self) -> None:
+        pass
+
+    def type_type(self) -> ParsedTypeTypes:
+        raise NotImplementedError()
+
+    def __str__(self) -> str:
+        raise NotImplementedError()
+
+
+class ParsedIdType(ParsedType):
+    def __init__(self, value: str) -> None:
+        super().__init__()
+        self.value = value
+
+    def type_type(self) -> ParsedTypeTypes:
+        return ParsedTypeTypes.Id
+
+    def __str__(self) -> str:
+        return f'IdType {{ value: "{self.value}" }}'
 
 
 class ParsedExprTypes(Enum):
@@ -429,21 +476,28 @@ class Parser:
         self.step()
         self.expect(TokenTypes.LParen)
         self.step()
-        args: List[str] = []
+        params: List[ParsedParam] = []
         while not self.done() and self.current_type() != TokenTypes.RParen:
             self.expect(TokenTypes.Id)
-            args.append(self.current().value)
+            value = self.current().value
             self.step()
+            self.expect(TokenTypes.Colon)
+            self.step()
+            value_type = self.parse_type()
+            params.append(ParsedParam(value, value_type))
             if self.current_type() == TokenTypes.Comma:
                 self.step()
             else:
                 break
         self.expect(TokenTypes.RParen)
         self.step()
+        self.expect(TokenTypes.ThinArrow)
+        self.step()
+        return_type = self.parse_type()
         body = self.parse_statements()
         self.expect(TokenTypes.KwSlut)
         self.step()
-        return ParsedFunc(subject, args, body)
+        return ParsedFunc(subject, params, return_type, body)
 
     def parse_return(self) -> ParsedReturn:
         self.step()
@@ -502,13 +556,24 @@ class Parser:
         self.expect(TokenTypes.Id)
         subject = self.current().value
         self.step()
+        self.expect(TokenTypes.Colon)
+        self.step()
+        value_type = self.parse_type()
         self.expect(TokenTypes.Assign)
         self.step()
         value = self.parse_expr()
-        return ParsedLet(subject, value)
+        return ParsedLet(subject, value_type, value)
 
     def parse_expr_statement(self) -> ParsedExprStatement:
         return ParsedExprStatement(self.parse_expr())
+
+    def parse_type(self) -> ParsedType:
+        if self.current_type() == TokenTypes.Id:
+            value = self.current().value
+            self.step()
+            return ParsedIdType(value)
+        else:
+            raise Exception(f"expected type, got {self.current()}")
 
     def parse_expr(self) -> ParsedExpr:
         if self.current_type() == TokenTypes.LBrace:
