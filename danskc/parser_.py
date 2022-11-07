@@ -96,7 +96,7 @@ class ParsedBreak(ParsedStatement):
         super().__init__()
 
     def statement_type(self) -> ParsedStatementTypes:
-        return ParsedStatementTypes.While
+        return ParsedStatementTypes.Break
 
     def __str__(self) -> str:
         return f"Break"
@@ -117,7 +117,7 @@ class ParsedFunc(ParsedStatement):
         self.body = body
 
     def statement_type(self) -> ParsedStatementTypes:
-        return ParsedStatementTypes.While
+        return ParsedStatementTypes.Func
 
     def __str__(self) -> str:
         params = ", ".join(str(param) for param in self.params)
@@ -136,7 +136,7 @@ class ParsedReturn(ParsedStatement):
         self.value = value
 
     def statement_type(self) -> ParsedStatementTypes:
-        return ParsedStatementTypes.Expr
+        return ParsedStatementTypes.Return
 
     def __str__(self) -> str:
         return f"Return {{ value: {self.value} }}"
