@@ -2,7 +2,6 @@ KOMMENTER
 funktion hello(a: heltal, b: heltal) -> heltal
     tilbagesend a + b
 slut
-FÆRDIG
 
 hvis a == 4 så
     print("hello world\n")
@@ -15,4 +14,15 @@ slut
 
 mens a <= 4 så
     tilbagesend
+slut
+FÆRDIG
+
+
+funktion test() -> heltal
+    tilbagesend 1
+slut
+
+funktion main() -> heltal
+    test()
+    tilbagesend 0
 slut

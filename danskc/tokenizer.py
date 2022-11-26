@@ -60,7 +60,6 @@ def chars_match(pool: str, matcher: str) -> bool:
     if len(pool) < len(matcher):
         return False
     for i, v in enumerate(matcher):
-        print(f"'{pool[i]}' == '{v}' == {pool[i] == v}, {ord(pool[i])} {ord(v)}")
         if pool[i] != v:
             return False
     return True
@@ -75,7 +74,6 @@ def tokenize(text: str) -> List[Token]:
     i = 0
     line = 1
     while i < len(text):
-        # print('"' + text[i:i+2] + '"', chars_match(text[i:], "så"), text[i:i+2] == "sǻ")
         if text[i] in " \t\r\n":
             if text[i] == "\n":
                 line += 1

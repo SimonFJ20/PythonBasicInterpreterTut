@@ -262,18 +262,22 @@ class CheckedExpr:
     def expr_type(self) -> CheckedExprTypes:
         raise NotImplementedError()
 
-    def value_type(self) -> CheckedType:
+    def expr_value_type(self) -> CheckedType:
         raise NotImplementedError()
 
 
 class CheckedId(CheckedExpr):
-    def __init__(self, value: str, symbol_id: int) -> None:
+    def __init__(self, value: str, symbol_id: int, value_type: CheckedType) -> None:
         super().__init__()
         self.value = value
         self.symbol_id = symbol_id
+        self.value_type = value_type
 
     def expr_type(self) -> CheckedExprTypes:
         return CheckedExprTypes.Id
+
+    def expr_value_type(self) -> CheckedType:
+        return self.value_type
 
 
 class CheckedInt(CheckedExpr):
@@ -284,6 +288,9 @@ class CheckedInt(CheckedExpr):
     def expr_type(self) -> CheckedExprTypes:
         return CheckedExprTypes.Int
 
+    def expr_value_type(self) -> CheckedType:
+        return CheckedIntType()
+
 
 class CheckedFloat(CheckedExpr):
     def __init__(self, value: float) -> None:
@@ -292,6 +299,9 @@ class CheckedFloat(CheckedExpr):
 
     def expr_type(self) -> CheckedExprTypes:
         return CheckedExprTypes.Float
+
+    def expr_value_type(self) -> CheckedType:
+        return CheckedFloatType()
 
 
 class CheckedChar(CheckedExpr):
@@ -302,6 +312,9 @@ class CheckedChar(CheckedExpr):
     def expr_type(self) -> CheckedExprTypes:
         return CheckedExprTypes.Char
 
+    def expr_value_type(self) -> CheckedType:
+        return CheckedCharType()
+
 
 class CheckedString(CheckedExpr):
     def __init__(self, value: str) -> None:
@@ -310,6 +323,9 @@ class CheckedString(CheckedExpr):
 
     def expr_type(self) -> CheckedExprTypes:
         return CheckedExprTypes.String
+
+    def expr_value_type(self) -> CheckedType:
+        return CheckedStringType()
 
 
 class CheckedBool(CheckedExpr):
@@ -320,6 +336,9 @@ class CheckedBool(CheckedExpr):
     def expr_type(self) -> CheckedExprTypes:
         return CheckedExprTypes.Bool
 
+    def expr_value_type(self) -> CheckedType:
+        return CheckedBoolType()
+
 
 class CheckedArray(CheckedExpr):
     def __init__(self, values: List[CheckedExpr], value_type: CheckedArrayType) -> None:
@@ -329,6 +348,9 @@ class CheckedArray(CheckedExpr):
 
     def expr_type(self) -> CheckedExprTypes:
         return CheckedExprTypes.Array
+
+    def expr_value_type(self) -> CheckedType:
+        return self.value_type
 
 
 class CheckedObject(CheckedExpr):
@@ -343,6 +365,9 @@ class CheckedObject(CheckedExpr):
 
     def expr_type(self) -> CheckedExprTypes:
         return CheckedExprTypes.Object
+
+    def expr_value_type(self) -> CheckedType:
+        return self.value_type
 
 
 class CheckedAccessing(CheckedExpr):
@@ -360,6 +385,9 @@ class CheckedAccessing(CheckedExpr):
     def expr_type(self) -> CheckedExprTypes:
         return CheckedExprTypes.Accessing
 
+    def expr_value_type(self) -> CheckedType:
+        return self.value_type
+
 
 class CheckedIndexing(CheckedExpr):
     def __init__(
@@ -376,13 +404,16 @@ class CheckedIndexing(CheckedExpr):
     def expr_type(self) -> CheckedExprTypes:
         return CheckedExprTypes.Indexing
 
+    def expr_value_type(self) -> CheckedType:
+        return self.value_type
+
 
 class CheckedCall(CheckedExpr):
     def __init__(
         self,
         subject: CheckedExpr,
         args: List[CheckedExpr],
-        value_type: CheckedObjectType,
+        value_type: CheckedType,
     ) -> None:
         super().__init__()
         self.subject = subject
@@ -391,6 +422,9 @@ class CheckedCall(CheckedExpr):
 
     def expr_type(self) -> CheckedExprTypes:
         return CheckedExprTypes.Call
+
+    def expr_value_type(self) -> CheckedType:
+        return self.value_type
 
 
 class CheckedUnaryOperations(Enum):
@@ -411,6 +445,9 @@ class CheckedUnary(CheckedExpr):
 
     def expr_type(self) -> CheckedExprTypes:
         return CheckedExprTypes.Unary
+
+    def expr_value_type(self) -> CheckedType:
+        return self.value_type
 
 
 class CheckedBinaryOperations(Enum):
@@ -442,6 +479,9 @@ class CheckedBinary(CheckedExpr):
     def expr_type(self) -> CheckedExprTypes:
         return CheckedExprTypes.Binary
 
+    def expr_value_type(self) -> CheckedType:
+        return self.value_type
+
 
 class CheckedAssignOperations(Enum):
     Assign = auto()
@@ -465,6 +505,9 @@ class CheckedAssign(CheckedExpr):
 
     def expr_type(self) -> CheckedExprTypes:
         return CheckedExprTypes.Assign
+
+    def expr_value_type(self) -> CheckedType:
+        return self.value_type
 
 
 class GlobalSymbol:
@@ -617,7 +660,9 @@ def check_top_level_statements(
             func = cast(ParsedFunc, statement)
             checked_statements.append(check_top_level_func(func, global_table))
         else:
-            raise Exception(f"statement {statement} not allowed in top level")
+            raise Exception(
+                f"statement {statement.statement_type()} not allowed in top level"
+            )
     return checked_statements
 
 
@@ -765,32 +810,100 @@ def types_compatible(a: CheckedType, b: CheckedType) -> bool:
 
 def check_expr(node: ParsedExpr, local_table: LocalTable) -> CheckedExpr:
     if node.expr_type() == ParsedExprTypes.Id:
-        pass
+        return check_id(cast(ParsedId, node), local_table)
     elif node.expr_type() == ParsedExprTypes.Int:
-        pass
+        return CheckedInt(cast(ParsedInt, node).value)
     elif node.expr_type() == ParsedExprTypes.Float:
-        pass
+        return CheckedFloat(cast(ParsedFloat, node).value)
     elif node.expr_type() == ParsedExprTypes.Char:
-        pass
+        return CheckedChar(cast(ParsedChar, node).value)
     elif node.expr_type() == ParsedExprTypes.String:
-        pass
+        return CheckedString(cast(ParsedString, node).value)
     elif node.expr_type() == ParsedExprTypes.Bool:
-        pass
+        return CheckedBool(cast(ParsedBool, node).value)
     elif node.expr_type() == ParsedExprTypes.Array:
-        pass
+        return check_array(cast(ParsedArray, node), local_table)
     elif node.expr_type() == ParsedExprTypes.Object:
-        pass
+        return check_object(cast(ParsedObject, node), local_table)
     elif node.expr_type() == ParsedExprTypes.Accessing:
-        pass
+        return check_accessing(cast(ParsedAccessing, node), local_table)
     elif node.expr_type() == ParsedExprTypes.Indexing:
-        pass
+        return check_indexing(cast(ParsedIndexing, node), local_table)
     elif node.expr_type() == ParsedExprTypes.Call:
-        pass
+        return check_call(cast(ParsedCall, node), local_table)
     elif node.expr_type() == ParsedExprTypes.Unary:
-        pass
+        return check_unary(cast(ParsedUnary, node), local_table)
     elif node.expr_type() == ParsedExprTypes.Binary:
-        pass
+        return check_binary(cast(ParsedBinary, node), local_table)
     elif node.expr_type() == ParsedExprTypes.Assign:
-        pass
+        return check_assign(cast(ParsedAssign, node), local_table)
     else:
         raise Exception(f"unknown expression {node.expr_type()}")
+
+
+def check_id(node: ParsedId, local_table: LocalTable) -> CheckedId:
+    raise NotImplementedError()
+
+
+def check_array(node: ParsedArray, local_table: LocalTable) -> CheckedArray:
+    checked_values = [check_expr(value, local_table) for value in node.values]
+    if len(checked_values) == 0:
+        raise Exception("empty arrays are unimplemented")
+    return CheckedArray(
+        checked_values, CheckedArrayType(checked_values[0].expr_value_type())
+    )
+
+
+def check_object(node: ParsedObject, local_table: LocalTable) -> CheckedObject:
+    used_keys: List[str] = []
+    checked_values: List[Tuple[str, CheckedExpr]] = []
+    checked_params: List[CheckedParam] = []
+    for (key, value) in node.values:
+        if key in used_keys:
+            raise Exception("cannot reuse key in object")
+        used_keys.append(key)
+        checked_value = check_expr(value, local_table)
+        checked_values.append((key, checked_value))
+        checked_params.append(CheckedParam(key, checked_value.expr_value_type()))
+    return CheckedObject(checked_values, CheckedObjectType(checked_params))
+
+
+def check_accessing(node: ParsedAccessing, local_table: LocalTable) -> CheckedAccessing:
+    raise NotImplementedError()
+
+
+def check_indexing(node: ParsedIndexing, local_table: LocalTable) -> CheckedIndexing:
+    raise NotImplementedError()
+
+
+def check_call(node: ParsedCall, local_table: LocalTable) -> CheckedCall:
+    checked_subject = check_expr(node.subject, local_table)
+    if checked_subject.expr_value_type().type_type() != CheckedTypeTypes.Func:
+        raise Exception("expression is not callable")
+    subject_type = cast(CheckedFuncType, checked_subject.expr_type())
+    checked_args = [check_expr(arg, local_table) for arg in node.args]
+    if len(subject_type.params) != len(checked_args):
+        raise Exception("wrong number of arguments")
+    for i in range(len(subject_type.params)):
+        if (
+            checked_args[i].expr_value_type().type_type()
+            != subject_type.params[i].value_type.type_type()
+        ):
+            raise Exception(f"argument nr. {i + 1} is invalid")
+    return CheckedCall(
+        checked_subject,
+        checked_args,
+        subject_type.return_type,
+    )
+
+
+def check_unary(node: ParsedUnary, local_table: LocalTable) -> CheckedUnary:
+    raise NotImplementedError()
+
+
+def check_binary(node: ParsedBinary, local_table: LocalTable) -> CheckedBinary:
+    raise NotImplementedError()
+
+
+def check_assign(node: ParsedAssign, local_table: LocalTable) -> CheckedAssign:
+    raise NotImplementedError()
