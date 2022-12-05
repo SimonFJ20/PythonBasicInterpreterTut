@@ -1,0 +1,503 @@
+From 2dcf65aeb81bbc4f21f624416844aa076d7031bf Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Wed, 22 Jun 2022 02:34:45 +0200
+Subject: [PATCH] weak af typing
+
+---
+ ast.ts          |  96 +++++++++++++++++++++++++--
+ compile_to_c.ts | 172 ++++++++++++++++++++++++++++++++++++++++++++++++
+ grammar.ne      | 122 ++++++++++++++++++++++++++--------
+ main.ts         |   5 +-
+ test.splang     |   7 +-
+ 5 files changed, 365 insertions(+), 37 deletions(-)
+ create mode 100644 compile_to_c.ts
+
+diff --git a/ast.ts b/ast.ts
+index a2a4096..a3dac44 100644
+--- a/ast.ts
++++ b/ast.ts
+@@ -2,7 +2,81 @@ export abstract class Node {
+     protected constructor(public id: string) {}
+ }
+ 
+-export abstract class Expression extends Node {}
++export abstract class Statement extends Node {}
++
++export class Block extends Statement {
++    public constructor(public body: Statement[]) {
++        super("Block");
++    }
++}
++
++export class ConstDeclaration extends Statement {
++    public constructor(public target: Argument, public value: Expression) {
++        super("ConstDeclaration");
++    }
++}
++
++export class LetDeclaration extends Statement {
++    public constructor(public target: Argument, public value: Expression) {
++        super("LetDeclaration");
++    }
++}
++
++export class If extends Statement {
++    public constructor(public condition: Expression, public body: Statement) {
++        super("If");
++    }
++}
++
++export class IfElse extends Statement {
++    public constructor(
++        public condition: Expression,
++        public truhty: Statement,
++        public falsy: Statement,
++    ) {
++        super("IfElse");
++    }
++}
++
++export class While extends Statement {
++    public constructor(public condition: Expression, public body: Statement) {
++        super("While");
++    }
++}
++
++export abstract class Type extends Statement {}
++
++export class IntType extends Type {
++    public constructor() {
++        super("IntType");
++    }
++}
++
++export class StringType extends Type {
++    public constructor() {
++        super("StringType");
++    }
++}
++
++export class FunctionType extends Type {
++    public constructor() {
++        super("FunctionType");
++    }
++}
++
++export abstract class Expression extends Statement {}
++
++export class Function extends Expression {
++    public constructor(public args: Argument[], public body: Statement) {
++        super("Function");
++    }
++}
++
++export class Argument extends Node {
++    public constructor(public name: string, public type: Type) {
++        super("Argument");
++    }
++}
+ 
+ export enum OperationType {
+     Add,
+@@ -22,16 +96,28 @@ export class BinaryOperation extends Expression {
+     }
+ }
+ 
++export class Call extends Expression {
++    public constructor(public callee: Expression, public args: Expression[]) {
++        super("Call");
++    }
++}
++
+ export abstract class Value extends Expression {}
+ 
++export class Int extends Value {
++    public constructor(public value: number) {
++        super("Int");
++    }
++}
++
+ export class String extends Value {
+     public constructor(public value: string) {
+-        super("Value");
++        super("String");
+     }
+ }
+ 
+-export class Int extends Value {
+-    public constructor(public value: number) {
+-        super("Int");
++export class Accessor extends Value {
++    public constructor(public name: string) {
++        super("Accessor");
+     }
+ }
+diff --git a/compile_to_c.ts b/compile_to_c.ts
+new file mode 100644
+index 0000000..adb0aa0
+--- /dev/null
++++ b/compile_to_c.ts
+@@ -0,0 +1,172 @@
++import * as ast from "./ast.ts";
++
++export const compileToC = (program: ast.Statement[]): string => {
++    const symbolTable = new Checker().checkProgram(program);
++    console.log(JSON.stringify(symbolTable, null, 4));
++    return "";
++};
++
++type ValueType = "int" | "string" | "function";
++
++type Symbol = {
++    type: ValueType;
++};
++
++class SymbolTable {
++    private names: { [key: string]: Symbol } = {};
++    private functions: ast.Function[] = [];
++
++    public constructor(private parent?: SymbolTable) {}
++
++    public setName(name: string, symbol: Symbol) {
++        this.names[name] = symbol;
++    }
++
++    public getName(name: string): Symbol {
++        const localName = this.names[name];
++        if (localName) return localName;
++        else if (this.parent) return this.parent.getName(name);
++        else throw new Error(`name '${name}' is not defined`);
++    }
++
++    public nameDefinedLocally(name: string): boolean {
++        return this.names[name] !== undefined;
++    }
++
++    public nameDefined(name: string): boolean {
++        return (
++            this.nameDefinedLocally(name) ||
++            (this.parent?.nameDefined(name) ?? false)
++        );
++    }
++
++    public addFunction(node: ast.Function) {
++        this.functions.push(node);
++    }
++}
++
++class Checker {
++    private symbolTable: SymbolTable = new SymbolTable();
++
++    public constructor() {}
++
++    public checkProgram(program: ast.Statement[]): SymbolTable {
++        this.symbolTable = new SymbolTable();
++        this.checkStatements(program);
++        return this.symbolTable;
++    }
++
++    private checkStatements(nodes: ast.Statement[]) {
++        nodes.forEach((node) => this.checkStatement(node));
++    }
++
++    private checkStatement(node: ast.Statement) {
++        switch (node.id) {
++            case "Block":
++                return this.checkBlock(force(node));
++            case "ConstDeclaration":
++                return this.checkConstDeclaration(force(node));
++            case "BinaryOperation":
++            case "Call":
++                return this.checkExpression(node);
++            default:
++                throw new Error(`unchecked statement '${node.id}'`);
++        }
++    }
++
++    private checkBlock(node: ast.Block) {
++        const parentTable = this.symbolTable;
++        this.symbolTable = new SymbolTable(parentTable);
++        this.checkStatements(node.body);
++        this.symbolTable = parentTable;
++    }
++
++    private checkConstDeclaration(node: ast.ConstDeclaration) {
++        if (this.symbolTable.nameDefinedLocally(node.target.name))
++            throw new Error(`multiple definition of ${node.target.name}`);
++        const type = this.checkExpression(node.value);
++        this.symbolTable.setName(node.target.name, { type });
++    }
++
++    private checkType(node: ast.Type): ValueType {
++        switch (node.id) {
++            case "IntType":
++                return "int";
++            default:
++                throw new Error(`unchecked type '${node.id}'`);
++        }
++    }
++
++    private checkExpression(node: ast.Expression): ValueType {
++        switch (node.id) {
++            case "Function":
++                return this.checkFunction(force(node));
++            case "BinaryOperation":
++                return this.checkBinaryOperation(force(node));
++            case "Call":
++                return this.checkCall(force(node));
++            case "Accessor":
++                return this.checkAccessor(force(node));
++            case "Int":
++                return "int";
++            default:
++                throw new Error(`unchecked expression '${node.id}'`);
++        }
++    }
++
++    private checkFunction(node: ast.Function): ValueType {
++        const parentTable = this.symbolTable;
++        this.symbolTable = new SymbolTable(parentTable);
++        node.args.forEach((arg) => {
++            if (this.symbolTable.nameDefinedLocally(arg.name))
++                throw new Error("already defined");
++            this.symbolTable.setName(arg.name, {
++                type: this.checkType(arg.type),
++            });
++        });
++        this.checkStatement(node.body);
++        this.symbolTable = parentTable;
++        this.symbolTable.addFunction(node);
++        return "function";
++    }
++
++    private checkBinaryOperation(node: ast.BinaryOperation): ValueType {
++        const leftType = this.checkExpression(node.left);
++        const rightType = this.checkExpression(node.right);
++        switch (node.operation) {
++            case ast.OperationType.Add:
++                if (leftType === "int" && rightType !== "int") {
++                    throw new Error("type mismatch");
++                } else if (leftType === "string" && rightType !== "string") {
++                    throw new Error("type mismatch");
++                }
++                break;
++            case ast.OperationType.Subtract:
++            case ast.OperationType.Multiply:
++            case ast.OperationType.Divide:
++            case ast.OperationType.Modulus:
++                if (leftType !== "int" || rightType !== "int") {
++                    throw new Error(
++                        `type mismatch '${leftType}' and '${rightType}'`,
++                    );
++                }
++        }
++        return leftType;
++    }
++
++    private checkCall(node: ast.Call): ValueType {
++        const calleeType = this.checkExpression(node.callee);
++        if (calleeType !== "function")
++            throw new Error(`cannot call type '${calleeType}'`);
++        return "int";
++    }
++
++    private checkAccessor(node: ast.Accessor): ValueType {
++        if (!this.symbolTable.nameDefined(node.name))
++            throw new Error(`undefined symbol '${node.name}'`);
++        const symbol = this.symbolTable.getName(node.name);
++        return symbol.type;
++    }
++}
++
++const force = <T extends U, U>(v: U) => v as unknown as T;
+diff --git a/grammar.ne b/grammar.ne
+index 0fdf31c..b0df1d5 100644
+--- a/grammar.ne
++++ b/grammar.ne
+@@ -2,13 +2,7 @@
+ 
+ @{%
+ import moo from "https://deno.land/x/moo@0.5.1.1/index.ts";
+-import {
+-    Expression,
+-    OperationType,
+-    BinaryOperation,
+-    String,
+-    Int,
+-} from './ast.ts'
++import * as ast from './ast.ts'
+ const lexer = moo.compile({
+     nl:         {match: /[\n;]+/, lineBreaks: true},
+     ws:         /[ \t]+/,
+@@ -20,7 +14,7 @@ const lexer = moo.compile({
+     char:       {match: /'(?:[^'\\]|\\[\s\S])'/, value: s => s.slice(1, -1), lineBreaks: true},
+     string:     {match: /"(?:[^"\\]|\\[\s\S])*"/, value: s => s.slice(1, -1), lineBreaks: true},
+     name:       {match: /[a-zA-Z0-9_]+/, type: moo.keywords({
+-        keyword: ['let', 'mut', 'if', 'else']
++        keyword: ['const', 'let', 'if', 'else']
+     })},
+     dot:        '.',
+ 
+@@ -74,30 +68,100 @@ const lexer = moo.compile({
+ 
+ 
+ statements  ->  (_ statement (_nl_ statement):*):? _
+-    {% v => v[0] ? [v[0][1], ...v[0][2].map((v: string) => v[1])] : [] %}
+-
+-statement   ->  expression  {% id %}
+-
+-expression  ->  add_sub     {% id %}
+-
+-add_sub     ->  add_sub _ "+" _ mul_div_mod
+-                    {% v => new BinaryOperation(OperationType.Add, v[0], v[4]) %}
+-            |   add_sub _ "-" _ mul_div_mod
+-                    {% v => new BinaryOperation(OperationType.Subtract, v[0], v[4]) %}
+-            |   mul_div_mod
+-
+-mul_div_mod ->  mul_div_mod _ "*" _ value
+-                    {% v => new BinaryOperation(OperationType.Multiply, v[0], v[4]) %}
+-            |   mul_div_mod _ "/" _ value
+-                    {% v => new BinaryOperation(OperationType.Divide, v[0], v[4]) %}
+-            |   mul_div_mod _ "%" _ value
+-                    {% v => new BinaryOperation(OperationType.Modulus, v[0], v[4]) %}
+-            |   value
++    {% v => v[0] ? [v[0][1], ...v[0][2].map((v: any) => v[1])] : [] %}
++
++statement   ->  block               {% id %}
++            |   const_declaration   {% id %}
++            |   let_declaration     {% id %}
++            |   if                  {% id %}
++            |   if_else             {% id %}
++            |   while               {% id %}
++            |   expression          {% id %}
++
++block       ->  "{" statements "}"
++                    {% v => new ast.Block(v[1]) %}
++
++const_declaration   ->  "const" __ argument _ "=" _ expression
++                            {% v => new ast.ConstDeclaration(v[2], v[6]) %}
++
++let_declaration     ->  "let" __ argument _ "=" _ expression
++                            {% v => new ast.LetDeclaration(v[2], v[6]) %}
++
++if          ->  "if" _ "(" _ expression _ ")" _ statement
++                    {% v => new ast.If(v[4], v[8]) %}
++
++if_else     ->  "if" _ "(" _ expression _ ")" _ statement _ "else" _ statement
++                    {% v => new ast.IfElse(v[4], v[8], v[12]) %}
++
++while       ->  "while" _ "(" _ expression _ ")" _ statement
++                    {% v => new ast.While(v[4], v[8]) %}
++
++expressions ->  (_ expression (_ "," _ expression):*):? _
++                    {% v => v[0] ? [v[0][1], ...v[0][2].map((v: any) => v[3])] : [] %}
++
++type        ->  "int"
++                        {% v => new ast.IntType() %}
++            |   "string"
++                        {% v => new ast.StringType() %}
++            |   "function"
++                        {% v => new ast.FunctionType() %}
++
++expression  ->  function        {% id %}
++            |   precedence_1    {% id %}
++
++function    ->  "(" arguments ")" _ block
++                    {% v => new ast.Function(v[1], v[4]) %}
++            |   "(" arguments ")" _ "=>" _ expression
++                    {% v => new ast.Function(v[1], v[6]) %}
++
++arguments   ->  (_ argument (_ "," _ argument):*):? _
++                    {% v => v[0] ? [v[0][1], ...v[0][2].map((v: any) => v[3])] : [] %}
++
++argument    ->  %name _ ":" _ type
++                    {% v => new ast.Argument(v[0].value, v[4]) %}
++
++precedence_1    ->  precedence_2    {% id %}
++precedence_2    ->  precedence_3    {% id %}
++precedence_3    ->  precedence_4    {% id %}
++precedence_4    ->  precedence_5    {% id %}
++precedence_5    ->  precedence_6    {% id %}
++precedence_6    ->  precedence_8    {% id %}
++precedence_8    ->  precedence_9    {% id %}
++precedence_9    ->  precedence_10   {% id %}
++precedence_10   ->  precedence_11   {% id %}
++precedence_11   ->  precedence_12   {% id %}
++
++precedence_12   ->  precedence_12 _ "+" _ precedence_13
++                        {% v => new ast.BinaryOperation(ast.OperationType.Add, v[0], v[4]) %}
++                |   precedence_12 _ "-" _ precedence_13
++                        {% v => new ast.BinaryOperation(ast.OperationType.Subtract, v[0], v[4]) %}
++                |   precedence_13   {% id %}
++
++precedence_13   ->  precedence_13 _ "*" _ precedence_14
++                        {% v => new ast.BinaryOperation(ast.OperationType.Multiply, v[0], v[4]) %}
++                |   precedence_13 _ "/" _ precedence_14
++                        {% v => new ast.BinaryOperation(ast.OperationType.Divide, v[0], v[4]) %}
++                |   precedence_13 _ "%" _ precedence_14
++                        {% v => new ast.BinaryOperation(ast.OperationType.Modulus, v[0], v[4]) %}
++                |   precedence_14   {% id %}
++
++precedence_14   ->  precedence_15   {% id %}
++precedence_15   ->  precedence_16   {% id %}
++precedence_16   ->  precedence_17   {% id %}
++precedence_17   ->  precedence_18   {% id %}
++
++precedence_18   ->  precedence_18 _ "(" expressions ")"
++                        {% v => new ast.Call(v[0], v[3]) %}
++                |   precedence_19   {% id %}
++
++precedence_19   ->  value           {% id %}
+ 
+ value       ->  %int
+-                    {% v => new Int(v[0].value) %}
++                    {% v => new ast.Int(v[0].value) %}
+             |   %string
+-                    {% v => new String(v[0].value) %}
++                    {% v => new ast.String(v[0].value) %}
++            |   %name
++                    {% v => new ast.Accessor(v[0].value) %}
+             |   "(" _ expression _ ")"
+                     {% v => v %} 
+ 
+diff --git a/main.ts b/main.ts
+index 1d118a1..80b09bd 100644
+--- a/main.ts
++++ b/main.ts
+@@ -2,17 +2,18 @@ import {
+     Grammar,
+     Parser,
+ } from "https://deno.land/x/nearley@2.19.7-deno/mod.ts";
++import { compileToC } from "./compile_to_c.ts";
+ import compiledGrammar from "./grammar.out.ts";
+ 
+-if (Deno.args.length < 1) throw new Error("not enough args");
+-
+ const parse = (text: string) => {
+     const parser = new Parser(Grammar.fromCompiled(compiledGrammar));
+     parser.feed(text);
+     return parser.results[0];
+ };
+ 
++if (Deno.args.length < 1) throw new Error("not enough args");
+ const text = await Deno.readTextFile(Deno.args[0]);
+ const res = parse(text);
+ 
+ console.log(JSON.stringify(res, null, "│   "));
++console.log(compileToC(res));
+diff --git a/test.splang b/test.splang
+index 8302cda..24467b5 100644
+--- a/test.splang
++++ b/test.splang
+@@ -1 +1,6 @@
+-1 + 2 * 3
+\ No newline at end of file
++
++const test: function = (hello: int) {
++    hello + 1
++}
++
++test()
+-- 
+2.25.1
+

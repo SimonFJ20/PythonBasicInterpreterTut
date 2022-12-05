@@ -1,0 +1,484 @@
+From 1eae0cda01588cb02e9f398df0ff94ed352b5fd0 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Fri, 1 Jul 2022 04:53:57 +0200
+Subject: [PATCH] some rewriting
+
+---
+ ast.ts     |   8 +-
+ checker.ts | 257 +++++++++++++++++++++++------------------------------
+ grammar.ne |  16 ++--
+ main.ts    |   1 -
+ utils.ts   |  40 +++++++++
+ 5 files changed, 162 insertions(+), 160 deletions(-)
+
+diff --git a/ast.ts b/ast.ts
+index 5866427..ebbc71e 100644
+--- a/ast.ts
++++ b/ast.ts
+@@ -11,11 +11,7 @@ export class Block extends Statement {
+ }
+ 
+ export class ConstDefinition extends Statement {
+-    public constructor(
+-        public target: Argument,
+-        public type: Type | null,
+-        public value: Expression,
+-    ) {
++    public constructor(public target: Argument, public value: Expression) {
+         super("ConstDefinition");
+     }
+ }
+@@ -23,7 +19,6 @@ export class ConstDefinition extends Statement {
+ export class LetDeclaration extends Statement {
+     public constructor(
+         public target: Argument,
+-        public type: Type | null,
+         public value: Expression | null,
+     ) {
+         super("LetDeclaration");
+@@ -85,7 +80,6 @@ export class Function extends Expression {
+         public args: Argument[],
+         public returnType: Type | null,
+         public body: Statement,
+-        public fid: number,
+     ) {
+         super("Function");
+     }
+diff --git a/checker.ts b/checker.ts
+index 1abf1db..ca2cfed 100644
+--- a/checker.ts
++++ b/checker.ts
+@@ -1,22 +1,45 @@
+ import * as ast from "./ast.ts";
+-import { idGenerator } from "./utils.ts";
+-
+-export type Type<ID extends string = string> = { id: ID };
+-export type IntType = Type<"int">;
+-export type StringType = Type<"string">;
+-export type FunctionType = Type<"function"> & {
+-    args: Type[];
+-    returnType: Type;
++import { Err, force, Ok, Result } from "./utils.ts";
++
++export abstract class Type {
++    protected constructor(public id: string) {}
++}
++
++export class IntType extends Type {
++    public constructor() {
++        super("IntType");
++    }
++}
++
++export class StringType extends Type {
++    public constructor() {
++        super("StringType");
++    }
++}
++
++export class FunctionType extends Type {
++    public constructor(public args: Type[], public returnType: Type) {
++        super("FunctionType");
++    }
++}
++
++const typesCompatible = (a: Type, b: Type) => {
++    switch (a.id) {
++        default:
++            throw new Error(
++                `typesCompatible unexhaustive '${a.id}' and '${b.id}'`,
++            );
++    }
+ };
+ 
+ export type Symbol = {
++    name: string;
+     type: Type;
+-    symbolTable: SymbolTable;
++    mutable: boolean;
+ };
+ 
+ export class SymbolTable {
+-    private names: { [key: string]: Symbol } = {};
+-    private functions: ast.Function[] = [];
++    private symbols = new Map<string, Symbol>();
+     private children: SymbolTable[] = [];
+ 
+     public constructor(private parent?: SymbolTable) {}
+@@ -25,194 +48,140 @@ export class SymbolTable {
+         this.children.push(child);
+     }
+ 
+-    public setName(name: string, symbol: Symbol) {
+-        this.names[name] = symbol;
++    public declaredLocally(name: string): boolean {
++        return this.symbols.has(name);
+     }
+ 
+-    public getName(name: string): Symbol {
+-        const localName = this.names[name];
+-        if (localName) return localName;
+-        else if (this.parent) return this.parent.getName(name);
+-        else throw new Error(`name '${name}' is not defined`);
++    public declared(name: string): boolean {
++        return (
++            this.declaredLocally(name) || (this.parent?.declared(name) ?? false)
++        );
+     }
+ 
+-    public nameDefinedLocally(name: string): boolean {
+-        return this.names[name] !== undefined;
++    public getLocally(name: string): Result<Symbol, string> {
++        const symbol = this.symbols.get(name);
++        return symbol ? Ok(symbol) : Err("cannot find symbol");
+     }
+ 
+-    public nameDefined(name: string): boolean {
+-        return (
+-            this.nameDefinedLocally(name) ||
+-            (this.parent?.nameDefined(name) ?? false)
++    public get(name: string): Result<Symbol, string> {
++        return this.getLocally(name).match(
++            (v) => Ok(v),
++            (e) => Err(e),
+         );
+     }
+ 
+-    public addFunction(node: ast.Function) {
+-        this.functions.push(node);
++    public set(symbol: Symbol) {
++        this.symbols.set(symbol.name, symbol);
+     }
+ }
+ 
+-export class CheckerError extends Error {
+-    public constructor(message: string) {
+-        super(message);
+-    }
+-}
++export type Function = {
++    node: ast.Function;
++    type: FunctionType;
++    symbolTable: SymbolTable;
++};
++
++export type CheckerError = string;
+ 
+ export type CheckerResult = {
+     symbolTable: SymbolTable;
++    functions: Function[];
+     errors: CheckerError[];
+ };
+ 
+ export class Checker {
+-    private symbolTable: SymbolTable = new SymbolTable();
+-    private errors: CheckerError[] = [];
+-
+-    public constructor() {}
++    private symbolTable!: SymbolTable;
++    private symbolTableHistory!: SymbolTable[];
++    private functions!: Function[];
++    private errors!: CheckerError[];
+ 
+     public checkProgram(program: ast.Statement[]): CheckerResult {
+         this.symbolTable = new SymbolTable();
++        this.symbolTableHistory = [];
++        this.functions = [];
++        this.errors = [];
+         this.checkStatements(program);
+         return {
+             symbolTable: this.symbolTable,
++            functions: this.functions,
+             errors: this.errors,
+         };
+     }
+ 
+-    private catchErrors<T>(f: () => T) {
+-        try {
+-            f();
+-        } catch (catched) {
+-            if (catched instanceof CheckerError) this.errors.push(catched);
+-            else throw catched;
+-        }
+-    }
+-
+-    private checkStatements(nodes: ast.Statement[]) {
+-        nodes.forEach((node) =>
+-            this.catchErrors(() => this.checkStatement(node)),
++    public checkStatements(nodes: ast.Statement[]) {
++        nodes.forEach((v) =>
++            this.checkStatement(v).match(
++                () => {},
++                (e) => {
++                    this.errors.push(e);
++                },
++            ),
+         );
+     }
+ 
+-    private checkStatement(node: ast.Statement) {
++    public checkStatement(node: ast.Statement): Result<null, CheckerError> {
+         switch (node.id) {
+-            case "Block":
+-                return this.checkBlock(force(node));
+             case "ConstDefinition":
+                 return this.checkConstDefinition(force(node));
+-            case "BinaryOperation":
+-            case "Call":
+-                return this.checkExpression(node);
+             default:
+                 throw new Error(`unchecked statement '${node.id}'`);
+         }
+     }
+ 
+-    private checkBlock(node: ast.Block) {
+-        const parentTable = this.symbolTable;
+-        this.symbolTable = new SymbolTable(parentTable);
+-        this.checkStatements(node.body);
+-        this.symbolTable = parentTable;
+-    }
+-
+-    private checkConstDefinition(node: ast.ConstDefinition) {
+-        if (this.symbolTable.nameDefinedLocally(node.target.name))
+-            throw new Error(`multiple definition of ${node.target.name}`);
+-        const type = this.checkExpression(node.value);
+-        this.symbolTable.setName(node.target.name, {
+-            type,
+-            symbolTable: this.symbolTable,
++    public checkConstDefinition(
++        node: ast.ConstDefinition,
++    ): Result<null, CheckerError> {
++        if (this.symbolTable.declaredLocally(node.target.name))
++            return Err(`multiple definitions of symbol '${node.target.name}'`);
++        const valueTypeResult = this.checkExpression(node.value);
++        if (!valueTypeResult.ok) return valueTypeResult.transform();
++        const valueType = valueTypeResult.value!;
++        if (node.target.type && !typesCompatible(node.target.type, valueType))
++            return Err("types incompatible");
++        this.symbolTable.set({
++            name: node.target.name,
++            type: valueType,
++            mutable: false,
+         });
++        return Ok(null);
+     }
+ 
+-    private checkType(node: ast.Type): Type {
+-        switch (node.id) {
+-            case "IntType":
+-                return { id: "int" };
+-            default:
+-                throw new Error(`unchecked type '${node.id}'`);
+-        }
+-    }
+-
+-    private checkExpression(node: ast.Expression): Type {
++    public checkExpression(node: ast.Expression): Result<Type, CheckerError> {
+         switch (node.id) {
+             case "Function":
+                 return this.checkFunction(force(node));
+-            case "BinaryOperation":
+-                return this.checkBinaryOperation(force(node));
+-            case "Call":
+-                return this.checkCall(force(node));
+-            case "Accessor":
+-                return this.checkAccessor(force(node));
+-            case "Int":
+-                return { id: "int" };
+             default:
+                 throw new Error(`unchecked expression '${node.id}'`);
+         }
+     }
+ 
+-    private checkFunction(node: ast.Function): Type {
+-        const parentTable = this.symbolTable;
+-        this.symbolTable = new SymbolTable(parentTable);
+-        const args = node.args.map((arg) => {
+-            if (this.symbolTable.nameDefinedLocally(arg.name))
+-                throw new Error("already defined");
+-            const type = this.checkType(arg.type);
+-            this.symbolTable.setName(arg.name, {
+-                type,
+-                symbolTable: this.symbolTable,
+-            });
+-            return type;
+-        });
+-        this.checkStatement(node.body);
+-        this.symbolTable = parentTable;
+-        this.symbolTable.addFunction(node);
+-        return {
+-            id: "function",
+-            args,
+-            returnType: node.returnType,
+-        } as FunctionType;
+-    }
+-
+-    private checkBinaryOperation(node: ast.BinaryOperation): Type {
+-        const leftType = this.checkExpression(node.left);
+-        const rightType = this.checkExpression(node.right);
+-        switch (node.operation) {
+-            case ast.OperationType.Add:
+-                if (leftType.id === "int" && rightType.id !== "int") {
+-                    throw new Error("type mismatch");
+-                } else if (
+-                    leftType.id === "string" &&
+-                    rightType.id !== "string"
+-                ) {
+-                    throw new Error("type mismatch");
+-                }
+-                break;
+-            case ast.OperationType.Subtract:
+-            case ast.OperationType.Multiply:
+-            case ast.OperationType.Divide:
+-            case ast.OperationType.Modulus:
+-                if (leftType.id !== "int" || rightType.id !== "int") {
+-                    throw new Error(
+-                        `type mismatch '${leftType}' and '${rightType}'`,
+-                    );
+-                }
++    public checkFunction(node: ast.Function): Result<Type, CheckerError> {
++        return Ok(
++            new FunctionType(
++                node.args.map((arg) => this.checkType(arg.type).unwrap()),
++                node.returnType!,
++            ),
++        );
++    }
++
++    public checkType(node: ast.Type): Result<Type, CheckerError> {
++        switch (node.id) {
++            case "IntType":
++                return Ok(new IntType());
++            default:
++                throw new Error(`unchecked type '${node.id}'`);
+         }
+-        return leftType;
+     }
+ 
+-    private checkCall(node: ast.Call): Type {
+-        const calleeType = this.checkExpression(node.callee) as FunctionType;
+-        if (calleeType.id !== "function")
+-            throw new Error(`cannot call type '${calleeType}'`);
+-        return calleeType.returnType;
++    private branchSymbolTable() {
++        this.symbolTableHistory.push(this.symbolTable);
++        this.symbolTable = new SymbolTable(this.symbolTable);
+     }
+ 
+-    private checkAccessor(node: ast.Accessor): Type {
+-        if (!this.symbolTable.nameDefined(node.name))
+-            throw new Error(`undefined symbol '${node.name}'`);
+-        const symbol = this.symbolTable.getName(node.name);
+-        return symbol.type;
++    private mergeSymbolTable() {
++        const symbolTable = this.symbolTableHistory.pop();
++        if (!symbolTable) throw new Error("no symbol table history");
++        symbolTable.addChild(this.symbolTable);
++        this.symbolTable = symbolTable;
+     }
+ }
+-
+-const force = <T extends U, U>(v: U) => v as unknown as T;
+diff --git a/grammar.ne b/grammar.ne
+index 8cefbdc..e2b9ecc 100644
+--- a/grammar.ne
++++ b/grammar.ne
+@@ -85,11 +85,11 @@ statement   ->  block               {% id %}
+ block       ->  "{" statements "}"
+                     {% v => new ast.Block(v[1]) %}
+ 
+-const_declaration   ->  "const" __ argument _ (type_specifier _):? "=" _ expression
+-                            {% v => new ast.ConstDefinition(v[2], v[4] ? v[4][0] : null, v[7]) %}
++const_declaration   ->  "const" __ argument _ "=" _ expression
++                            {% v => new ast.ConstDefinition(v[2], v[6]) %}
+ 
+-let_declaration     ->  "let" __ argument _ (type_specifier _):? ("=" _ expression):?
+-                            {% v => new ast.LetDeclaration(v[2], v[4] ? v[4][0] : null, v[5] ? v[5][2] : null) %}
++let_declaration     ->  "let" __ argument _ ("=" _ expression):?
++                            {% v => new ast.LetDeclaration(v[2], v[5] ? v[5][2] : null) %}
+ 
+ if          ->  "if" _ "(" _ expression _ ")" _ statement
+                     {% v => new ast.If(v[4], v[8]) %}
+@@ -126,15 +126,15 @@ expression  ->  function        {% id %}
+             |   precedence_1    {% id %}
+ 
+ function    ->  "(" arguments ")" _ (type_specifier _):? block
+-                    {% v => new ast.Function(v[1], v[4] ? v[4][0] : null, v[5], fid()) %}
++                    {% v => new ast.Function(v[1], v[4] ? v[4][0] : null, v[5]) %}
+             |   "(" arguments ")" _ (type_specifier _):? "=>" _ expression
+-                    {% v => new ast.Function(v[1], v[4] ? v[4][0] : null, v[7], fid()) %}
++                    {% v => new ast.Function(v[1], v[4] ? v[4][0] : null, v[7]) %}
+ 
+ arguments   ->  (_ argument (_ "," _ argument):*):? _
+                     {% v => v[0] ? [v[0][1], ...v[0][2].map((v: any) => v[3])] : [] %}
+ 
+-argument    ->  %name _ ":" _ type
+-                    {% v => new ast.Argument(v[0].value, v[4]) %}
++argument    ->  %name _ type_specifier
++                    {% v => new ast.Argument(v[0].value, v[2]) %}
+ 
+ precedence_1    ->  precedence_2    {% id %}
+ precedence_2    ->  precedence_3    {% id %}
+diff --git a/main.ts b/main.ts
+index bf013a0..5797142 100644
+--- a/main.ts
++++ b/main.ts
+@@ -4,7 +4,6 @@ import {
+ } from "https://deno.land/x/nearley@2.19.7-deno/mod.ts";
+ import { Checker } from "./checker.ts";
+ import compiledGrammar from "./grammar.out.ts";
+-import { idGenerator } from "./utils.ts";
+ 
+ const parse = (text: string) => {
+     const parser = new Parser(Grammar.fromCompiled(compiledGrammar));
+diff --git a/utils.ts b/utils.ts
+index 7ae7f3a..97deb6d 100644
+--- a/utils.ts
++++ b/utils.ts
+@@ -7,3 +7,43 @@ export const idGenerator = () =>
+             for (let i = 0; true; i++) yield i;
+         })(),
+     );
++
++export class Result<T, E> {
++    private constructor(
++        public readonly ok: boolean,
++        public value: T | null,
++        public error: E | null,
++    ) {}
++
++    public static ok<T, E>(value: T): Result<T, E> {
++        return new Result<T, E>(true, value, null);
++    }
++
++    public static error<T, E>(error: E): Result<T, E> {
++        return new Result<T, E>(false, null, error);
++    }
++
++    public transform<NT, NE extends E>(): Result<NT, NE> {
++        if (!this.ok) return this as unknown as Result<NT, NE>;
++        else throw new Error("cannot transform ok result");
++    }
++
++    public unwrap(): T {
++        if (this.ok) return this.value!;
++        else throw new Error("cannot unwrap non-ok result");
++    }
++
++    public expect(msg: string): T {
++        if (this.ok) return this.value!;
++        else throw new Error(`cannot unwrap non-ok result, expected ${msg}`);
++    }
++
++    public match<Y>(caseOk: (v: T) => Y, caseError: (e: E) => Y): Y {
++        return this.ok ? caseOk(this.value!) : caseError(this.error!);
++    }
++}
++
++export const Ok = <T, E>(value: T) => Result.ok<T, E>(value);
++export const Err = <T, E>(error: E) => Result.error<T, E>(error);
++
++export const force = <T extends U, U>(v: U) => v as unknown as T;
+-- 
+2.25.1
+

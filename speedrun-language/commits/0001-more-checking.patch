@@ -1,0 +1,169 @@
+From 4c53c2fa450225f4dca4ad023a56704119647fbe Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Fri, 1 Jul 2022 19:57:14 +0200
+Subject: [PATCH] more checking
+
+---
+ ast.ts     |  8 +++++++-
+ checker.ts | 47 ++++++++++++++++++++++++++++++++++++++++++++---
+ grammar.ne | 17 ++++++++++-------
+ 3 files changed, 61 insertions(+), 11 deletions(-)
+
+diff --git a/ast.ts b/ast.ts
+index ebbc71e..3fd01b2 100644
+--- a/ast.ts
++++ b/ast.ts
+@@ -47,7 +47,13 @@ export class While extends Statement {
+     }
+ }
+ 
+-export abstract class Type extends Statement {}
++export class ExpressionStatement extends Statement {
++    public constructor(public expression: Expression) {
++        super("ExpressionStatement");
++    }
++}
++
++export abstract class Type extends Node {}
+ 
+ export class VoidType extends Type {
+     public constructor() {
+diff --git a/checker.ts b/checker.ts
+index ca2cfed..11ca83c 100644
+--- a/checker.ts
++++ b/checker.ts
+@@ -23,8 +23,11 @@ export class FunctionType extends Type {
+     }
+ }
+ 
+-const typesCompatible = (a: Type, b: Type) => {
++const typesCompatible = (a: Type, b: Type): boolean => {
+     switch (a.id) {
++        case "FunctionType":
++            if (b.id !== "FunctionType") return false;
++            else return functionTypesCompatible(force(a), force(b));
+         default:
+             throw new Error(
+                 `typesCompatible unexhaustive '${a.id}' and '${b.id}'`,
+@@ -32,6 +35,11 @@ const typesCompatible = (a: Type, b: Type) => {
+     }
+ };
+ 
++const functionTypesCompatible = (a: FunctionType, b: FunctionType): boolean => {
++    if (a.args.length !== b.args.length) return false;
++    else return true;
++};
++
+ export type Symbol = {
+     name: string;
+     type: Type;
+@@ -119,10 +127,14 @@ export class Checker {
+         );
+     }
+ 
+-    public checkStatement(node: ast.Statement): Result<null, CheckerError> {
++    public checkStatement(
++        node: ast.Statement,
++    ): Result<Type | null, CheckerError> {
+         switch (node.id) {
+             case "ConstDefinition":
+                 return this.checkConstDefinition(force(node));
++            case "ExpressionStatement":
++                return this.checkExpressionStatement(force(node));
+             default:
+                 throw new Error(`unchecked statement '${node.id}'`);
+         }
+@@ -130,7 +142,7 @@ export class Checker {
+ 
+     public checkConstDefinition(
+         node: ast.ConstDefinition,
+-    ): Result<null, CheckerError> {
++    ): Result<Type | null, CheckerError> {
+         if (this.symbolTable.declaredLocally(node.target.name))
+             return Err(`multiple definitions of symbol '${node.target.name}'`);
+         const valueTypeResult = this.checkExpression(node.value);
+@@ -146,10 +158,21 @@ export class Checker {
+         return Ok(null);
+     }
+ 
++    public checkExpressionStatement(
++        node: ast.ExpressionStatement,
++    ): Result<Type | null, CheckerError> {
++        this.checkExpression(node.expression);
++        return Ok(null);
++    }
++
+     public checkExpression(node: ast.Expression): Result<Type, CheckerError> {
+         switch (node.id) {
+             case "Function":
+                 return this.checkFunction(force(node));
++            case "Call":
++                return this.checkCall(force(node));
++            case "Accessor":
++                return this.checkAccessor(force(node));
+             default:
+                 throw new Error(`unchecked expression '${node.id}'`);
+         }
+@@ -164,6 +187,24 @@ export class Checker {
+         );
+     }
+ 
++    public checkCall(node: ast.Call): Result<Type, CheckerError> {
++        const calleeTypeResult = this.checkExpression(node.callee);
++        if (!calleeTypeResult.ok) return calleeTypeResult.transform();
++        const calleeType = calleeTypeResult.value! as FunctionType;
++        if (calleeType.id !== "FunctionType")
++            return Err("cannot call non-function type");
++        else if (calleeType.args.length !== node.args.length)
++            return Err("wrong amount of arguments");
++        else return Ok(calleeType.returnType);
++    }
++
++    public checkAccessor(node: ast.Accessor): Result<Type, CheckerError> {
++        const symbol = this.symbolTable
++            .get(node.name)
++            .expect("symbol to be declared");
++        return Ok(symbol.type);
++    }
++
+     public checkType(node: ast.Type): Result<Type, CheckerError> {
+         switch (node.id) {
+             case "IntType":
+diff --git a/grammar.ne b/grammar.ne
+index e2b9ecc..3779359 100644
+--- a/grammar.ne
++++ b/grammar.ne
+@@ -74,13 +74,13 @@ const fid = idGenerator();
+ statements  ->  (_ statement (_nl_ statement):*):? _
+     {% v => v[0] ? [v[0][1], ...v[0][2].map((v: any) => v[1])] : [] %}
+ 
+-statement   ->  block               {% id %}
+-            |   const_declaration   {% id %}
+-            |   let_declaration     {% id %}
+-            |   if                  {% id %}
+-            |   if_else             {% id %}
+-            |   while               {% id %}
+-            |   expression          {% id %}
++statement   ->  block                   {% id %}
++            |   const_declaration       {% id %}
++            |   let_declaration         {% id %}
++            |   if                      {% id %}
++            |   if_else                 {% id %}
++            |   while                   {% id %}
++            |   expression_statement    {% id %}
+ 
+ block       ->  "{" statements "}"
+                     {% v => new ast.Block(v[1]) %}
+@@ -100,6 +100,9 @@ if_else     ->  "if" _ "(" _ expression _ ")" _ statement _ "else" _ statement
+ while       ->  "while" _ "(" _ expression _ ")" _ statement
+                     {% v => new ast.While(v[4], v[8]) %}
+ 
++expression_statement    ->  expression
++                                {% v => new ast.ExpressionStatement(v[0]) %}
++
+ expressions ->  (_ expression (_ "," _ expression):*):? _
+                     {% v => v[0] ? [v[0][1], ...v[0][2].map((v: any) => v[3])] : [] %}
+ 
+-- 
+2.25.1
+

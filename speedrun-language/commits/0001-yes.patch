@@ -1,0 +1,27 @@
+From 275305d44b553bcdb1952c90e552758484541f34 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Sat, 2 Jul 2022 17:37:28 +0200
+Subject: [PATCH] yes
+
+---
+ code_generator.ts | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/code_generator.ts b/code_generator.ts
+index 48aa38f..dc07292 100644
+--- a/code_generator.ts
++++ b/code_generator.ts
+@@ -75,7 +75,9 @@ const generate_expression = (self: Generator, node: ast.Expression): string => {
+ };
+ 
+ const generate_function = (self: Generator, node: ast.Function): string => {
+-    throw new Error("not implemented");
++    // instead of checker(ast) -> ast + total perspective symbol table
++    // do checker(ast) -> checked(ast) + node specific symbol table
++    throw new Error("_");
+ };
+ 
+ const generate_binary_operation = (
+-- 
+2.25.1
+

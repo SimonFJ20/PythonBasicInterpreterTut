@@ -1,0 +1,150 @@
+From e75e2bef38a8eb54663bb6b5629eaaed6b0c547d Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Tue, 21 Jun 2022 04:26:51 +0200
+Subject: [PATCH] stuff
+
+---
+ ast.ts     | 37 +++++++++++++++++++++++++++++++++++++
+ grammar.ne | 31 +++++++++++++++++++------------
+ main.ts    | 13 +------------
+ 3 files changed, 57 insertions(+), 24 deletions(-)
+ create mode 100644 ast.ts
+
+diff --git a/ast.ts b/ast.ts
+new file mode 100644
+index 0000000..a2a4096
+--- /dev/null
++++ b/ast.ts
+@@ -0,0 +1,37 @@
++export abstract class Node {
++    protected constructor(public id: string) {}
++}
++
++export abstract class Expression extends Node {}
++
++export enum OperationType {
++    Add,
++    Subtract,
++    Multiply,
++    Divide,
++    Modulus,
++}
++
++export class BinaryOperation extends Expression {
++    public constructor(
++        public operation: OperationType,
++        public left: Value,
++        public right: Value,
++    ) {
++        super("BinaryOperation");
++    }
++}
++
++export abstract class Value extends Expression {}
++
++export class String extends Value {
++    public constructor(public value: string) {
++        super("Value");
++    }
++}
++
++export class Int extends Value {
++    public constructor(public value: number) {
++        super("Int");
++    }
++}
+diff --git a/grammar.ne b/grammar.ne
+index db5f5da..0fdf31c 100644
+--- a/grammar.ne
++++ b/grammar.ne
+@@ -2,6 +2,13 @@
+ 
+ @{%
+ import moo from "https://deno.land/x/moo@0.5.1.1/index.ts";
++import {
++    Expression,
++    OperationType,
++    BinaryOperation,
++    String,
++    Int,
++} from './ast.ts'
+ const lexer = moo.compile({
+     nl:         {match: /[\n;]+/, lineBreaks: true},
+     ws:         /[ \t]+/,
+@@ -13,7 +20,7 @@ const lexer = moo.compile({
+     char:       {match: /'(?:[^'\\]|\\[\s\S])'/, value: s => s.slice(1, -1), lineBreaks: true},
+     string:     {match: /"(?:[^"\\]|\\[\s\S])*"/, value: s => s.slice(1, -1), lineBreaks: true},
+     name:       {match: /[a-zA-Z0-9_]+/, type: moo.keywords({
+-        keyword: ['func', 'return', 'if', 'else', 'while', 'for', 'break', 'continue', 'let', 'import', 'struct', 'new', 'delete']
++        keyword: ['let', 'mut', 'if', 'else']
+     })},
+     dot:        '.',
+ 
+@@ -67,32 +74,32 @@ const lexer = moo.compile({
+ 
+ 
+ statements  ->  (_ statement (_nl_ statement):*):? _
+-    {% v => (v[0] ? [v[0][1], ...v[0][2].map((v: string) => v[1])] : []).map(v => `${v};\n`) %}
++    {% v => v[0] ? [v[0][1], ...v[0][2].map((v: string) => v[1])] : [] %}
+ 
+-statement   ->  expression
++statement   ->  expression  {% id %}
+ 
+-expression  ->  add_sub
++expression  ->  add_sub     {% id %}
+ 
+ add_sub     ->  add_sub _ "+" _ mul_div_mod
+-                    {% v => `(${v[0]} + ${v[4]})` %}
++                    {% v => new BinaryOperation(OperationType.Add, v[0], v[4]) %}
+             |   add_sub _ "-" _ mul_div_mod
+-                    {% v => `(${v[0]} - ${v[4]})` %}
++                    {% v => new BinaryOperation(OperationType.Subtract, v[0], v[4]) %}
+             |   mul_div_mod
+ 
+ mul_div_mod ->  mul_div_mod _ "*" _ value
+-                    {% v => `(${v[0]} * ${v[4]})` %}
++                    {% v => new BinaryOperation(OperationType.Multiply, v[0], v[4]) %}
+             |   mul_div_mod _ "/" _ value
+-                    {% v => `(${v[0]} / ${v[4]})` %}
++                    {% v => new BinaryOperation(OperationType.Divide, v[0], v[4]) %}
+             |   mul_div_mod _ "%" _ value
+-                    {% v => `(${v[0]} % ${v[4]})` %}
++                    {% v => new BinaryOperation(OperationType.Modulus, v[0], v[4]) %}
+             |   value
+ 
+ value       ->  %int
+-                    {% v => `${v[0].value}` %}
++                    {% v => new Int(v[0].value) %}
+             |   %string
+-                    {% v => `"${v[0].value}"` %}
++                    {% v => new String(v[0].value) %}
+             |   "(" _ expression _ ")"
+-                    {% v => `(${v[2]})` %} 
++                    {% v => v %} 
+ 
+ _           ->  __:?
+ __          ->  (%ws|%nl|%comment_sl|%comment_ml):+
+diff --git a/main.ts b/main.ts
+index 5d8ef47..1d118a1 100644
+--- a/main.ts
++++ b/main.ts
+@@ -15,15 +15,4 @@ const parse = (text: string) => {
+ const text = await Deno.readTextFile(Deno.args[0]);
+ const res = parse(text);
+ 
+-const c = `// compiled
+-#include <stdio.h>
+-#include <stdlib.h>
+-#include <stdbool.h>
+-#include <stdint.h>
+-int main(int argc, char** argv)
+-{
+-    ${res}
+-}
+-`;
+-
+-await Deno.writeTextFile("out.c", c);
++console.log(JSON.stringify(res, null, "│   "));
+-- 
+2.25.1
+

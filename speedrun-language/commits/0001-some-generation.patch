@@ -1,0 +1,317 @@
+From 3b07ee48691969903402bfb7ad89f376b6d6ed0a Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Sat, 2 Jul 2022 05:01:53 +0200
+Subject: [PATCH] some generation
+
+---
+ ast.ts            |  7 +++-
+ checker.ts        | 13 +++++--
+ code_generator.ts | 99 +++++++++++++++++++++++++++++++++++++++++++++++
+ grammar.ne        |  5 +--
+ main.ts           | 22 ++++++++++-
+ math.splang       |  3 ++
+ run.sh            |  2 +-
+ utils.ts          | 20 +++++-----
+ 8 files changed, 150 insertions(+), 21 deletions(-)
+ create mode 100644 code_generator.ts
+ create mode 100644 math.splang
+
+diff --git a/ast.ts b/ast.ts
+index 40be458..2cef7ad 100644
+--- a/ast.ts
++++ b/ast.ts
+@@ -1,4 +1,4 @@
+-import { Option } from "./utils.ts";
++import { id_generator, Option } from "./utils.ts";
+ 
+ export abstract class Node {
+     protected constructor(public id: string) {}
+@@ -81,9 +81,12 @@ export class FunctionType extends Type {
+     }
+ }
+ 
+-export abstract class Expression extends Statement {}
++export abstract class Expression extends Node {}
+ 
+ export class Function extends Expression {
++    private static fid_generator = id_generator();
++    public fid = Function.fid_generator();
++
+     public constructor(
+         public args: Argument[],
+         public return_type: Option<Type>,
+diff --git a/checker.ts b/checker.ts
+index 0526a7e..a3a5379 100644
+--- a/checker.ts
++++ b/checker.ts
+@@ -33,6 +33,7 @@ const types_compatible = (a: Type, b: Type): boolean => {
+     // prettier-ignore
+     return match(a.id, [
+         ["VoidType", () => b.id === "VoidType"],
++        ["IntType", () => b.id === "IntType"],
+         ["FunctionType", () => match(b.id, [
+             ["FunctionType", () => function_types_compatible(force(a), force(b))],
+             [_, () => false]
+@@ -98,6 +99,7 @@ export class SymbolTable {
+ }
+ 
+ export type Function = {
++    id: number;
+     node: ast.Function;
+     type: FunctionType;
+     symbol_table: SymbolTable;
+@@ -106,7 +108,7 @@ export type Function = {
+ export type CheckerError = string;
+ 
+ export type CheckerResult = {
+-    symbol_table: SymbolTable;
++    st: SymbolTable;
+     functions: Function[];
+     errors: CheckerError[];
+ };
+@@ -124,7 +126,7 @@ export class Checker {
+         this.errors = [];
+         this.check_statements(program);
+         return {
+-            symbol_table: this.symbol_table,
++            st: this.symbol_table,
+             functions: this.functions,
+             errors: this.errors,
+         };
+@@ -237,7 +239,12 @@ export class Checker {
+             node.args.map((arg) => this.check_type(arg.type).expect("_")),
+             decl_return_type,
+         );
+-        this.functions.push({ node, type, symbol_table: this.symbol_table });
++        this.functions.push({
++            id: node.fid,
++            node,
++            type,
++            symbol_table: this.symbol_table,
++        });
+         return Ok(type);
+     }
+ 
+diff --git a/code_generator.ts b/code_generator.ts
+new file mode 100644
+index 0000000..48aa38f
+--- /dev/null
++++ b/code_generator.ts
+@@ -0,0 +1,99 @@
++import { SymbolTable, Function, Type } from "./checker.ts";
++import * as ast from "./ast.ts";
++import { force, match, _ } from "./utils.ts";
++
++export type Generator = {
++    st: SymbolTable;
++    functions: Function[];
++};
++
++export const generate = (self: Generator, program: ast.Statement[]): string => {
++    const code =
++        "#include <stdio.h>\n" +
++        "#include <stdlib.h>\n" +
++        "#include <stdint.h>\n" +
++        "#include <stdbool.h>\n" +
++        "#include <string.h>\n" +
++        "int main()\n{\n" +
++        generate_statements(self, program) +
++        "\n}\n";
++    return code;
++};
++
++const generate_statements = (
++    self: Generator,
++    nodes: ast.Statement[],
++): string => {
++    return nodes.map((node) => generate_statement(self, node)).join("\n");
++};
++
++const generate_statement = (self: Generator, node: ast.Statement): string => {
++    // prettier-ignore
++    return match(node.id, [
++        ["ConstDefinition", () => generate_const_definition(self, force(node))],
++        [_, () => {
++            throw new Error(`code generation not implemented for statement '${node.id}'`);
++        }]
++    ]);
++};
++
++const generate_type = (self: Generator, type: Type): string => {
++    // prettier-ignore
++    return match(type.id, [
++        ["FunctionType", () => "void*"],
++        ["IntType", () => "int"],
++        [_, () => {
++            throw new Error(`code generation not implemented for type '${type.id}'`);
++        }]
++    ]);
++};
++
++const generate_const_definition = (
++    self: Generator,
++    node: ast.ConstDefinition,
++): string => {
++    const type = generate_type(
++        self,
++        self.st.get(node.target.name).expect("_").type,
++    );
++    const name = node.target.name;
++    const value = generate_expression(self, node.value);
++    return `${type} ${name} = ${value};`;
++};
++
++const generate_expression = (self: Generator, node: ast.Expression): string => {
++    // prettier-ignore
++    return match(node.id, [
++        ["Function", () => generate_function(self, force(node))],
++        ["BinaryOperation", () => generate_binary_operation(self, force(node))],
++        ["Accessor", () => generate_accessor(force(node))],
++        ["Int", () => generate_int(force(node))],
++        [_, () => {
++            throw new Error(`code generation not implemented for expression '${node.id}'`);
++        }]
++    ]);
++};
++
++const generate_function = (self: Generator, node: ast.Function): string => {
++    throw new Error("not implemented");
++};
++
++const generate_binary_operation = (
++    self: Generator,
++    node: ast.BinaryOperation,
++): string => {
++    const operator = match(node.operation, [
++        [ast.OperationType.Add, () => "+"],
++        [ast.OperationType.Subtract, () => "-"],
++        [ast.OperationType.Multiply, () => "*"],
++        [ast.OperationType.Divide, () => "/"],
++        [ast.OperationType.Modulus, () => "%"],
++    ]);
++    const left = generate_expression(self, node.left);
++    const right = generate_expression(self, node.right);
++    return `(${left} ${operator} ${right})`;
++};
++
++const generate_accessor = (node: ast.Accessor): string => node.name;
++
++const generate_int = (node: ast.Int): string => node.value.toString();
+diff --git a/grammar.ne b/grammar.ne
+index 5bf170c..8524f2e 100644
+--- a/grammar.ne
++++ b/grammar.ne
+@@ -3,7 +3,7 @@
+ @{%
+ import moo from "https://deno.land/x/moo@0.5.1.1/index.ts";
+ import * as ast from './ast.ts';
+-import { id_generator, Some, None } from './utils.ts';
++import { Some, None } from './utils.ts';
+ const lexer = moo.compile({
+     nl:         {match: /[\n;]+/, lineBreaks: true},
+     ws:         /[ \t]+/,
+@@ -63,9 +63,6 @@ const lexer = moo.compile({
+     qmark:      '?',
+     colon:      ':',
+ });
+-
+-const fid = id_generator();
+-
+ %}
+ 
+ @lexer lexer
+diff --git a/main.ts b/main.ts
+index 7badac9..bc54852 100644
+--- a/main.ts
++++ b/main.ts
+@@ -3,6 +3,7 @@ import {
+     Parser,
+ } from "https://deno.land/x/nearley@2.19.7-deno/mod.ts";
+ import { Checker } from "./checker.ts";
++import { generate } from "./code_generator.ts";
+ import compiled_grammar from "./grammar.out.ts";
+ 
+ const parse = (text: string) => {
+@@ -11,9 +12,28 @@ const parse = (text: string) => {
+     return parser.results[0];
+ };
+ 
++const compileToBinary = async (target_file_name: string, c_code: string) => {
++    const temp_c_file = await Deno.makeTempFile();
++    await Deno.writeTextFile(temp_c_file, c_code);
++    const process = Deno.run({
++        cmd: ["gcc", "-xc", temp_c_file, "-o", target_file_name],
++    });
++    await process.status();
++    process.close();
++    Deno.remove(temp_c_file);
++};
++
+ if (Deno.args.length < 1) throw new Error("not enough args");
+ const text = await Deno.readTextFile(Deno.args[0]);
+ const res = parse(text);
+ 
+ console.log(JSON.stringify(res, null, "│   "));
+-console.log(new Checker().check_program(res));
++const { functions, st, errors } = new Checker().check_program(res);
++if (errors.length === 0) {
++    const c_code = generate({ st, functions }, res);
++    console.log(c_code);
++    await compileToBinary("a.out", c_code);
++} else {
++    console.log("Compilation failed:");
++    for (const v of errors) console.log(errors);
++}
+diff --git a/math.splang b/math.splang
+new file mode 100644
+index 0000000..a36d1d7
+--- /dev/null
++++ b/math.splang
+@@ -0,0 +1,3 @@
++
++const a: int = 1 + 1
++const b: int = a + 1
+diff --git a/run.sh b/run.sh
+index 049c0fd..9bdb953 100755
+--- a/run.sh
++++ b/run.sh
+@@ -1 +1 @@
+-nearleyc grammar.ne > grammar.out.ts && deno run --allow-read --allow-write main.ts $1
+\ No newline at end of file
++nearleyc grammar.ne > grammar.out.ts && deno run --allow-read --allow-write --allow-run main.ts $1
+\ No newline at end of file
+diff --git a/utils.ts b/utils.ts
+index b9c66be..72d8733 100644
+--- a/utils.ts
++++ b/utils.ts
+@@ -1,13 +1,3 @@
+-export const id_generator = () =>
+-    (
+-        (ids) => () =>
+-            ids.next().value!
+-    )(
+-        (function* () {
+-            for (let i = 0; true; i++) yield i;
+-        })(),
+-    );
+-
+ export class Option<T> {
+     private static None = Symbol("None");
+ 
+@@ -132,3 +122,13 @@ export const match = <V, T>(
+         if ((v === _ || v === value) && action !== Or) return action();
+     throw new Error("unexhaustive match");
+ };
++
++export const id_generator = () =>
++    (
++        (ids) => () =>
++            ids.next().value!
++    )(
++        (function* () {
++            for (let i = 0; true; i++) yield i;
++        })(),
++    );
+-- 
+2.25.1
+

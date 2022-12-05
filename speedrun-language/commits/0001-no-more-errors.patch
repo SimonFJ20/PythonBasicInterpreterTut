@@ -1,0 +1,329 @@
+From ee4094328f9fa3d918846ce4ff7ad8b3c0a3c44a Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Fri, 1 Jul 2022 02:38:13 +0200
+Subject: [PATCH] no more errors?
+
+---
+ ast.ts     |  15 ++++++--
+ checker.ts | 101 +++++++++++++++++++++++++++++++++++++----------------
+ grammar.ne |  19 +++++-----
+ main.ts    |   2 ++
+ 4 files changed, 95 insertions(+), 42 deletions(-)
+
+diff --git a/ast.ts b/ast.ts
+index 99a9013..5866427 100644
+--- a/ast.ts
++++ b/ast.ts
+@@ -11,13 +11,21 @@ export class Block extends Statement {
+ }
+ 
+ export class ConstDefinition extends Statement {
+-    public constructor(public target: Argument, public value: Expression) {
++    public constructor(
++        public target: Argument,
++        public type: Type | null,
++        public value: Expression,
++    ) {
+         super("ConstDefinition");
+     }
+ }
+ 
+ export class LetDeclaration extends Statement {
+-    public constructor(public target: Argument, public value: Expression) {
++    public constructor(
++        public target: Argument,
++        public type: Type | null,
++        public value: Expression | null,
++    ) {
+         super("LetDeclaration");
+     }
+ }
+@@ -65,7 +73,7 @@ export class StringType extends Type {
+ }
+ 
+ export class FunctionType extends Type {
+-    public constructor(args: Type[], returnType: Type) {
++    public constructor(public args: Type[], public returnType: Type) {
+         super("FunctionType");
+     }
+ }
+@@ -75,6 +83,7 @@ export abstract class Expression extends Statement {}
+ export class Function extends Expression {
+     public constructor(
+         public args: Argument[],
++        public returnType: Type | null,
+         public body: Statement,
+         public fid: number,
+     ) {
+diff --git a/checker.ts b/checker.ts
+index 25ff110..1abf1db 100644
+--- a/checker.ts
++++ b/checker.ts
+@@ -1,20 +1,20 @@
+ import * as ast from "./ast.ts";
+ import { idGenerator } from "./utils.ts";
+ 
+-type Type<ID extends string = string> = { id: ID };
+-type Int = Type<"int">;
+-type String = Type<"string">;
+-type Function = Type<"function"> & {
++export type Type<ID extends string = string> = { id: ID };
++export type IntType = Type<"int">;
++export type StringType = Type<"string">;
++export type FunctionType = Type<"function"> & {
+     args: Type[];
+     returnType: Type;
+ };
+ 
+-type Symbol = {
++export type Symbol = {
+     type: Type;
+     symbolTable: SymbolTable;
+ };
+ 
+-class SymbolTable {
++export class SymbolTable {
+     private names: { [key: string]: Symbol } = {};
+     private functions: ast.Function[] = [];
+     private children: SymbolTable[] = [];
+@@ -52,27 +52,53 @@ class SymbolTable {
+     }
+ }
+ 
+-class Checker {
++export class CheckerError extends Error {
++    public constructor(message: string) {
++        super(message);
++    }
++}
++
++export type CheckerResult = {
++    symbolTable: SymbolTable;
++    errors: CheckerError[];
++};
++
++export class Checker {
+     private symbolTable: SymbolTable = new SymbolTable();
++    private errors: CheckerError[] = [];
+ 
+     public constructor() {}
+ 
+-    public checkProgram(program: ast.Statement[]): SymbolTable {
++    public checkProgram(program: ast.Statement[]): CheckerResult {
+         this.symbolTable = new SymbolTable();
+         this.checkStatements(program);
+-        return this.symbolTable;
++        return {
++            symbolTable: this.symbolTable,
++            errors: this.errors,
++        };
++    }
++
++    private catchErrors<T>(f: () => T) {
++        try {
++            f();
++        } catch (catched) {
++            if (catched instanceof CheckerError) this.errors.push(catched);
++            else throw catched;
++        }
+     }
+ 
+     private checkStatements(nodes: ast.Statement[]) {
+-        nodes.forEach((node) => this.checkStatement(node));
++        nodes.forEach((node) =>
++            this.catchErrors(() => this.checkStatement(node)),
++        );
+     }
+ 
+     private checkStatement(node: ast.Statement) {
+         switch (node.id) {
+             case "Block":
+                 return this.checkBlock(force(node));
+-            case "ConstDeclaration":
+-                return this.checkConstDeclaration(force(node));
++            case "ConstDefinition":
++                return this.checkConstDefinition(force(node));
+             case "BinaryOperation":
+             case "Call":
+                 return this.checkExpression(node);
+@@ -88,23 +114,26 @@ class Checker {
+         this.symbolTable = parentTable;
+     }
+ 
+-    private checkConstDeclaration(node: ast.ConstDeclaration) {
++    private checkConstDefinition(node: ast.ConstDefinition) {
+         if (this.symbolTable.nameDefinedLocally(node.target.name))
+             throw new Error(`multiple definition of ${node.target.name}`);
+         const type = this.checkExpression(node.value);
+-        this.symbolTable.setName(node.target.name, { type });
++        this.symbolTable.setName(node.target.name, {
++            type,
++            symbolTable: this.symbolTable,
++        });
+     }
+ 
+-    private checkType(node: ast.Type): ValueType {
++    private checkType(node: ast.Type): Type {
+         switch (node.id) {
+             case "IntType":
+-                return "int";
++                return { id: "int" };
+             default:
+                 throw new Error(`unchecked type '${node.id}'`);
+         }
+     }
+ 
+-    private checkExpression(node: ast.Expression): ValueType {
++    private checkExpression(node: ast.Expression): Type {
+         switch (node.id) {
+             case "Function":
+                 return this.checkFunction(force(node));
+@@ -115,36 +144,46 @@ class Checker {
+             case "Accessor":
+                 return this.checkAccessor(force(node));
+             case "Int":
+-                return "int";
++                return { id: "int" };
+             default:
+                 throw new Error(`unchecked expression '${node.id}'`);
+         }
+     }
+ 
+-    private checkFunction(node: ast.Function): ValueType {
++    private checkFunction(node: ast.Function): Type {
+         const parentTable = this.symbolTable;
+         this.symbolTable = new SymbolTable(parentTable);
+-        node.args.forEach((arg) => {
++        const args = node.args.map((arg) => {
+             if (this.symbolTable.nameDefinedLocally(arg.name))
+                 throw new Error("already defined");
++            const type = this.checkType(arg.type);
+             this.symbolTable.setName(arg.name, {
+-                type: this.checkType(arg.type),
++                type,
++                symbolTable: this.symbolTable,
+             });
++            return type;
+         });
+         this.checkStatement(node.body);
+         this.symbolTable = parentTable;
+         this.symbolTable.addFunction(node);
+-        return "function";
++        return {
++            id: "function",
++            args,
++            returnType: node.returnType,
++        } as FunctionType;
+     }
+ 
+-    private checkBinaryOperation(node: ast.BinaryOperation): ValueType {
++    private checkBinaryOperation(node: ast.BinaryOperation): Type {
+         const leftType = this.checkExpression(node.left);
+         const rightType = this.checkExpression(node.right);
+         switch (node.operation) {
+             case ast.OperationType.Add:
+-                if (leftType === "int" && rightType !== "int") {
++                if (leftType.id === "int" && rightType.id !== "int") {
+                     throw new Error("type mismatch");
+-                } else if (leftType === "string" && rightType !== "string") {
++                } else if (
++                    leftType.id === "string" &&
++                    rightType.id !== "string"
++                ) {
+                     throw new Error("type mismatch");
+                 }
+                 break;
+@@ -152,7 +191,7 @@ class Checker {
+             case ast.OperationType.Multiply:
+             case ast.OperationType.Divide:
+             case ast.OperationType.Modulus:
+-                if (leftType !== "int" || rightType !== "int") {
++                if (leftType.id !== "int" || rightType.id !== "int") {
+                     throw new Error(
+                         `type mismatch '${leftType}' and '${rightType}'`,
+                     );
+@@ -161,14 +200,14 @@ class Checker {
+         return leftType;
+     }
+ 
+-    private checkCall(node: ast.Call): ValueType {
+-        const calleeType = this.checkExpression(node.callee);
+-        if (calleeType !== "function")
++    private checkCall(node: ast.Call): Type {
++        const calleeType = this.checkExpression(node.callee) as FunctionType;
++        if (calleeType.id !== "function")
+             throw new Error(`cannot call type '${calleeType}'`);
+-        return "int";
++        return calleeType.returnType;
+     }
+ 
+-    private checkAccessor(node: ast.Accessor): ValueType {
++    private checkAccessor(node: ast.Accessor): Type {
+         if (!this.symbolTable.nameDefined(node.name))
+             throw new Error(`undefined symbol '${node.name}'`);
+         const symbol = this.symbolTable.getName(node.name);
+diff --git a/grammar.ne b/grammar.ne
+index 3eedb39..8cefbdc 100644
+--- a/grammar.ne
++++ b/grammar.ne
+@@ -85,11 +85,11 @@ statement   ->  block               {% id %}
+ block       ->  "{" statements "}"
+                     {% v => new ast.Block(v[1]) %}
+ 
+-const_declaration   ->  "const" __ argument _ "=" _ expression
+-                            {% v => new ast.ConstDefinition(v[2], v[6]) %}
++const_declaration   ->  "const" __ argument _ (type_specifier _):? "=" _ expression
++                            {% v => new ast.ConstDefinition(v[2], v[4] ? v[4][0] : null, v[7]) %}
+ 
+-let_declaration     ->  "let" __ argument _ "=" _ expression
+-                            {% v => new ast.LetDeclaration(v[2], v[6]) %}
++let_declaration     ->  "let" __ argument _ (type_specifier _):? ("=" _ expression):?
++                            {% v => new ast.LetDeclaration(v[2], v[4] ? v[4][0] : null, v[5] ? v[5][2] : null) %}
+ 
+ if          ->  "if" _ "(" _ expression _ ")" _ statement
+                     {% v => new ast.If(v[4], v[8]) %}
+@@ -106,6 +106,9 @@ expressions ->  (_ expression (_ "," _ expression):*):? _
+ type_list   ->  (_ type (_ "," _ type):*):? _
+                     {% v => v[0] ? [v[0][1], ...v[0][2].map((v: any) => v[3])] : [] %}
+ 
++type_specifier  ->  ":" _ type
++                        {% v => v[2] %}
++
+ type        ->  function_type   {% id %}
+             |   type_literal    {% id %}
+ 
+@@ -122,10 +125,10 @@ type_literal    ->  "int"
+ expression  ->  function        {% id %}
+             |   precedence_1    {% id %}
+ 
+-function    ->  "(" arguments ")" _ block
+-                    {% v => new ast.Function(v[1], v[4], fid()) %}
+-            |   "(" arguments ")" _ "=>" _ expression
+-                    {% v => new ast.Function(v[1], v[6], fid()) %}
++function    ->  "(" arguments ")" _ (type_specifier _):? block
++                    {% v => new ast.Function(v[1], v[4] ? v[4][0] : null, v[5], fid()) %}
++            |   "(" arguments ")" _ (type_specifier _):? "=>" _ expression
++                    {% v => new ast.Function(v[1], v[4] ? v[4][0] : null, v[7], fid()) %}
+ 
+ arguments   ->  (_ argument (_ "," _ argument):*):? _
+                     {% v => v[0] ? [v[0][1], ...v[0][2].map((v: any) => v[3])] : [] %}
+diff --git a/main.ts b/main.ts
+index 3f532a6..bf013a0 100644
+--- a/main.ts
++++ b/main.ts
+@@ -2,6 +2,7 @@ import {
+     Grammar,
+     Parser,
+ } from "https://deno.land/x/nearley@2.19.7-deno/mod.ts";
++import { Checker } from "./checker.ts";
+ import compiledGrammar from "./grammar.out.ts";
+ import { idGenerator } from "./utils.ts";
+ 
+@@ -16,3 +17,4 @@ const text = await Deno.readTextFile(Deno.args[0]);
+ const res = parse(text);
+ 
+ console.log(JSON.stringify(res, null, "│   "));
++console.log(new Checker().checkProgram(res));
+-- 
+2.25.1
+

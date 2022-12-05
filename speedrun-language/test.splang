@@ -1,0 +1,6 @@
+
+const test: (int) => void = (hello: int) {
+    hello + 1
+}
+
+test()

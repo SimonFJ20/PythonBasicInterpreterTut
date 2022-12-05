@@ -1,0 +1,232 @@
+From 5826e5ee47f7ed63e1d19995bc88a2843215feab Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Wed, 29 Jun 2022 04:36:37 +0200
+Subject: [PATCH] broke the build
+
+---
+ ast.ts                        | 18 ++++++++++++++----
+ compile_to_c.ts => checker.ts | 23 +++++++++++++++--------
+ grammar.ne                    | 33 +++++++++++++++++++++++----------
+ main.ts                       |  3 +--
+ test.splang                   |  2 +-
+ utils.ts                      |  9 +++++++++
+ 6 files changed, 63 insertions(+), 25 deletions(-)
+ rename compile_to_c.ts => checker.ts (93%)
+ create mode 100644 utils.ts
+
+diff --git a/ast.ts b/ast.ts
+index a3dac44..99a9013 100644
+--- a/ast.ts
++++ b/ast.ts
+@@ -10,9 +10,9 @@ export class Block extends Statement {
+     }
+ }
+ 
+-export class ConstDeclaration extends Statement {
++export class ConstDefinition extends Statement {
+     public constructor(public target: Argument, public value: Expression) {
+-        super("ConstDeclaration");
++        super("ConstDefinition");
+     }
+ }
+ 
+@@ -46,6 +46,12 @@ export class While extends Statement {
+ 
+ export abstract class Type extends Statement {}
+ 
++export class VoidType extends Type {
++    public constructor() {
++        super("VoidType");
++    }
++}
++
+ export class IntType extends Type {
+     public constructor() {
+         super("IntType");
+@@ -59,7 +65,7 @@ export class StringType extends Type {
+ }
+ 
+ export class FunctionType extends Type {
+-    public constructor() {
++    public constructor(args: Type[], returnType: Type) {
+         super("FunctionType");
+     }
+ }
+@@ -67,7 +73,11 @@ export class FunctionType extends Type {
+ export abstract class Expression extends Statement {}
+ 
+ export class Function extends Expression {
+-    public constructor(public args: Argument[], public body: Statement) {
++    public constructor(
++        public args: Argument[],
++        public body: Statement,
++        public fid: number,
++    ) {
+         super("Function");
+     }
+ }
+diff --git a/compile_to_c.ts b/checker.ts
+similarity index 93%
+rename from compile_to_c.ts
+rename to checker.ts
+index adb0aa0..25ff110 100644
+--- a/compile_to_c.ts
++++ b/checker.ts
+@@ -1,23 +1,30 @@
+ import * as ast from "./ast.ts";
+-
+-export const compileToC = (program: ast.Statement[]): string => {
+-    const symbolTable = new Checker().checkProgram(program);
+-    console.log(JSON.stringify(symbolTable, null, 4));
+-    return "";
++import { idGenerator } from "./utils.ts";
++
++type Type<ID extends string = string> = { id: ID };
++type Int = Type<"int">;
++type String = Type<"string">;
++type Function = Type<"function"> & {
++    args: Type[];
++    returnType: Type;
+ };
+ 
+-type ValueType = "int" | "string" | "function";
+-
+ type Symbol = {
+-    type: ValueType;
++    type: Type;
++    symbolTable: SymbolTable;
+ };
+ 
+ class SymbolTable {
+     private names: { [key: string]: Symbol } = {};
+     private functions: ast.Function[] = [];
++    private children: SymbolTable[] = [];
+ 
+     public constructor(private parent?: SymbolTable) {}
+ 
++    public addChild(child: SymbolTable) {
++        this.children.push(child);
++    }
++
+     public setName(name: string, symbol: Symbol) {
+         this.names[name] = symbol;
+     }
+diff --git a/grammar.ne b/grammar.ne
+index b0df1d5..3eedb39 100644
+--- a/grammar.ne
++++ b/grammar.ne
+@@ -2,7 +2,8 @@
+ 
+ @{%
+ import moo from "https://deno.land/x/moo@0.5.1.1/index.ts";
+-import * as ast from './ast.ts'
++import * as ast from './ast.ts';
++import {idGenerator} from './utils.ts';
+ const lexer = moo.compile({
+     nl:         {match: /[\n;]+/, lineBreaks: true},
+     ws:         /[ \t]+/,
+@@ -62,6 +63,9 @@ const lexer = moo.compile({
+     qmark:      '?',
+     colon:      ':',
+ });
++
++const fid = idGenerator();
++
+ %}
+ 
+ @lexer lexer
+@@ -82,7 +86,7 @@ block       ->  "{" statements "}"
+                     {% v => new ast.Block(v[1]) %}
+ 
+ const_declaration   ->  "const" __ argument _ "=" _ expression
+-                            {% v => new ast.ConstDeclaration(v[2], v[6]) %}
++                            {% v => new ast.ConstDefinition(v[2], v[6]) %}
+ 
+ let_declaration     ->  "let" __ argument _ "=" _ expression
+                             {% v => new ast.LetDeclaration(v[2], v[6]) %}
+@@ -99,20 +103,29 @@ while       ->  "while" _ "(" _ expression _ ")" _ statement
+ expressions ->  (_ expression (_ "," _ expression):*):? _
+                     {% v => v[0] ? [v[0][1], ...v[0][2].map((v: any) => v[3])] : [] %}
+ 
+-type        ->  "int"
+-                        {% v => new ast.IntType() %}
+-            |   "string"
+-                        {% v => new ast.StringType() %}
+-            |   "function"
+-                        {% v => new ast.FunctionType() %}
++type_list   ->  (_ type (_ "," _ type):*):? _
++                    {% v => v[0] ? [v[0][1], ...v[0][2].map((v: any) => v[3])] : [] %}
++
++type        ->  function_type   {% id %}
++            |   type_literal    {% id %}
++
++function_type   ->  "(" type_list ")" _ "=>" _ type
++                        {% v => new ast.FunctionType(v[1], v[6]) %}
++
++type_literal    ->  "int"
++                            {% v => new ast.IntType() %}
++                |   "string"
++                            {% v => new ast.IntType() %}
++                |   "void"
++                            {% v => new ast.VoidType() %}
+ 
+ expression  ->  function        {% id %}
+             |   precedence_1    {% id %}
+ 
+ function    ->  "(" arguments ")" _ block
+-                    {% v => new ast.Function(v[1], v[4]) %}
++                    {% v => new ast.Function(v[1], v[4], fid()) %}
+             |   "(" arguments ")" _ "=>" _ expression
+-                    {% v => new ast.Function(v[1], v[6]) %}
++                    {% v => new ast.Function(v[1], v[6], fid()) %}
+ 
+ arguments   ->  (_ argument (_ "," _ argument):*):? _
+                     {% v => v[0] ? [v[0][1], ...v[0][2].map((v: any) => v[3])] : [] %}
+diff --git a/main.ts b/main.ts
+index 80b09bd..3f532a6 100644
+--- a/main.ts
++++ b/main.ts
+@@ -2,8 +2,8 @@ import {
+     Grammar,
+     Parser,
+ } from "https://deno.land/x/nearley@2.19.7-deno/mod.ts";
+-import { compileToC } from "./compile_to_c.ts";
+ import compiledGrammar from "./grammar.out.ts";
++import { idGenerator } from "./utils.ts";
+ 
+ const parse = (text: string) => {
+     const parser = new Parser(Grammar.fromCompiled(compiledGrammar));
+@@ -16,4 +16,3 @@ const text = await Deno.readTextFile(Deno.args[0]);
+ const res = parse(text);
+ 
+ console.log(JSON.stringify(res, null, "│   "));
+-console.log(compileToC(res));
+diff --git a/test.splang b/test.splang
+index 24467b5..d34a1e2 100644
+--- a/test.splang
++++ b/test.splang
+@@ -1,5 +1,5 @@
+ 
+-const test: function = (hello: int) {
++const test: () => void = (hello: int) {
+     hello + 1
+ }
+ 
+diff --git a/utils.ts b/utils.ts
+new file mode 100644
+index 0000000..7ae7f3a
+--- /dev/null
++++ b/utils.ts
+@@ -0,0 +1,9 @@
++export const idGenerator = () =>
++    (
++        (ids) => () =>
++            ids.next().value!
++    )(
++        (function* () {
++            for (let i = 0; true; i++) yield i;
++        })(),
++    );
+-- 
+2.25.1
+

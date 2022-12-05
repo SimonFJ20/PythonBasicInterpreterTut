@@ -1,0 +1,1 @@
+nearleyc grammar.ne > grammar.out.ts && deno run --allow-read --allow-write --allow-run main.ts $1
