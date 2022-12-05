@@ -1,0 +1,61 @@
+From 420e9ed9dac23561e554e522ea574d0f6799eac0 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Fri, 26 Aug 2022 18:53:23 +0200
+Subject: [PATCH] experimental build script
+
+---
+ build.py | 42 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
+ create mode 100644 build.py
+
+diff --git a/build.py b/build.py
+new file mode 100644
+index 0000000..a723c6b
+--- /dev/null
++++ b/build.py
+@@ -0,0 +1,42 @@
++
++from platform import system
++from sys import argv, stderr, stdout
++from subprocess import  run
++
++def transpile(filename: str, debug: bool):
++    debugstr = "--debug" if debug else ""
++    process = run([f"node skivelang.js {filename} {debugstr}"], shell=True)
++    if process.returncode != 0:
++        print("ERROR: transpilation failed, exitting!", file=stderr)
++
++def compile():
++    process = run(["gcc -xc -Wno-int-conversion out.c lib.c"], shell=True)
++    if process.returncode != 0:
++        print("ERROR: compilation failed, exitting!", file=stderr)
++
++def execute():
++    if system() == "Windows":
++        filename = "a.exe"
++    else:
++        filename = "./a.out"
++    run([filename], shell=True)
++
++def main():
++    if len(argv) >= 2:
++        transpile(argv[1], False)
++        compile()
++        execute()
++    elif len(argv) >= 3:
++        if 't' in argv[2]:
++            transpile(argv[1], "--debug" in argv)
++        if 'c' in argv[2]:
++            compile()
++        if 'e' in argv[2]:
++            execute()
++    else:
++        print("USAGE: python3 build.py <FILE> <[t - transpile][b - build][e - execute]> [--debug]")
++        exit()
++
++
++if __name__ == "__main__":
++    main()
+-- 
+2.25.1
+

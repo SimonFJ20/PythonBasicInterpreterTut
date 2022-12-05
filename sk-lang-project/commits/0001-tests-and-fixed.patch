@@ -1,0 +1,234 @@
+From b76e4201a04b4f2e353a8d281dc664f47a32fe3b Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Sat, 27 Aug 2022 18:54:39 +0200
+Subject: [PATCH] tests and fixed
+
+---
+ scripts/test_js.py                            |  4 ++--
+ skivelang.js                                  | 22 ++++++++++++++-----
+ tests/tokenizer/comments.expected             |  8 +++++++
+ tests/tokenizer/comments.skl                  |  7 ++++++
+ tests/tokenizer/numbers.expected              |  6 +++++
+ tests/tokenizer/numbers.skl                   |  3 +++
+ tests/tokenizer/punctuation.expected          | 20 +++++++++++++++++
+ tests/tokenizer/punctuation.skl               |  4 ++++
+ tests/tokenizer/strings.expected              |  7 ++++++
+ tests/tokenizer/strings.skl                   |  7 ++++++
+ tests/tokenizer/strings_and_comments.expected |  7 ++++++
+ tests/tokenizer/strings_and_comments.skl      | 10 +++++++++
+ 12 files changed, 98 insertions(+), 7 deletions(-)
+ create mode 100644 tests/tokenizer/comments.expected
+ create mode 100644 tests/tokenizer/comments.skl
+ create mode 100644 tests/tokenizer/numbers.expected
+ create mode 100644 tests/tokenizer/numbers.skl
+ create mode 100644 tests/tokenizer/punctuation.expected
+ create mode 100644 tests/tokenizer/punctuation.skl
+ create mode 100644 tests/tokenizer/strings.expected
+ create mode 100644 tests/tokenizer/strings.skl
+ create mode 100644 tests/tokenizer/strings_and_comments.expected
+ create mode 100644 tests/tokenizer/strings_and_comments.skl
+
+diff --git a/scripts/test_js.py b/scripts/test_js.py
+index d560808..d6d4ae2 100644
+--- a/scripts/test_js.py
++++ b/scripts/test_js.py
+@@ -3,8 +3,8 @@ from subprocess import run
+ from re import search
+ 
+ def run_part_tests(flag: str, test_folder: str):
+-    samples = list(filter(lambda s : test_folder in s, glob(f"tests/**/*.skl")))
+-    expected = list(filter(lambda s : test_folder in s, glob(f"tests/**/*.expected")))
++    samples = list(sorted(filter(lambda s : test_folder in s, glob(f"tests/**/*.skl"))))
++    expected = list(sorted(filter(lambda s : test_folder in s, glob(f"tests/**/*.expected"))))
+     for i in range(len(samples)):
+         print(f"Running '{samples[i]}' ", end="")
+         result = run(["node", "skivelang.js", samples[i], flag], capture_output=True)
+diff --git a/skivelang.js b/skivelang.js
+index 21f09f8..8affb24 100644
+--- a/skivelang.js
++++ b/skivelang.js
+@@ -53,7 +53,7 @@ const operatorPrecedence = {
+ function tokenize(text) {
+     let strings = allStringTokens(text);
+     return text
+-        .replace(/".*?"/g, "__STRING__")
++        .replace(/".*?[^\\]"/g, "__STRING__")
+         .replace(/\/\/.*?$/gm, "")
+         .replace(/\/\*.*?\*\//gs, "")
+         .replace(/->/g, "__THIN_ARROW__")
+@@ -420,9 +420,21 @@ class Parser {
+         if (!this.done() && /^0x\d+$/.test(this.current())) {
+             return saveValueStepReturn("hex");
+         } else if (!this.done() && /^\d+$/.test(this.current())) {
+-            return saveValueStepReturn("int");
+-        } else if (!this.done() && /^\d+(?:\.\d+)$/.test(this.current())) {
+-            return saveValueStepReturn("float");
++            let value = this.current();
++            this.step();
++            if (!this.done() && this.current() === ".") {
++                value += this.current();
++                this.step();
++                if (!this.done() && /^\d+$/.test(this.current())) {
++                    value += this.current();
++                    this.step();
++                    return { id: "float", value };
++                } else {
++                    return { id: "float", value };
++                }
++            } else {
++                return { id: "int", value };
++            }
+         } else if (!this.done() && /^'\\?.'$/.test(this.current())) {
+             return saveValueStepReturn("char");
+         } else if (!this.done() && /^".*?"$/.test(this.current())) {
+@@ -853,7 +865,7 @@ class Transpiler {
+     }
+ 
+     transpileFloat(node) {
+-        this.code += parseFloat(node.value).toString();
++        this.code += parseFloat(node.value + "0").toString();
+     }
+ 
+     transpileChar(node) {
+diff --git a/tests/tokenizer/comments.expected b/tests/tokenizer/comments.expected
+new file mode 100644
+index 0000000..1053d5d
+--- /dev/null
++++ b/tests/tokenizer/comments.expected
+@@ -0,0 +1,8 @@
++capture
++this
++capture
++this
++capture
++this
++capture
++this
+diff --git a/tests/tokenizer/comments.skl b/tests/tokenizer/comments.skl
+new file mode 100644
+index 0000000..fdff1d1
+--- /dev/null
++++ b/tests/tokenizer/comments.skl
+@@ -0,0 +1,7 @@
++capture this
++// done capture this
++capture this
++/*
++dont caputure this
++*/ capture this
++capture this /* but not this */
+diff --git a/tests/tokenizer/numbers.expected b/tests/tokenizer/numbers.expected
+new file mode 100644
+index 0000000..27de9a3
+--- /dev/null
++++ b/tests/tokenizer/numbers.expected
+@@ -0,0 +1,6 @@
++12
++3
++.
++14
++5
++57
+diff --git a/tests/tokenizer/numbers.skl b/tests/tokenizer/numbers.skl
+new file mode 100644
+index 0000000..839e549
+--- /dev/null
++++ b/tests/tokenizer/numbers.skl
+@@ -0,0 +1,3 @@
++12 3.14
++5
++57
+diff --git a/tests/tokenizer/punctuation.expected b/tests/tokenizer/punctuation.expected
+new file mode 100644
+index 0000000..924eca1
+--- /dev/null
++++ b/tests/tokenizer/punctuation.expected
+@@ -0,0 +1,20 @@
++(
++)
++{
++}
++<
++>
++[
++]
++,
++.
++:
++&
++*
+++
++-
++*=
++-=
++-
++>
++->
+diff --git a/tests/tokenizer/punctuation.skl b/tests/tokenizer/punctuation.skl
+new file mode 100644
+index 0000000..1ca458c
+--- /dev/null
++++ b/tests/tokenizer/punctuation.skl
+@@ -0,0 +1,4 @@
++(){}<>[]
++,.:&*+-
++*= -=
++- > ->
+diff --git a/tests/tokenizer/strings.expected b/tests/tokenizer/strings.expected
+new file mode 100644
+index 0000000..cf7340e
+--- /dev/null
++++ b/tests/tokenizer/strings.expected
+@@ -0,0 +1,7 @@
++"hello world"
++'a'
++'\n'
++"hello world\n"
++"\""
++'\''
++"\'"
+diff --git a/tests/tokenizer/strings.skl b/tests/tokenizer/strings.skl
+new file mode 100644
+index 0000000..cf7340e
+--- /dev/null
++++ b/tests/tokenizer/strings.skl
+@@ -0,0 +1,7 @@
++"hello world"
++'a'
++'\n'
++"hello world\n"
++"\""
++'\''
++"\'"
+diff --git a/tests/tokenizer/strings_and_comments.expected b/tests/tokenizer/strings_and_comments.expected
+new file mode 100644
+index 0000000..48c2631
+--- /dev/null
++++ b/tests/tokenizer/strings_and_comments.expected
+@@ -0,0 +1,7 @@
++"in in"
++"in // in in"
++"in in"
++"in in */ in"
++"in in in"
++"in in */ in"
++"in in"
+diff --git a/tests/tokenizer/strings_and_comments.skl b/tests/tokenizer/strings_and_comments.skl
+new file mode 100644
+index 0000000..225522d
+--- /dev/null
++++ b/tests/tokenizer/strings_and_comments.skl
+@@ -0,0 +1,10 @@
++"in in"
++"in // in in"
++// "out out ou"
++"in in" // "out out"
++"in in */ in"
++"in in in"
++"in in */ in"
++/* "out out"
++"out out"
++"out */ "in in"
+-- 
+2.25.1
+

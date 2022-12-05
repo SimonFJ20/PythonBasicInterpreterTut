@@ -1,0 +1,1 @@
+node skivelang.js $1 --debug

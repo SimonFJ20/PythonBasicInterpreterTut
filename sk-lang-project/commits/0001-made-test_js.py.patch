@@ -1,0 +1,62 @@
+From b4f70891a8bcbf37d157a927bc0ce875277909d3 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Sat, 27 Aug 2022 18:37:33 +0200
+Subject: [PATCH] made test_js.py
+
+---
+ scripts/test_js.py | 29 +++++++++++++++++++++++++++++
+ test.skl           |  6 ------
+ 2 files changed, 29 insertions(+), 6 deletions(-)
+ delete mode 100644 test.skl
+
+diff --git a/scripts/test_js.py b/scripts/test_js.py
+index 139597f..d560808 100644
+--- a/scripts/test_js.py
++++ b/scripts/test_js.py
+@@ -1,2 +1,31 @@
++from glob import glob
++from subprocess import run
++from re import search
+ 
++def run_part_tests(flag: str, test_folder: str):
++    samples = list(filter(lambda s : test_folder in s, glob(f"tests/**/*.skl")))
++    expected = list(filter(lambda s : test_folder in s, glob(f"tests/**/*.expected")))
++    for i in range(len(samples)):
++        print(f"Running '{samples[i]}' ", end="")
++        result = run(["node", "skivelang.js", samples[i], flag], capture_output=True)
++        if result.returncode != 0:
++            print("FAIL")
++            print("REASON: returncode != 0")
++        else:
++            with open(expected[i]) as f:
++                expected_stdout = f.read()
++            if expected_stdout != result.stdout.decode("utf-8"):
++                print("FAIL")
++                print("REASON: expected_stdout != result.stdout")
++                print("EXPECTED:")
++                print(expected_stdout)
++                print("GOT:")
++                print(result.stdout.decode("utf-8"))
++            else:
++                print("OK")
++
++if __name__ == "__main__":
++    run_part_tests("--test-tokenizer", "tokenizer")
++    run_part_tests("--test-parser", "parser")
++    run_part_tests("--test-transpiler", "transpiler")
+ 
+diff --git a/test.skl b/test.skl
+deleted file mode 100644
+index 24689d0..0000000
+--- a/test.skl
++++ /dev/null
+@@ -1,6 +0,0 @@
+-
+-"foo"
+-/*
+-"bar"
+-*/
+-
+-- 
+2.25.1
+

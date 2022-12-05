@@ -1,0 +1,7 @@
+capture this
+// done capture this
+capture this
+/*
+dont caputure this
+*/ capture this
+capture this /* but not this */

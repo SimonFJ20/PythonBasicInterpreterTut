@@ -1,0 +1,151 @@
+From 7b1b888d86ab31501927ec193022137a3916da60 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Sun, 28 Aug 2022 04:39:04 +0200
+Subject: [PATCH] member needs to be implemented
+
+---
+ selfhost.skl | 88 ++++++++++++----------------------------------------
+ skivelang.js |  4 +--
+ 2 files changed, 21 insertions(+), 71 deletions(-)
+
+diff --git a/selfhost.skl b/selfhost.skl
+index f69b05b..0e5c53a 100644
+--- a/selfhost.skl
++++ b/selfhost.skl
+@@ -1,6 +1,5 @@
+ 
+-/*
+-let keywords: Vec<String> = new(Vec)
++let keywords: Own<Vec<String>> = new(Vec)
+ keywords.vec_push("if")
+ keywords.vec_push("then")
+ keywords.vec_push("else")
+@@ -14,17 +13,17 @@ keywords.vec_push("and")
+ keywords.vec_push("or")
+ keywords.vec_push("not")
+ 
+-let assign_operators: Vec<String> = new(Vec)
++let assign_operators: Own<Vec<String>> = new(Vec)
+ assign_operators.vec_push("=")
+ assign_operators.vec_push("+=")
+ assign_operators.vec_push("-=")
+ assign_operators.vec_push("*=")
+ 
+-let unary_operators: Vec<String> = new(Vec)
++let unary_operators: Own<Vec<String>> = new(Vec)
+ unary_operators.vec_push("-")
+ unary_operators.vec_push("not")
+ 
+-let binary_operators: Vec<String> = new(Vec)
++let binary_operators: Own<Vec<String>> = new(Vec)
+ binary_operators.vec_push("+")
+ binary_operators.vec_push("-")
+ binary_operators.vec_push("*")
+@@ -39,72 +38,23 @@ binary_operators.vec_push("!=")
+ binary_operators.vec_push("and")
+ binary_operators.vec_push("or")
+ 
+-fn tokenize(text: String) -> Vec<String>
+-
+-end
+-
+-fn remove_single_line_comments(text: String) -> String
+-    let result: String = ""
+-    let i: int = 0
+-    let comment: bool = false
+-    let last_was_slash: bool = false
+-    while i < text.vec_length() do
+-        if not comment and text.vec_get(i) == '/' then
+-            comment = if last_was_slash then true else false
+-            last_was_slash = true
+-        end
+-        if not comment then
+-            result.vec_push(text.vec_get(i))
+-        end
+-        if comment and text.vec_get(i) == '\n' then
+-            comment = false
+-        end
+-        i += 1
+-    end
+-    return result
+-end
+-
+-fn replace_strings_with_placeholders(text: String) -> String
+-    text.print()
++struct Lexer
++    text: Ref<String>,
++    index: int,
++    tokens: Vec<String>
+ end
+ 
++fn tokenize(text: String) -> Own<Vec<String>>
++    let lexer: Own<Lexer> = new(Lexer)
++    lexer.text = text
++    lexer.index = 0
++    lexer.tokens = new(Vec)
+ 
+-print(remove_single_line_comments("foo bar\n// foo bar\nfoo bar\n"))
+-*/
+-
+-fn all_string_tokens(text: String) -> Vec<String>
+-    let strings: Vec<String> = new(Vec)
+-    // 0 = default, 1 = string, 2 = linecomment, 3 = blockcomment
+-    let state: int = 0
+-    let acc: String = "asdsa"
+-    let i: int = 0
+-    while i < text.vec_length() do
+-        if state == 0 then
+-            if text[i] == '"' then
+-                state = 1
+-                acc = ""
+-                acc.vec_push(text[i])
+-            else if i > 0 and text[i - 1] == '/' and text[i] == '/' then
+-                state = 2
+-            else if i > 0 and text[i - 1] == '/' and text[i] == '*' then
+-                state = 3
+-            end end end
+-        else if state == 1 then
+-            acc.vec_push(text[i])
+-            if text[i - 1] != '\\' and text[i] == '"' then
+-                strings.vec_push(acc)
+-                state = 0
+-            end
+-        else if state == 2 then
+-            if text[i] == '\n' then
+-                state = 0
+-            end
+-        else if state == 3 then
+-            if text[i - 1] == '*' and text[i] == '/' then
+-                state = 0
+-            end
+-        end end end end
+-        i += 1
++    while lexer.index < text.vec_length() do
++        lexer.index += 1
+     end
+-    return strings
++
++    let tokens = lexer.tokens
++    delete(lexer)
++    return tokens
+ end
+diff --git a/skivelang.js b/skivelang.js
+index 03203db..3bcb4a8 100644
+--- a/skivelang.js
++++ b/skivelang.js
+@@ -1097,10 +1097,10 @@ class Transpiler {
+             case "generic":
+                 if (this.struct_names.includes(node.value)) {
+                     return `${node.value}*`;
+-                } else if (node.value === "Owned") {
++                } else if (["Own", "Ref"].includes(node.value)) {
+                     if (node.params.length < 1)
+                         throw new Error("not enough generic params");
+-                    return `${node.params[0]}`;
++                    return this.transpileType(node.params[0]);
+                 } else {
+                     throw new Error(`'${node.id}' not implemented`);
+                 }
+-- 
+2.25.1
+

@@ -1,0 +1,1227 @@
+From 772215fc89f8d42222bfb39e823cc3a3b446c5d3 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Fri, 26 Aug 2022 18:09:25 +0200
+Subject: [PATCH] init
+
+---
+ .gitignore        |   3 +
+ .prettierrc.json  |   7 +
+ compile_flags.txt |   2 +
+ lib.c             |  80 +++++
+ lib.h             |  33 ++
+ selfhost.skl      |  69 ++++
+ skivelang.js      | 892 ++++++++++++++++++++++++++++++++++++++++++++++
+ test.skl          |  18 +
+ tests/all.skl     |  36 ++
+ 9 files changed, 1140 insertions(+)
+ create mode 100644 .gitignore
+ create mode 100644 .prettierrc.json
+ create mode 100644 compile_flags.txt
+ create mode 100644 lib.c
+ create mode 100644 lib.h
+ create mode 100644 selfhost.skl
+ create mode 100644 skivelang.js
+ create mode 100644 test.skl
+ create mode 100644 tests/all.skl
+
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..28eb77c
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,3 @@
++a.out
++a.exe
++out.c
+\ No newline at end of file
+diff --git a/.prettierrc.json b/.prettierrc.json
+new file mode 100644
+index 0000000..5b120de
+--- /dev/null
++++ b/.prettierrc.json
+@@ -0,0 +1,7 @@
++{
++    "trailingComma": "all",
++    "tabWidth": 4,
++    "semi": true,
++    "singleQuote": false,
++    "printWidth": 80    
++}
+\ No newline at end of file
+diff --git a/compile_flags.txt b/compile_flags.txt
+new file mode 100644
+index 0000000..1147299
+--- /dev/null
++++ b/compile_flags.txt
+@@ -0,0 +1,2 @@
++-xc
++-Wno-int-conversion
+\ No newline at end of file
+diff --git a/lib.c b/lib.c
+new file mode 100644
+index 0000000..4746f8e
+--- /dev/null
++++ b/lib.c
+@@ -0,0 +1,80 @@
++#include "lib.h"
++
++#include <assert.h>
++
++void print_int(int v)
++{
++    printf("%d\n", v);
++}
++
++void vec_push(Vec* v, uint64_t item)
++{
++    v->size++;
++    if (v->size > v->capacity) {
++        v->capacity = v->size + v->size % 8;
++        v->items = realloc(v->items, sizeof (uint64_t) * v->capacity);
++    }
++    v->items[v->size - 1] = item;
++}
++
++void vec_reserve(Vec* v,  size_t slots)
++{
++    size_t required = v->size + slots;
++    if (required > v->capacity) {
++        v->capacity = required + required % 8;
++        v->items = realloc(v->items, sizeof (uint64_t) * v->capacity);
++    }
++}
++
++uint64_t vec_pop(Vec* v)
++{
++    assert(v->size > 0);
++    v->size--;
++    return v->items[v->size];
++}
++
++uint64_t vec_get(Vec* v, size_t i)
++{
++    if (i > 0)
++        return vec_get(v, -i);
++    assert(v->size > i);
++    return v->items[i];
++}
++
++size_t vec_length(Vec* v)
++{
++    return v->size;
++}
++
++Vec* vec_from_string(const char* string)
++{
++    Vec* v = calloc(1, sizeof (Vec));
++    vec_reserve(v, strlen(string));
++    for (int i = 0; string[i]; i++)
++        vec_push(v, string[i]);
++    return v;
++}
++
++bool string_match(Vec* a, Vec* b)
++{
++    if (a->size != b->size)
++        return false;
++    for (int i = 0; i < a->size; i++) {
++        if (a->items[i] != b->items[i])
++            return false;
++    }
++    return true;
++}
++
++void print(Vec* s)
++{
++    char* buffer = calloc(s->size + 1, sizeof (char));
++    int i = 0;
++    while (i < s->size)
++    {
++        buffer[i] = (char)s->items[i];
++        i++;
++    }
++    buffer[i] = '\0';
++    puts(buffer);
++}
+diff --git a/lib.h b/lib.h
+new file mode 100644
+index 0000000..a30b848
+--- /dev/null
++++ b/lib.h
+@@ -0,0 +1,33 @@
++#ifndef LIB_H
++#define LIB_H
++
++#include <stdlib.h>
++#include <stdbool.h>
++#include <stdint.h>
++#include <string.h>
++#include <stdio.h>
++
++#define new(s) (calloc(1, sizeof (s)))
++#define delete(o) (free(o))
++
++void print_int(int v);
++
++typedef struct {
++    uint64_t* items;
++    size_t size;
++    size_t capacity;
++} Vec;
++
++typedef Vec String;
++
++void vec_push(Vec* v, uint64_t item);
++void vec_reserve(Vec* v,  size_t slots);
++uint64_t vec_pop(Vec* v);
++uint64_t vec_get(Vec* v, size_t i);
++size_t vec_length(Vec* v);
++
++Vec* vec_from_string(const char* string);
++bool string_match(Vec* a, Vec* b);
++void print(Vec* s);
++
++#endif
+diff --git a/selfhost.skl b/selfhost.skl
+new file mode 100644
+index 0000000..3df0c4c
+--- /dev/null
++++ b/selfhost.skl
+@@ -0,0 +1,69 @@
++
++let keywords: Vec<String> = new(Vec)
++keywords.vec_push("if")
++keywords.vec_push("then")
++keywords.vec_push("else")
++keywords.vec_push("end")
++keywords.vec_push("while")
++keywords.vec_push("do")
++keywords.vec_push("fn")
++keywords.vec_push("return")
++keywords.vec_push("struct")
++keywords.vec_push("and")
++keywords.vec_push("or")
++keywords.vec_push("not")
++
++let assign_operators: Vec<String> = new(Vec)
++assign_operators.vec_push("=")
++assign_operators.vec_push("+=")
++assign_operators.vec_push("-=")
++assign_operators.vec_push("*=")
++
++let unary_operators: Vec<String> = new(Vec)
++unary_operators.vec_push("-")
++unary_operators.vec_push("not")
++
++let binary_operators: Vec<String> = new(Vec)
++binary_operators.vec_push("+")
++binary_operators.vec_push("-")
++binary_operators.vec_push("*")
++binary_operators.vec_push("/")
++binary_operators.vec_push("%")
++binary_operators.vec_push("<")
++binary_operators.vec_push("<=")
++binary_operators.vec_push(">")
++binary_operators.vec_push(">=")
++binary_operators.vec_push("==")
++binary_operators.vec_push("!=")
++binary_operators.vec_push("and")
++binary_operators.vec_push("or")
++
++fn tokenize(text: String) -> Vec<String>
++
++end
++
++fn remove_single_line_comments(text: String) -> String
++    let result: String = ""
++    let i: int = 0
++    let comment: bool = false
++    let last_was_slash: bool = false
++    while i < text.vec_length() do
++        if not comment and text.vec_get(i) == '/' then
++            comment = if last_was_slash then true else false
++            last_was_slash = true
++        end
++        if not comment then
++            result.vec_push(text.vec_get(i))
++        end
++        if comment and text.vec_get(i) == '\n' then
++            comment = false
++        end
++        i += 1
++    end
++end
++
++fn replace_strings_with_placeholders(text: String) -> String
++    text.print()
++end
++
++replace_strings_with_placeholders("test")
+diff --git a/skivelang.js b/skivelang.js
+new file mode 100644
+index 0000000..0e6298b
+--- /dev/null
++++ b/skivelang.js
+@@ -0,0 +1,892 @@
++"use strict";
++
++const fs = require("fs");
++
++const keywords = [
++    "if",
++    "then",
++    "else",
++    "end",
++    "while",
++    "do",
++    "fn",
++    "return",
++    "struct",
++    "and",
++    "or",
++    "not",
++];
++const assignOperators = ["=", "+=", "-=", "*="];
++const unaryOperators = ["-", "not"];
++const binaryOperators = [
++    "+",
++    "-",
++    "*",
++    "/",
++    "%",
++    "<",
++    "<=",
++    ">",
++    ">=",
++    "==",
++    "!=",
++    "and",
++    "or",
++];
++const operatorPrecedence = {
++    "+": 11,
++    "-": 11,
++    "*": 12,
++    "/": 12,
++    "%": 12,
++    "<": 9,
++    "<=": 9,
++    ">": 9,
++    ">=": 9,
++    "==": 8,
++    "!=": 8,
++    and: 4,
++    or: 3,
++};
++
++/** @param {string} text @returns {string[]} */
++function tokenize(text) {
++    const textWithoutComments = text
++        .replace(/\/\/.*?$/gm, "")
++        .replace(/\/\*.*?\*\//gs, "");
++
++    const strings = textWithoutComments.match(/(".*?")/g);
++
++    return textWithoutComments
++        .replace(/(".*?")/g, "__STRING__")
++        .replace(/->/g, "__THIN_ARROW__")
++        .replace(/=>/g, "__HEAVY_ARROW__")
++        .replace(/\-=/g, "__SUBTRACT_ASSIGN__")
++        .replace(/\*=/g, "__MULTIPLY_ASSIGN__")
++        .replace(/(?<!\\)([\(\)\[\]\{\}<>.,:\-\*&])/g, " $1 ")
++        .split(/[ \r\n\t]/)
++        .map((s) => (s === "__STRING__" ? strings.shift() : s))
++        .map((s) => (s === "__THIN_ARROW__" ? "->" : s))
++        .map((s) => (s === "__HEAVY_ARROW__" ? "=>" : s))
++        .map((s) => (s === "__SUBTRACT_ASSIGN__" ? "-=" : s))
++        .map((s) => (s === "__MULTIPLY_ASSIGN__" ? "*=" : s))
++        .filter((s) => s);
++}
++
++class Parser {
++    /** @param {string[]} tokens */
++    constructor(tokens) {
++        this.tokens = tokens;
++        this.index = 0;
++    }
++
++    parseStatements() {
++        let statements = [];
++        while (!this.done() && !["end", "else"].includes(this.current())) {
++            statements.push(this.parseStatement());
++        }
++        return statements;
++    }
++
++    parseStatement() {
++        switch (this.current()) {
++            case "struct":
++                return this.parseStruct();
++            case "fn":
++                return this.parseFunc();
++            case "return":
++                return this.parseReturn();
++            case "if":
++                return this.parseIf();
++            case "while":
++                return this.parseWhile();
++            case "let":
++                return this.parseLet();
++        }
++        const res = this.tryParseAssign();
++        if (res.completed) return res.statement;
++        else return { id: "expression", value: res.expression };
++    }
++
++    parseStruct() {
++        this.step();
++        if (this.done() || !/[a-zA-Z_][a-zA-Z_0-9]*/.test(this.current()))
++            throw new Error("expected identifier");
++        const identifier = this.current();
++        this.step();
++        let fields = [];
++        if (!this.done() && /[a-zA-Z_][a-zA-Z_0-9]*/.test(this.current())) {
++            fields.push(this.parseParameter());
++            while (!this.done() && this.current() === ",") {
++                this.step();
++                if (!this.done() && this.current() === "end") break;
++                fields.push(this.parseParameter());
++            }
++        }
++        if (this.done() || this.current() !== "end")
++            throw new Error(`expected 'end', got '${this.current()}'`);
++        this.step();
++        return { id: "struct", identifier, fields };
++    }
++
++    parseFunc() {
++        this.step();
++        if (this.done() || !/[a-zA-Z_][a-zA-Z_0-9]*/.test(this.current()))
++            throw new Error("expected identifier");
++        const identifier = this.current();
++        this.step();
++        const params = this.parseParameters();
++        const type = this.parseReturnType();
++        const body = this.parseStatements();
++        if (this.done() || this.current() !== "end")
++            throw new Error(`expected 'end', got '${this.current()}'`);
++        this.step();
++        return { id: "func", identifier, params, type, body };
++    }
++
++    parseReturn() {
++        this.step();
++        const value = this.parseExpression();
++        return { id: "return", value };
++    }
++
++    parseIf() {
++        this.step();
++        const condition = this.parseExpression();
++        if (this.done() || this.current() !== "then")
++            throw new Error(`expected 'then', got '${this.current()}'`);
++        this.step();
++        const truthy = this.parseStatements();
++        if (!this.done() && this.current() === "end") {
++            this.step();
++            return { id: "if", condition, truthy, falsy: null };
++        } else if (!this.done() && this.current() === "else") {
++            this.step();
++            const falsy = this.parseStatements();
++            if (this.done() || this.current() !== "end")
++                throw new Error(`expected 'end', got '${this.current()}'`);
++            this.step();
++            return { id: "if", condition, truthy, falsy };
++        } else {
++            throw new Error(
++                `expected 'else' or 'end', got '${this.current()}'`,
++            );
++        }
++    }
++
++    parseWhile() {
++        this.step();
++        const condition = this.parseExpression();
++        if (this.done() || this.current() !== "do")
++            throw new Error(`expected 'do', got '${this.current()}'`);
++        this.step();
++        const body = this.parseStatements();
++        if (this.done() || this.current() !== "end")
++            throw new Error(`expected 'end', got '${this.current()}'`);
++        this.step();
++        return { id: "while", condition, body };
++    }
++
++    parseLet() {
++        this.step();
++        if (!this.done() && /[a-zA-Z_][a-zA-Z_0-9]*/.test(this.current())) {
++            const { identifier, type } = this.parseParameter();
++            if (!this.done() && this.current() === "=") {
++                this.step();
++                const value = this.parseExpression();
++                return { id: "let", identifier, type, value };
++            } else {
++                return { id: "let", identifier, type, value: null };
++            }
++        } else {
++            throw new Error("expected identifier");
++        }
++    }
++
++    tryParseAssign() {
++        const target = this.parseExpression();
++        if (this.done() || !assignOperators.includes(this.current()))
++            return { completed: false, expression: target };
++        const op = this.current();
++        this.step();
++        const value = this.parseExpression();
++        return {
++            completed: true,
++            statement: { id: "assign", target, value, op },
++        };
++    }
++
++    parseExpression() {
++        switch (this.current()) {
++            case "fn":
++                return this.parseClosure();
++            case "if":
++                return this.parseTernary();
++            default:
++                return this.parseBinary();
++        }
++    }
++
++    parseClosure() {
++        this.step();
++        const capures = this.parseCaptures();
++        const params = this.parseParameters();
++        const type = this.parseReturnType();
++        if (!this.done() && this.current() === "do") {
++            this.step();
++            const body = this.parseStatements();
++            if (this.done() || this.current() !== "end")
++                throw new Error(`expected 'end', got '${this.current()}'`);
++            this.step();
++            return { id: "closure", capures, params, type, value: null, body };
++        } else if (!this.done() && this.current() === "=>") {
++            this.step();
++            const value = this.parseExpression();
++            return { id: "closure", capures, params, type, value, body: null };
++        } else {
++            throw new Error(`expected 'do' or '=>', got '${this.current()}'`);
++        }
++    }
++
++    parseCaptures() {
++        if (this.done() || this.current() !== "[") return null;
++        this.step();
++        let captures = [];
++        if (!this.done() && /[a-zA-Z_][a-zA-Z_0-9]*/.test(this.current())) {
++            captures.push(this.current());
++            this.step();
++            while (!this.done() && this.current() === ",") {
++                this.step();
++                if (!this.done() && this.current() === "]") break;
++                captures.push(this.current());
++                this.step();
++            }
++        }
++        if (this.done() || this.current() !== "]")
++            throw new Error(`expected ']', got '${this.current()}'`);
++        this.step();
++        return captures;
++    }
++
++    parseTernary() {
++        this.step();
++        const condition = this.parseExpression();
++        if (this.done() || this.current() !== "then")
++            throw new Error(`expected 'then', got '${this.current()}'`);
++        this.step();
++        const truthy = this.parseExpression();
++        if (this.done() || this.current() !== "else")
++            throw new Error(`expected 'else', got '${this.current()}'`);
++        this.step();
++        const falsy = this.parseExpression();
++        return { id: "ternary", condition, truthy, falsy };
++    }
++
++    parseBinary() {
++        let exprs = [this.parseUnary()];
++        let ops = [];
++        let lastPrec = 20;
++        while (!this.done()) {
++            const op = this.current();
++            if (!binaryOperators.includes(op)) break;
++            this.step();
++            const prec = operatorPrecedence[op];
++            const right = this.parseUnary();
++            while (prec <= lastPrec && exprs.length > 1) {
++                const right = exprs.pop();
++                const op = ops.pop();
++                lastPrec = operatorPrecedence[op];
++                if (lastPrec < prec) {
++                    exprs.push(right);
++                    ops.push(op);
++                    break;
++                }
++                const left = exprs.pop();
++                exprs.push({ id: "binary", left, right, op });
++            }
++            exprs.push(right);
++            ops.push(op);
++        }
++        while (exprs.length > 1) {
++            const right = exprs.pop();
++            const left = exprs.pop();
++            const op = ops.pop();
++            exprs.push({ id: "binary", left, right, op });
++        }
++        return exprs[0];
++    }
++
++    parseUnary() {
++        if (!this.done() && unaryOperators.includes(this.current())) {
++            const op = this.current();
++            this.step();
++            return { id: "unary", value: this.parseUnary(), op };
++        } else {
++            return this.tryParseMemberCallIndex();
++        }
++    }
++
++    tryParseMemberCallIndex() {
++        let value = this.parseValue();
++        while (!this.done()) {
++            if (!this.done() && this.current() === ".") {
++                this.step();
++                if (
++                    this.done() ||
++                    !/[a-zA-Z_][a-zA-Z_0-9]*/.test(this.current())
++                )
++                    throw new Error("expected identifier");
++                const identifier = this.current();
++                this.step();
++                value = { id: "member", value, identifier };
++            } else if (!this.done() && this.current() === "(") {
++                this.step();
++                let args = [];
++                if (!this.done() && this.current() !== ")") {
++                    args.push(this.parseExpression());
++                    while (!this.done() && this.current() === ",") {
++                        this.step();
++                        if (!this.done() && this.current() === ")") break;
++                        args.push(this.parseExpression());
++                    }
++                }
++                if (this.done() || this.current() !== ")")
++                    throw new Error(`expected ')', got '${this.current()}'`);
++                this.step();
++                value = { id: "call", value, args };
++            } else if (!this.done() && this.current() === "[") {
++                this.step();
++                const index = this.parseExpression();
++                if (this.done() || this.current() !== "]")
++                    throw new Error(`expected ']', got '${this.current()}'`);
++                this.step();
++                value = { id: "index", value, index };
++            } else {
++                break;
++            }
++        }
++        return value;
++    }
++
++    parseGroup() {
++        if (!this.done() && this.current() === "(") {
++            this.step();
++            const expression = this.parseExpression();
++            if (!this.done() && this.current() != ")")
++                throw new Error(`expected ')', got '${this.current()}'`);
++            this.step();
++            return expression;
++        } else {
++            return this.parseValue();
++        }
++    }
++
++    parseValue() {
++        const saveValueStepReturn = (id) => {
++            const value = this.current();
++            this.step();
++            return { id, value };
++        };
++        if (!this.done() && /0x\d+/.test(this.current())) {
++            return saveValueStepReturn("hex");
++        } else if (!this.done() && /\d+/.test(this.current())) {
++            return saveValueStepReturn("int");
++        } else if (!this.done() && /\d+(?:\.\d+)/.test(this.current())) {
++            return saveValueStepReturn("float");
++        } else if (!this.done() && /'\\?.'/.test(this.current())) {
++            return saveValueStepReturn("char");
++        } else if (!this.done() && /".*?"/.test(this.current())) {
++            return saveValueStepReturn("string");
++        } else if (
++            !this.done() &&
++            /[a-zA-Z_][a-zA-Z_0-9]*/.test(this.current())
++        ) {
++            const value = this.current();
++            if (keywords.includes(value))
++                throw new Error(
++                    `cannot use keyword '${this.current()}' as variable name`,
++                );
++            this.step();
++            return { id: "identifier", value };
++        } else {
++            throw new Error(`expected value, got '${this.current()}'`);
++        }
++    }
++
++    parseParameters() {
++        if (this.done() || this.current() !== "(")
++            throw new Error(`expected '(', got '${this.current()}'`);
++        this.step();
++        let params = [];
++        if (!this.done() && /[a-zA-Z_][a-zA-Z_0-9]*/.test(this.current())) {
++            params.push(this.parseParameter());
++            while (!this.done() && this.current() === ",") {
++                this.step();
++                if (!this.done() && this.current() === ")") break;
++                params.push(this.parseParameter());
++            }
++        }
++        if (this.done() || this.current() !== ")")
++            throw new Error(`expected ')', got '${this.current()}'`);
++        this.step();
++        return params;
++    }
++
++    parseParameter() {
++        if (this.done() || !/[a-zA-Z_][a-zA-Z_0-9]*/.test(this.current()))
++            throw new Error("expected identifier");
++        const identifier = this.current();
++        this.step();
++        if (!this.done() && this.current() === ":") {
++            this.step();
++            const type = this.parseType();
++            return { identifier, type };
++        } else {
++            return { identifier, type: null };
++        }
++    }
++
++    parseReturnType() {
++        if (!this.done() && ["->", ":"].includes(this.current())) {
++            this.step();
++            return this.parseType();
++        } else {
++            return null;
++        }
++    }
++
++    parseType() {
++        if (this.done() || !/[a-zA-Z_][a-zA-Z_0-9]*/.test(this.current()))
++            throw new Error("expected type");
++        const value = this.current();
++        this.step();
++        if (!this.done() && this.current() === "<") {
++            this.step();
++            let params = [];
++            if (!this.done() && this.current() !== ">") {
++                params.push(this.parseType());
++                while (!this.done() && this.current() !== ">") {
++                    if (this.current() !== ",")
++                        throw new Error(
++                            `expected ',', got '${this.current()}'`,
++                        );
++                    this.step();
++                    if (!this.done() && this.current() !== ">") break;
++                    params.push(this.parseType());
++                }
++            }
++            if (this.done() || this.current() !== ">")
++                throw new Error(`expected '>', got '${this.current()}'`);
++            this.step();
++            return { id: "generic", value, params };
++        } else {
++            return { id: "identifier", value };
++        }
++    }
++
++    step() {
++        this.index += 1;
++    }
++
++    current() {
++        return this.tokens[this.index];
++    }
++
++    done() {
++        return this.index >= this.tokens.length;
++    }
++}
++
++class Transpiler {
++    constructor() {
++        this.code = "";
++        this.structs = [];
++        this.struct_names = ["Vec", "String"];
++        this.funcs = [];
++        this.globals = [];
++        this.closure_identifiers = [];
++    }
++
++    result() {
++        const main = this.code;
++        this.code = "";
++        this.code += '#include "lib.h"\n';
++
++        if (this.structs.length > 0) {
++            this.code += "\n// struct forward declarations\n";
++            for (const struct of this.structs)
++                this.code += `typedef struct ${struct.identifier} ${struct.identifier};\n`;
++
++            this.code += "\n// struct definitions\n";
++            for (const struct of this.structs) {
++                this.code += `typedef struct ${struct.identifier} {\n`;
++                this.code += struct.fields;
++                this.code += `} ${struct.identifier};\n`;
++            }
++        }
++
++        if (this.funcs.length > 0) {
++            this.code += "\n// func forward declarations\n";
++            for (const func of this.funcs) {
++                this.code += `${func.type} ${func.identifier}(${func.params});\n`;
++            }
++
++            this.code += "\n// func definitions\n";
++            for (const func of this.funcs) {
++                this.code += `${func.type} ${func.identifier}(${func.params})\n`;
++                this.code += "{\n";
++                this.code += func.code;
++                this.code += "}\n";
++            }
++        }
++
++        if (this.globals.length > 0) {
++            this.code += "\n// global declarations\n";
++            for (const { type, identifier } of this.globals)
++                this.code += `${type} ${identifier};\n`;
++        }
++
++        this.code += "\n";
++        this.code += "int main(int argc, char** argv)\n";
++        this.code += "{\n";
++        this.code += main;
++        this.code += "}\n";
++        return this.code;
++    }
++
++    transpileStatements(nodes, isTopLevel = false) {
++        for (const node of nodes) {
++            this.transpileStatement(node, isTopLevel);
++        }
++    }
++
++    transpileStatement(node, isTopLevel) {
++        switch (node.id) {
++            case "struct":
++                this.transpileStruct(node, isTopLevel);
++                break;
++            case "func":
++                this.transpileFunc(node, isTopLevel);
++                break;
++            case "return":
++                this.transpileReturn(node);
++                this.code += ";\n";
++                break;
++            case "if":
++                this.transpileIf(node);
++                break;
++            case "while":
++                this.transpileWhile(node);
++                break;
++            case "let":
++                this.transpileLet(node, isTopLevel);
++                this.code += ";\n";
++                break;
++            case "assign":
++                this.transpileAssign(node);
++                this.code += ";\n";
++                break;
++            case "expression":
++                this.transpileExpression(node.value);
++                this.code += ";\n";
++                break;
++            default:
++                throw new Error(`'${node.id}' not implemented`);
++        }
++    }
++
++    transpileStruct(node, isTopLevel) {
++        if (!isTopLevel)
++            throw new Error(
++                "structs can only be defined at top level (might change)",
++            );
++        const fields = node.fields
++            .map(
++                ({ type, identifier }) =>
++                    `${this.transpileType(type)} ${identifier};\n`,
++            )
++            .join("");
++        this.structs.push({ identifier: node.identifier, fields });
++        this.struct_names.push(node.identifier);
++    }
++
++    transpileFunc(node, isTopLevel) {
++        if (!isTopLevel)
++            throw new Error(
++                "functions can only be defined at top level (might change)",
++            );
++        const params = node.params
++            .map(
++                ({ type, identifier }) =>
++                    `${this.transpileType(type)} ${identifier}`,
++            )
++            .join(", ");
++        const type = this.transpileType(node.type);
++
++        const outerCode = this.code;
++        this.code = "";
++        this.transpileStatements(node.body);
++        const code = this.code;
++        this.code = outerCode;
++
++        this.funcs.push({ identifier: node.identifier, params, type, code });
++    }
++
++    transpileReturn(node) {
++        this.code += "return ";
++        this.transpileExpression(node.value);
++    }
++
++    transpileIf(node) {
++        this.code += "if (";
++        this.transpileExpression(node.condition);
++        this.code += ") {";
++        this.transpileStatements(node.truthy);
++        this.code += "}";
++        if (node.falsy) {
++            this.code += "} else {";
++            this.transpileStatements(node.falsy);
++            this.code += "}";
++        }
++    }
++
++    transpileWhile(node) {
++        this.code += "while (";
++        this.transpileExpression(node.condition);
++        this.code += ") {";
++        this.transpileStatements(node.body);
++        this.code += "}";
++    }
++
++    transpileLet(node, isTopLevel) {
++        if (!node.type) throw new Error("inferrence not implemented");
++        const type = this.transpileType(node.type);
++        if (isTopLevel) {
++            this.globals.push({ identifier: node.identifier, type });
++        } else {
++            this.code += type;
++            this.code += " ";
++        }
++        this.code += node.identifier;
++        if (node.value) {
++            this.code += " = ";
++            this.transpileExpression(node.value);
++        }
++    }
++
++    transpileAssign(node) {
++        this.code += "(";
++        this.transpileExpression(node.target);
++        this.code += ` ${node.op} `;
++        this.transpileExpression(node.value);
++        this.code += ")";
++    }
++
++    transpileExpression(node) {
++        switch (node.id) {
++            case "ternary":
++                return this.transpileTernary(node);
++            case "closure":
++                return this.transpileClosure(node);
++            case "call":
++                return this.transpileCall(node);
++            case "index":
++                return this.transpileIndex(node);
++            case "binary":
++                return this.transpileBinary(node);
++            case "unary":
++                return this.transpileUnary(node);
++            case "hex":
++                return this.transpileHex(node);
++            case "int":
++                return this.transpileInt(node);
++            case "float":
++                return this.transpileFloat(node);
++            case "char":
++                return this.transpileChar(node);
++            case "string":
++                return this.transpileString(node);
++            case "identifier":
++                return this.transpileIdentifier(node);
++            default:
++                throw new Error(`'${node.id}' not implemented`);
++        }
++    }
++
++    transpileTernary(node) {
++        this.code += "(";
++        this.transpileExpression(node.condition);
++        this.code += " ? ";
++        this.transpileExpression(node.truthy);
++        this.code += " : ";
++        this.transpileExpression(node.falsy);
++        this.code += ")";
++    }
++
++    transpileClosure(node) {
++        throw new Error("not implemented");
++    }
++
++    transpileCall(node) {
++        if (node.value.id === "member") {
++            this.code += node.value.identifier;
++            this.code += "(";
++            this.transpileExpression(node.value.value);
++            if (node.args.length > 0) {
++                this.code += ", ";
++                this.transpileExpression(node.args[0]);
++                for (const arg of node.args.slice(1)) {
++                    this.code += ", ";
++                    this.transpileExpression(arg);
++                }
++            }
++            this.code += ")";
++        } else {
++            this.transpileExpression(node.value);
++            this.code += "(";
++            if (node.args.length > 0) {
++                this.transpileExpression(node.args[0]);
++                for (const arg of node.args.slice(1)) {
++                    this.code += ", ";
++                    this.transpileExpression(arg);
++                }
++            }
++            this.code += ")";
++        }
++    }
++
++    transpileIndex(node) {
++        this.code += "vec_get(";
++        this.transpileExpression(node.value);
++        this.code += ", ";
++        this.transpileExpression(node.index);
++        this.code += ")";
++    }
++
++    transpileIndex(node) {
++        this.code += "vec_get(";
++        this.transpileExpression(node.value);
++        this.code += ", ";
++        this.transpileExpression(node.index);
++        this.code += ")";
++    }
++
++    transpileBinary(node) {
++        this.code += "(";
++        this.transpileExpression(node.left);
++        switch (node.op) {
++            case "+":
++            case "-":
++            case "*":
++            case "/":
++            case "%":
++            case "<":
++            case ">":
++            case "<=":
++            case ">=":
++            case "==":
++            case "!=":
++                this.code += ` ${node.op} `;
++                break;
++            case "and":
++                this.code += " && ";
++                break;
++            case "or":
++                this.code += " || ";
++                break;
++            default:
++                throw new Error(`'${node.op}' not implemented`);
++        }
++        this.transpileExpression(node.right);
++        this.code += ")";
++    }
++
++    transpileUnary(node) {
++        this.code += "(";
++        switch (node.op) {
++            case "not":
++                this.code += "!";
++                break;
++            default:
++                throw new Error(`'${node.op}' not implemented`);
++        }
++        this.transpileExpression(node.value);
++        this.code += ")";
++    }
++
++    transpileHex(node) {
++        this.code += parseInt(node.value, 16).toString();
++    }
++
++    transpileInt(node) {
++        this.code += parseInt(node.value).toString();
++    }
++
++    transpileFloat(node) {
++        this.code += parseFloat(node.value).toString();
++    }
++
++    transpileChar(node) {
++        this.code += `${node.value}`;
++    }
++
++    transpileString(node) {
++        this.code += `vec_from_string(${node.value})`;
++    }
++
++    transpileIdentifier(node) {
++        this.code += node.value;
++    }
++
++    /** @returns {string} */
++    transpileType(node) {
++        if (node === null) return "void*";
++        switch (node.id) {
++            case "generic":
++                if (this.struct_names.includes(node.value)) {
++                    return `${node.value}*`;
++                } else if (node.value === "Owned") {
++                    if (node.params.length < 1)
++                        throw new Error("not enough generic params");
++                    return `${node.params[0]}`;
++                } else {
++                    throw new Error(`'${node.id}' not implemented`);
++                }
++            case "identifier":
++                if (this.struct_names.includes(node.value))
++                    return `${node.value}*`;
++                else return node.value;
++            default:
++                throw new Error(`'${node.id}' not implemented`);
++        }
++    }
++}
++
++function transpile(ast) {
++    const transpiler = new Transpiler();
++    transpiler.transpileStatements(ast, true);
++    return transpiler.result();
++}
++
++if (process.argv.length <= 2)
++    throw new Error("not enough args; USAGE: node main.js <filename>");
++const filename = process.argv[2];
++
++const isDebug = process.argv.includes("--debug");
++const printIfDebug = (...args) => {
++    if (isDebug) console.log(...args);
++};
++
++const text = fs.readFileSync(filename).toString();
++printIfDebug("text:\t", text);
++
++const tokens = tokenize(text);
++printIfDebug("tokens:\t", tokens);
++
++const ast = new Parser(tokens).parseStatements();
++printIfDebug("ast:\t", JSON.stringify(ast, null, "|   "));
++
++const code = transpile(ast);
++printIfDebug("code:\t", code);
++
++fs.writeFileSync("out.c", code);
+diff --git a/test.skl b/test.skl
+new file mode 100644
+index 0000000..0c7d97a
+--- /dev/null
++++ b/test.skl
+@@ -0,0 +1,18 @@
++/*
++let add: int = fn(a: int, b: int) => a + b
++
++let sum = add(3, 5)
++*/
++
++struct MyStruct
++    a: int,
++    b,
++end
++
++let myObject: MyStruct = new(MyStruct)
++
++print_int(5)
++
++let a: Vec<char> = "hello_world"
++let c: char = a[3]
++
+diff --git a/tests/all.skl b/tests/all.skl
+new file mode 100644
+index 0000000..321d67b
+--- /dev/null
++++ b/tests/all.skl
+@@ -0,0 +1,36 @@
++struct MyStruct
++    a: int,
++end
++
++
++fn my_func(b, a: int)
++    print(a)
++end
++
++fn my_func_int(a: int, b ,) -> int
++    print(a)
++end
++
++while true do
++    print(1 + 2)
++end
++
++if a == 4 then
++    print(3)    
++else if a == 5 then
++    print(a)
++else
++    print(5)
++end end
++
++let c = 2 + 3 * 4 + 5
++
++let d = fn(a) => a + 4 
++
++let d = fn(a) do
++    while a do
++        1 + not x
++    end
++end
++
++c -= a[2].asd().as[2].as()
+\ No newline at end of file
+-- 
+2.25.1
+

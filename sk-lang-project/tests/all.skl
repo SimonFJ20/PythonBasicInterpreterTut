@@ -1,0 +1,36 @@
+struct MyStruct
+    a: int,
+end
+
+
+fn my_func(b, a: int)
+    print(a)
+end
+
+fn my_func_int(a: int, b ,) -> int
+    print(a)
+end
+
+while true do
+    print(1 + 2)
+end
+
+if a == 4 then
+    print(3)    
+else if a == 5 then
+    print(a)
+else
+    print(5)
+end end
+
+let c = 2 + 3 * 4 + 5
+
+let d = fn(a) => a + 4 
+
+let d = fn(a) do
+    while a do
+        1 + not x
+    end
+end
+
+c -= a[2].asd().as[2].as()

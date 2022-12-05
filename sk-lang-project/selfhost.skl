@@ -1,0 +1,60 @@
+
+let keywords: Own<Vec<String>> = new(Vec)
+keywords.vec_push("if")
+keywords.vec_push("then")
+keywords.vec_push("else")
+keywords.vec_push("end")
+keywords.vec_push("while")
+keywords.vec_push("do")
+keywords.vec_push("fn")
+keywords.vec_push("return")
+keywords.vec_push("struct")
+keywords.vec_push("and")
+keywords.vec_push("or")
+keywords.vec_push("not")
+
+let assign_operators: Own<Vec<String>> = new(Vec)
+assign_operators.vec_push("=")
+assign_operators.vec_push("+=")
+assign_operators.vec_push("-=")
+assign_operators.vec_push("*=")
+
+let unary_operators: Own<Vec<String>> = new(Vec)
+unary_operators.vec_push("-")
+unary_operators.vec_push("not")
+
+let binary_operators: Own<Vec<String>> = new(Vec)
+binary_operators.vec_push("+")
+binary_operators.vec_push("-")
+binary_operators.vec_push("*")
+binary_operators.vec_push("/")
+binary_operators.vec_push("%")
+binary_operators.vec_push("<")
+binary_operators.vec_push("<=")
+binary_operators.vec_push(">")
+binary_operators.vec_push(">=")
+binary_operators.vec_push("==")
+binary_operators.vec_push("!=")
+binary_operators.vec_push("and")
+binary_operators.vec_push("or")
+
+struct Lexer
+    text: Ref<String>,
+    index: int,
+    tokens: Vec<String>
+end
+
+fn tokenize(text: String) -> Own<Vec<String>>
+    let lexer: Own<Lexer> = new(Lexer)
+    lexer.text = text
+    lexer.index = 0
+    lexer.tokens = new(Vec)
+
+    while lexer.index < text.vec_length() do
+        lexer.index += 1
+    end
+
+    let tokens = lexer.tokens
+    delete(lexer)
+    return tokens
+end

@@ -1,0 +1,434 @@
+From 6186d40a33a7dd69735ff208c27692df931a161e Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Sun, 28 Aug 2022 04:11:03 +0200
+Subject: [PATCH] new lexer
+
+---
+ scripts/test_js.py                   |  19 +-
+ skivelang.js                         | 307 ++++++++++++++++++++++-----
+ tests/tokenizer/numbers.expected     |   4 +-
+ tests/tokenizer/punctuation.expected |   4 +
+ tests/tokenizer/punctuation.skl      |   1 +
+ 5 files changed, 278 insertions(+), 57 deletions(-)
+
+diff --git a/scripts/test_js.py b/scripts/test_js.py
+index d6d4ae2..e67af77 100644
+--- a/scripts/test_js.py
++++ b/scripts/test_js.py
+@@ -1,8 +1,9 @@
+ from glob import glob
+ from subprocess import run
+ from re import search
++from sys import argv
+ 
+-def run_part_tests(flag: str, test_folder: str):
++def run_part_tests(flag: str, test_folder: str, exit_on_error=False, exit_on_fail=False):
+     samples = list(sorted(filter(lambda s : test_folder in s, glob(f"tests/**/*.skl"))))
+     expected = list(sorted(filter(lambda s : test_folder in s, glob(f"tests/**/*.expected"))))
+     for i in range(len(samples)):
+@@ -11,21 +12,27 @@ def run_part_tests(flag: str, test_folder: str):
+         if result.returncode != 0:
+             print("FAIL")
+             print("REASON: returncode != 0")
++            print("ERROR:")
++            print(result.stderr.decode("utf-8"))
++            if exit_on_error: exit()
+         else:
+             with open(expected[i]) as f:
+                 expected_stdout = f.read()
+             if expected_stdout != result.stdout.decode("utf-8"):
+-                print("FAIL")
++                print("FAIL", flush=True)
+                 print("REASON: expected_stdout != result.stdout")
+                 print("EXPECTED:")
+                 print(expected_stdout)
+                 print("GOT:")
+                 print(result.stdout.decode("utf-8"))
++                if exit_on_fail: exit()
+             else:
+-                print("OK")
++                print("OK", flush=True)
+ 
+ if __name__ == "__main__":
+-    run_part_tests("--test-tokenizer", "tokenizer")
+-    run_part_tests("--test-parser", "parser")
+-    run_part_tests("--test-transpiler", "transpiler")
++    exit_on_fail = "--exit-on-fail" in argv
++    exit_on_error = "--exit-on-error" in argv
++    run_part_tests("--test-tokenizer", "tokenizer", exit_on_error, exit_on_fail)
++    run_part_tests("--test-parser", "parser", exit_on_error, exit_on_fail)
++    run_part_tests("--test-transpiler", "transpiler", exit_on_error, exit_on_fail)
+ 
+diff --git a/skivelang.js b/skivelang.js
+index 8affb24..03203db 100644
+--- a/skivelang.js
++++ b/skivelang.js
+@@ -49,56 +49,266 @@ const operatorPrecedence = {
+     or: 3,
+ };
+ 
+-/** @param {string} text @returns {string[]} */
+-function tokenize(text) {
+-    let strings = allStringTokens(text);
+-    return text
+-        .replace(/".*?[^\\]"/g, "__STRING__")
+-        .replace(/\/\/.*?$/gm, "")
+-        .replace(/\/\*.*?\*\//gs, "")
+-        .replace(/->/g, "__THIN_ARROW__")
+-        .replace(/=>/g, "__HEAVY_ARROW__")
+-        .replace(/\-=/g, "__SUBTRACT_ASSIGN__")
+-        .replace(/\*=/g, "__MULTIPLY_ASSIGN__")
+-        .replace(/(?<!\\|')([\(\)\[\]\{\}<>.,:\-\*&])/g, " $1 ")
+-        .split(/[ \r\n\t]/)
+-        .map((s) => (s === "__STRING__" ? strings.shift() : s))
+-        .map((s) => (s === "__THIN_ARROW__" ? "->" : s))
+-        .map((s) => (s === "__HEAVY_ARROW__" ? "=>" : s))
+-        .map((s) => (s === "__SUBTRACT_ASSIGN__" ? "-=" : s))
+-        .map((s) => (s === "__MULTIPLY_ASSIGN__" ? "*=" : s))
+-        .filter((s) => s);
+-}
++class Lexer {
++    /** @param {string} text */
++    constructor(text) {
++        this.text = text;
++        this.index = 0;
++        this.tokens = [];
++    }
++
++    /** @returns {string[]} */
++    tokenize() {
++        while (!this.done()) {
++            if (this.currentMatches(/[ \n\r\t]/)) {
++                this.step();
++            } else if (this.currentMatches(/\d/)) {
++                this.makeNumber();
++            } else if (this.currentMatches(/[a-zA-Z_]/)) {
++                this.makeIdentifier();
++            } else {
++                switch (this.current()) {
++                    case '"':
++                        this.makeString();
++                        break;
++                    case "'":
++                        this.makeChar();
++                        break;
++                    case "+":
++                        this.makePlus();
++                        break;
++                    case "-":
++                        this.makeMinus();
++                        break;
++                    case "*":
++                        this.makeAsterisk();
++                        break;
++                    case "/":
++                        this.makeSlash();
++                        break;
++                    case "<":
++                    case ">":
++                        this.makeLessOrGreaterThan();
++                        break;
++                    case "=":
++                        this.makeEqual();
++                        break;
++                    case "!":
++                        this.makeExclamationMark();
++                        break;
++                    case "%":
++                    case "(":
++                    case ")":
++                    case "[":
++                    case "]":
++                    case "{":
++                    case "}":
++                    case "<":
++                    case ">":
++                    case ".":
++                    case ",":
++                    case ":":
++                    case "&":
++                        this.tokens.push(this.current());
++                        this.step();
++                        break;
++                    default:
++                        throw new Error(
++                            `invalid character '${this.current()}'`,
++                        );
++                }
++            }
++        }
++        return this.tokens;
++    }
++
++    makeNumber() {
++        let value = this.current();
++        this.step();
++        while (this.currentMatches(/\d/)) {
++            value += this.current();
++            this.step();
++        }
++        if (this.currentIs(".")) {
++            this.step();
++            if (this.currentMatches(/\d/)) {
++                value += ".";
++                while (this.currentMatches(/\d/)) {
++                    value += this.current();
++                    this.step();
++                }
++                this.tokens.push(value);
++            } else {
++                this.tokens.push(value);
++                this.tokens.push(".");
++            }
++        } else {
++            this.tokens.push(value);
++        }
++    }
++
++    makeIdentifier() {
++        let value = this.current();
++        this.step();
++        while (this.currentMatches(/[a-zA-Z_0-9]/)) {
++            value += this.current();
++            this.step();
++        }
++        this.tokens.push(value);
++    }
++
++    makeString() {
++        let value = this.current();
++        this.step();
++        let escaped = false;
++        while (!this.done()) {
++            if (this.current() === '"' && !escaped) break;
++            if (escaped) escaped = false;
++            else if (this.currentIs("\\")) escaped = true;
++            value += this.current();
++            this.step();
++        }
++        if (!this.currentIs('"'))
++            throw new Error(`expected '"', got '${this.current()}'`);
++        value += this.current();
++        this.step();
++        this.tokens.push(value);
++    }
++
++    makeChar() {
++        let value = this.current();
++        this.step();
++        if (this.done())
++            throw new Error(`expected char value before end of file`);
++        value += this.current();
++        this.step();
++        if (value === "'\\") {
++            if (this.done())
++                throw new Error(`expected char value before end of file`);
++            value += this.current();
++            this.step();
++        }
++        if (!this.currentIs("'"))
++            throw new Error(`expected '\\'', got '${this.current()}'`);
++        value += this.current();
++        this.step();
++        this.tokens.push(value);
++    }
++
++    makePlus() {
++        let value = this.current();
++        this.step();
++        if (this.currentIs("=")) {
++            value += this.current();
++            this.step();
++        }
++        this.tokens.push(value);
++    }
+ 
+-/** @param {string} text @returns {string[]} */
+-function allStringTokens(text) {
+-    let strings = [];
+-    // 0 = default, 1 = string, 2 = linecomment, 3 = blockcomment
+-    let state = 0;
+-    let acc = "";
+-    for (let i = 0; i < text.length; i++) {
+-        if (state === 0) {
+-            if (text[i] === '"') {
+-                state = 1;
+-                acc = text[i];
+-            } else if (text[i] === "'") {
+-                i += text[i + 1] == "\\" ? 3 : 2;
+-            } else if (i > 0 && text[i - 1] === "/" && text[i] === "/")
+-                state = 2;
+-            else if (i > 0 && text[i - 1] === "/" && text[i] === "*") state = 3;
+-        } else if (state === 1) {
+-            acc += text[i];
+-            if (text[i - 1] !== "\\" && text[i] === '"') {
+-                strings.push(acc);
+-                state = 0;
++    makeMinus() {
++        let value = this.current();
++        this.step();
++        if (this.currentIs("=")) {
++            value += this.current();
++            this.step();
++        } else if (this.currentIs(">")) {
++            value += this.current();
++            this.step();
++        }
++        this.tokens.push(value);
++    }
++
++    makeAsterisk() {
++        let value = this.current();
++        this.step();
++        if (this.currentIs("=")) {
++            value += this.current();
++            this.step();
++        }
++        this.tokens.push(value);
++    }
++
++    makeSlash() {
++        let value = this.current();
++        this.step();
++        if (this.currentIs("/")) {
++            this.step();
++            while (!this.done() && this.current() !== "\n") {
++                if (this.current() === "\n") {
++                    this.step();
++                    break;
++                }
++                this.step();
++            }
++        } else if (this.currentIs("*")) {
++            this.step();
++            let lastWasAsterisk = false;
++            while (!this.done() && !(lastWasAsterisk && this.currentIs("/"))) {
++                if (this.currentIs("*")) lastWasAsterisk = true;
++                else lastWasAsterisk = false;
++                this.step();
+             }
+-        } else if (state === 2) {
+-            if (text[i] === "\n") state = 0;
+-        } else if (state === 3) {
+-            if (text[i - 1] === "*" && text[i] === "/") state = 0;
++            if (this.done())
++                throw new Error(`expected '*/' before end of file`);
++            this.step();
++        } else {
++            this.tokens.push(value);
+         }
+     }
+-    return strings;
++
++    makeLessOrGreaterThan() {
++        let value = this.current();
++        this.step();
++        if (this.currentIs("=")) {
++            value += this.current();
++            this.step();
++        }
++        this.tokens.push(value);
++    }
++
++    makeEqual() {
++        let value = this.current();
++        this.step();
++        if (this.currentIs("=")) {
++            value += this.current();
++            this.step();
++        }
++        this.tokens.push(value);
++    }
++
++    makeExclamationMark() {
++        let value = this.current();
++        this.step();
++        if (this.currentIs("=")) {
++            value += this.current();
++            this.step();
++        }
++        this.tokens.push(value);
++    }
++
++    step() {
++        this.index++;
++    }
++
++    /** @returns {string} */
++    current() {
++        return this.text[this.index];
++    }
++
++    /** @returns {boolean} */
++    done() {
++        return this.index >= this.text.length;
++    }
++
++    /** @param {string} char @returns {boolean} */
++    currentIs(char) {
++        return !this.done() && this.current() === char;
++    }
++
++    /** @param {RegExp} regex @returns {boolean} */
++    currentMatches(regex) {
++        return !this.done() && regex.test(this.current());
++    }
+ }
+ 
+ class Parser {
+@@ -402,7 +612,7 @@ class Parser {
+         if (!this.done() && this.current() === "(") {
+             this.step();
+             const expression = this.parseExpression();
+-            if (!this.done() && this.current() != ")")
++            if (!this.done() && this.current() !== ")")
+                 throw new Error(`expected ')', got '${this.current()}'`);
+             this.step();
+             return expression;
+@@ -922,7 +1132,8 @@ const printIfDebug = (...args) => {
+ const text = fs.readFileSync(filename).toString();
+ printIfDebug("text:\t", text);
+ 
+-const tokens = tokenize(text);
++// const tokens = tokenize(text);
++const tokens = new Lexer(text).tokenize();
+ const tokenMaxPrintLength = 80;
+ printIfDebug(
+     "tokens:\t",
+diff --git a/tests/tokenizer/numbers.expected b/tests/tokenizer/numbers.expected
+index 27de9a3..034a170 100644
+--- a/tests/tokenizer/numbers.expected
++++ b/tests/tokenizer/numbers.expected
+@@ -1,6 +1,4 @@
+ 12
+-3
+-.
+-14
++3.14
+ 5
+ 57
+diff --git a/tests/tokenizer/punctuation.expected b/tests/tokenizer/punctuation.expected
+index 924eca1..8d75fb7 100644
+--- a/tests/tokenizer/punctuation.expected
++++ b/tests/tokenizer/punctuation.expected
+@@ -18,3 +18,7 @@
+ -
+ >
+ ->
++3.4
++3
++.
++a
+diff --git a/tests/tokenizer/punctuation.skl b/tests/tokenizer/punctuation.skl
+index 1ca458c..7846ecf 100644
+--- a/tests/tokenizer/punctuation.skl
++++ b/tests/tokenizer/punctuation.skl
+@@ -2,3 +2,4 @@
+ ,.:&*+-
+ *= -=
+ - > ->
++3.4 3.a
+\ No newline at end of file
+-- 
+2.25.1
+

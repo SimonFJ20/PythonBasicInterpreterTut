@@ -1,0 +1,367 @@
+From 682b6c60bc7475b6a11b8d207b6cc4a4a283f001 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Sat, 27 Aug 2022 02:25:47 +0200
+Subject: [PATCH] asdasd
+
+---
+ lib.c                                |  4 +-
+ scripts/build_debug.sh               |  1 +
+ scripts/build_run.sh                 |  1 +
+ scripts/test_js.py                   |  2 +
+ scripts/transpile_debug.sh           |  1 +
+ selfhost.skl                         | 43 ++++++++++++-
+ skivelang.js                         | 94 +++++++++++++++++++++-------
+ test.skl                             | 18 +-----
+ tests/tokenizer/identifiers.expected |  6 ++
+ tests/tokenizer/identifiers.skl      |  2 +
+ 10 files changed, 133 insertions(+), 39 deletions(-)
+ create mode 100755 scripts/build_debug.sh
+ create mode 100755 scripts/build_run.sh
+ create mode 100644 scripts/test_js.py
+ create mode 100755 scripts/transpile_debug.sh
+ create mode 100644 tests/tokenizer/identifiers.expected
+ create mode 100644 tests/tokenizer/identifiers.skl
+
+diff --git a/lib.c b/lib.c
+index 4746f8e..8f6a1a4 100644
+--- a/lib.c
++++ b/lib.c
+@@ -35,8 +35,8 @@ uint64_t vec_pop(Vec* v)
+ 
+ uint64_t vec_get(Vec* v, size_t i)
+ {
+-    if (i > 0)
+-        return vec_get(v, -i);
++    if (i < 0)
++        return vec_get(v, v->size - i);
+     assert(v->size > i);
+     return v->items[i];
+ }
+diff --git a/scripts/build_debug.sh b/scripts/build_debug.sh
+new file mode 100755
+index 0000000..6fe7d08
+--- /dev/null
++++ b/scripts/build_debug.sh
+@@ -0,0 +1 @@
++node skivelang.js $1 --debug && gcc -xc -Wno-int-conversion out.c lib.c
+\ No newline at end of file
+diff --git a/scripts/build_run.sh b/scripts/build_run.sh
+new file mode 100755
+index 0000000..1796947
+--- /dev/null
++++ b/scripts/build_run.sh
+@@ -0,0 +1 @@
++node skivelang.js $1 && gcc -xc -Wno-int-conversion out.c lib.c && ./a.out
+\ No newline at end of file
+diff --git a/scripts/test_js.py b/scripts/test_js.py
+new file mode 100644
+index 0000000..139597f
+--- /dev/null
++++ b/scripts/test_js.py
+@@ -0,0 +1,2 @@
++
++
+diff --git a/scripts/transpile_debug.sh b/scripts/transpile_debug.sh
+new file mode 100755
+index 0000000..469d4f3
+--- /dev/null
++++ b/scripts/transpile_debug.sh
+@@ -0,0 +1 @@
++node skivelang.js $1 --debug
+\ No newline at end of file
+diff --git a/selfhost.skl b/selfhost.skl
+index 3df0c4c..f69b05b 100644
+--- a/selfhost.skl
++++ b/selfhost.skl
+@@ -1,4 +1,5 @@
+ 
++/*
+ let keywords: Vec<String> = new(Vec)
+ keywords.vec_push("if")
+ keywords.vec_push("then")
+@@ -60,10 +61,50 @@ fn remove_single_line_comments(text: String) -> String
+         end
+         i += 1
+     end
++    return result
+ end
+ 
+ fn replace_strings_with_placeholders(text: String) -> String
+     text.print()
+ end
+ 
+-replace_strings_with_placeholders("test")
++
++print(remove_single_line_comments("foo bar\n// foo bar\nfoo bar\n"))
++*/
++
++fn all_string_tokens(text: String) -> Vec<String>
++    let strings: Vec<String> = new(Vec)
++    // 0 = default, 1 = string, 2 = linecomment, 3 = blockcomment
++    let state: int = 0
++    let acc: String = "asdsa"
++    let i: int = 0
++    while i < text.vec_length() do
++        if state == 0 then
++            if text[i] == '"' then
++                state = 1
++                acc = ""
++                acc.vec_push(text[i])
++            else if i > 0 and text[i - 1] == '/' and text[i] == '/' then
++                state = 2
++            else if i > 0 and text[i - 1] == '/' and text[i] == '*' then
++                state = 3
++            end end end
++        else if state == 1 then
++            acc.vec_push(text[i])
++            if text[i - 1] != '\\' and text[i] == '"' then
++                strings.vec_push(acc)
++                state = 0
++            end
++        else if state == 2 then
++            if text[i] == '\n' then
++                state = 0
++            end
++        else if state == 3 then
++            if text[i - 1] == '*' and text[i] == '/' then
++                state = 0
++            end
++        end end end end
++        i += 1
++    end
++    return strings
++end
+diff --git a/skivelang.js b/skivelang.js
+index 0e6298b..21f09f8 100644
+--- a/skivelang.js
++++ b/skivelang.js
+@@ -51,19 +51,16 @@ const operatorPrecedence = {
+ 
+ /** @param {string} text @returns {string[]} */
+ function tokenize(text) {
+-    const textWithoutComments = text
++    let strings = allStringTokens(text);
++    return text
++        .replace(/".*?"/g, "__STRING__")
+         .replace(/\/\/.*?$/gm, "")
+-        .replace(/\/\*.*?\*\//gs, "");
+-
+-    const strings = textWithoutComments.match(/(".*?")/g);
+-
+-    return textWithoutComments
+-        .replace(/(".*?")/g, "__STRING__")
++        .replace(/\/\*.*?\*\//gs, "")
+         .replace(/->/g, "__THIN_ARROW__")
+         .replace(/=>/g, "__HEAVY_ARROW__")
+         .replace(/\-=/g, "__SUBTRACT_ASSIGN__")
+         .replace(/\*=/g, "__MULTIPLY_ASSIGN__")
+-        .replace(/(?<!\\)([\(\)\[\]\{\}<>.,:\-\*&])/g, " $1 ")
++        .replace(/(?<!\\|')([\(\)\[\]\{\}<>.,:\-\*&])/g, " $1 ")
+         .split(/[ \r\n\t]/)
+         .map((s) => (s === "__STRING__" ? strings.shift() : s))
+         .map((s) => (s === "__THIN_ARROW__" ? "->" : s))
+@@ -73,6 +70,37 @@ function tokenize(text) {
+         .filter((s) => s);
+ }
+ 
++/** @param {string} text @returns {string[]} */
++function allStringTokens(text) {
++    let strings = [];
++    // 0 = default, 1 = string, 2 = linecomment, 3 = blockcomment
++    let state = 0;
++    let acc = "";
++    for (let i = 0; i < text.length; i++) {
++        if (state === 0) {
++            if (text[i] === '"') {
++                state = 1;
++                acc = text[i];
++            } else if (text[i] === "'") {
++                i += text[i + 1] == "\\" ? 3 : 2;
++            } else if (i > 0 && text[i - 1] === "/" && text[i] === "/")
++                state = 2;
++            else if (i > 0 && text[i - 1] === "/" && text[i] === "*") state = 3;
++        } else if (state === 1) {
++            acc += text[i];
++            if (text[i - 1] !== "\\" && text[i] === '"') {
++                strings.push(acc);
++                state = 0;
++            }
++        } else if (state === 2) {
++            if (text[i] === "\n") state = 0;
++        } else if (state === 3) {
++            if (text[i - 1] === "*" && text[i] === "/") state = 0;
++        }
++    }
++    return strings;
++}
++
+ class Parser {
+     /** @param {string[]} tokens */
+     constructor(tokens) {
+@@ -111,7 +139,7 @@ class Parser {
+     parseStruct() {
+         this.step();
+         if (this.done() || !/[a-zA-Z_][a-zA-Z_0-9]*/.test(this.current()))
+-            throw new Error("expected identifier");
++            throw new Error(`expected identifier, got ${this.current()}`);
+         const identifier = this.current();
+         this.step();
+         let fields = [];
+@@ -132,7 +160,7 @@ class Parser {
+     parseFunc() {
+         this.step();
+         if (this.done() || !/[a-zA-Z_][a-zA-Z_0-9]*/.test(this.current()))
+-            throw new Error("expected identifier");
++            throw new Error(`expected identifier, got ${this.current()}`);
+         const identifier = this.current();
+         this.step();
+         const params = this.parseParameters();
+@@ -199,7 +227,7 @@ class Parser {
+                 return { id: "let", identifier, type, value: null };
+             }
+         } else {
+-            throw new Error("expected identifier");
++            throw new Error(`expected identifier, got ${this.current()}`);
+         }
+     }
+ 
+@@ -335,7 +363,9 @@ class Parser {
+                     this.done() ||
+                     !/[a-zA-Z_][a-zA-Z_0-9]*/.test(this.current())
+                 )
+-                    throw new Error("expected identifier");
++                    throw new Error(
++                        `expected identifier, got ${this.current()}`,
++                    );
+                 const identifier = this.current();
+                 this.step();
+                 value = { id: "member", value, identifier };
+@@ -387,15 +417,15 @@ class Parser {
+             this.step();
+             return { id, value };
+         };
+-        if (!this.done() && /0x\d+/.test(this.current())) {
++        if (!this.done() && /^0x\d+$/.test(this.current())) {
+             return saveValueStepReturn("hex");
+-        } else if (!this.done() && /\d+/.test(this.current())) {
++        } else if (!this.done() && /^\d+$/.test(this.current())) {
+             return saveValueStepReturn("int");
+-        } else if (!this.done() && /\d+(?:\.\d+)/.test(this.current())) {
++        } else if (!this.done() && /^\d+(?:\.\d+)$/.test(this.current())) {
+             return saveValueStepReturn("float");
+-        } else if (!this.done() && /'\\?.'/.test(this.current())) {
++        } else if (!this.done() && /^'\\?.'$/.test(this.current())) {
+             return saveValueStepReturn("char");
+-        } else if (!this.done() && /".*?"/.test(this.current())) {
++        } else if (!this.done() && /^".*?"$/.test(this.current())) {
+             return saveValueStepReturn("string");
+         } else if (
+             !this.done() &&
+@@ -434,7 +464,7 @@ class Parser {
+ 
+     parseParameter() {
+         if (this.done() || !/[a-zA-Z_][a-zA-Z_0-9]*/.test(this.current()))
+-            throw new Error("expected identifier");
++            throw new Error(`expected identifier, got ${this.current()}`);
+         const identifier = this.current();
+         this.step();
+         if (!this.done() && this.current() === ":") {
+@@ -457,7 +487,7 @@ class Parser {
+ 
+     parseType() {
+         if (this.done() || !/[a-zA-Z_][a-zA-Z_0-9]*/.test(this.current()))
+-            throw new Error("expected type");
++            throw new Error(`expected type, got ${this.current()}`);
+         const value = this.current();
+         this.step();
+         if (!this.done() && this.current() === "<") {
+@@ -644,7 +674,7 @@ class Transpiler {
+         this.transpileStatements(node.truthy);
+         this.code += "}";
+         if (node.falsy) {
+-            this.code += "} else {";
++            this.code += "else {";
+             this.transpileStatements(node.falsy);
+             this.code += "}";
+         }
+@@ -881,7 +911,29 @@ const text = fs.readFileSync(filename).toString();
+ printIfDebug("text:\t", text);
+ 
+ const tokens = tokenize(text);
+-printIfDebug("tokens:\t", tokens);
++const tokenMaxPrintLength = 80;
++printIfDebug(
++    "tokens:\t",
++    tokens
++        .slice(1)
++        .reduce(
++            (acc, token) =>
++                acc +
++                (acc.includes("\n")
++                    ? acc.length - acc.lastIndexOf("\n") >= tokenMaxPrintLength
++                        ? "\n"
++                        : "  "
++                    : acc.length >= tokenMaxPrintLength
++                    ? "\n"
++                    : "  ") +
++                token,
++            tokens[0],
++        ),
++);
++if (process.argv.includes("--test-tokenizer")) {
++    console.log(tokens.join("\n"));
++    process.exit(0);
++}
+ 
+ const ast = new Parser(tokens).parseStatements();
+ printIfDebug("ast:\t", JSON.stringify(ast, null, "|   "));
+diff --git a/test.skl b/test.skl
+index 0c7d97a..24689d0 100644
+--- a/test.skl
++++ b/test.skl
+@@ -1,18 +1,6 @@
+-/*
+-let add: int = fn(a: int, b: int) => a + b
+ 
+-let sum = add(3, 5)
++"foo"
++/*
++"bar"
+ */
+ 
+-struct MyStruct
+-    a: int,
+-    b,
+-end
+-
+-let myObject: MyStruct = new(MyStruct)
+-
+-print_int(5)
+-
+-let a: Vec<char> = "hello_world"
+-let c: char = a[3]
+-
+diff --git a/tests/tokenizer/identifiers.expected b/tests/tokenizer/identifiers.expected
+new file mode 100644
+index 0000000..2c4dc88
+--- /dev/null
++++ b/tests/tokenizer/identifiers.expected
+@@ -0,0 +1,6 @@
++a
++a__a
++asdsa
++_asdsdas
++fn
++bruhhHh__
+diff --git a/tests/tokenizer/identifiers.skl b/tests/tokenizer/identifiers.skl
+new file mode 100644
+index 0000000..36a2ca3
+--- /dev/null
++++ b/tests/tokenizer/identifiers.skl
+@@ -0,0 +1,2 @@
++a a__a asdsa _asdsdas
++fn bruhhHh__
+\ No newline at end of file
+-- 
+2.25.1
+

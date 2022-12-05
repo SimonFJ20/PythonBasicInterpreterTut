@@ -1,0 +1,1 @@
+node skivelang.js $1 && gcc -xc -Wno-int-conversion out.c lib.c && ./a.out
