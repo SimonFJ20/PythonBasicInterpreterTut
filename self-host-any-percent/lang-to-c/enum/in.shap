@@ -1,0 +1,26 @@
+
+enum MyEnum {
+    OptionOne,
+    OptionTwo,
+    OptionThree,
+}
+
+enum FatEnum {
+    OptionOne,
+    OptionTwo(i32, i32),
+}
+
+fn main() {
+    let choice1 = MyEnum::OptionOne;
+    let a = match choice1 {
+        OptionOne => 1
+        OptionTwo => 0
+        OptionThree => 0
+    }
+
+    let choice2 = FatEnum::OptionTwo(3, 2);
+    let b = match choice2 {
+        OptionOne => 0,
+        OptionTwo(a, b) => a + b,
+    }
+}

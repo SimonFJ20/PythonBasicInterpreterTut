@@ -1,0 +1,155 @@
+From 39c3b73a204eb90ad54cf5f69b2574b3eba618d4 Mon Sep 17 00:00:00 2001
+From: SimonFJ20 <simonfromjakobsen@gmail.com>
+Date: Sat, 30 Jul 2022 04:37:36 +0200
+Subject: [PATCH] added some shap to c samples
+
+---
+ lang-to-c/enum/in.shap | 26 +++++++++++++++++
+ lang-to-c/enum/out.c   | 66 ++++++++++++++++++++++++++++++++++++++++++
+ lang-to-c/main/in.shap |  4 +++
+ lang-to-c/main/out.c   |  4 +++
+ selfhost/main.shap     |  4 +++
+ 5 files changed, 104 insertions(+)
+ create mode 100644 lang-to-c/enum/in.shap
+ create mode 100644 lang-to-c/enum/out.c
+ create mode 100644 lang-to-c/main/in.shap
+ create mode 100644 lang-to-c/main/out.c
+ create mode 100644 selfhost/main.shap
+
+diff --git a/lang-to-c/enum/in.shap b/lang-to-c/enum/in.shap
+new file mode 100644
+index 0000000..9988468
+--- /dev/null
++++ b/lang-to-c/enum/in.shap
+@@ -0,0 +1,26 @@
++
++enum MyEnum {
++    OptionOne,
++    OptionTwo,
++    OptionThree,
++}
++
++enum FatEnum {
++    OptionOne,
++    OptionTwo(i32, i32),
++}
++
++fn main() {
++    let choice1 = MyEnum::OptionOne;
++    let a = match choice1 {
++        OptionOne => 1
++        OptionTwo => 0
++        OptionThree => 0
++    }
++
++    let choice2 = FatEnum::OptionTwo(3, 2);
++    let b = match choice2 {
++        OptionOne => 0,
++        OptionTwo(a, b) => a + b,
++    }
++}
+diff --git a/lang-to-c/enum/out.c b/lang-to-c/enum/out.c
+new file mode 100644
+index 0000000..36ea820
+--- /dev/null
++++ b/lang-to-c/enum/out.c
+@@ -0,0 +1,66 @@
++
++typedef int i32;
++
++enum MyEnum_id {
++    MyEnum_OptionOne,
++    MyEnum_OptionTwo,
++    MyEnum_OptionThree,
++};
++
++struct MyEnum {
++    enum MyEnum_id id;
++};
++
++enum FatEnum_id {
++    FatEnum_OptionOne,
++    FatEnum_OptionTwo,
++};
++
++struct FatEnum {
++    enum FatEnum_id id;
++};
++
++struct FatEnum_OptionTwo_params {
++    enum FatEnum_id id;
++    i32 _0;
++    i32 _1;
++};
++
++int main() {
++    struct MyEnum* choice1 = &(struct MyEnum) {
++        .id = MyEnum_OptionOne,
++    };
++    i32 match_result0;
++    switch (choice1->id) {
++        case MyEnum_OptionOne:
++            match_result0 = 1;
++            break;
++        case MyEnum_OptionTwo:
++            match_result0 = 0;
++            break;
++        case MyEnum_OptionThree:
++            match_result0 = 0;
++            break;
++    }
++    struct FatEnum* choice2 = (struct FatEnum*) &(struct FatEnum_OptionTwo_params) {
++        .id = FatEnum_OptionTwo,
++        ._0 = 3,
++        ._1 = 2,
++    };
++    i32 a = match_result0;
++    i32 match_result1;
++    switch (choice2->id) {
++        case FatEnum_OptionOne: {
++            match_result1 = 0;
++            break;
++        }
++        case FatEnum_OptionTwo: {
++            i32 a = ((struct FatEnum_OptionTwo_params*)choice2)->_0;
++            i32 b = ((struct FatEnum_OptionTwo_params*)choice2)->_1;
++            match_result1 = a + b;
++            break;
++        }
++    }
++    i32 b = match_result1;
++    return 0;
++}
+diff --git a/lang-to-c/main/in.shap b/lang-to-c/main/in.shap
+new file mode 100644
+index 0000000..3783460
+--- /dev/null
++++ b/lang-to-c/main/in.shap
+@@ -0,0 +1,4 @@
++
++fn main() {
++    
++}
+diff --git a/lang-to-c/main/out.c b/lang-to-c/main/out.c
+new file mode 100644
+index 0000000..2b8c6ac
+--- /dev/null
++++ b/lang-to-c/main/out.c
+@@ -0,0 +1,4 @@
++
++int main() {
++    return 0;
++}
+diff --git a/selfhost/main.shap b/selfhost/main.shap
+new file mode 100644
+index 0000000..3033f62
+--- /dev/null
++++ b/selfhost/main.shap
+@@ -0,0 +1,4 @@
++
++fn main() {
++
++}
+-- 
+2.25.1
+
