@@ -1,0 +1,20 @@
+let the function with name add_three take three parameters: a, b and c, and do the following
+    first return the value of a plus b plus c
+    then stop
+
+let the function with name main do the following
+    first let the variable a have the value one hundred and five
+    then let the variable b have the value two thousands three hundred and sixty two
+    then let the variable r have the value the function add_three called with three arguments: a, b and sixty four
+    then the function print with one arguments: r
+    if r is five then do the following
+        first the function print with one arguments: "math be hard"
+        then stop
+    else if r is minus six then do
+        first the function print with one arguments: "math be hard^2"
+    else do the following instead
+        stop
+    while r is one hundred and zero do the following
+        first the function print with one arguments: "asdf"
+        then stop
+    then stop

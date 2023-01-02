@@ -1,0 +1,57 @@
+
+statements ::= ("first" __ statement (__ "then" statement):* __ "then"):? __ "stop"
+
+statement ::= func_def | return | while | if | let | expr
+
+func_def ::= "let the function with name" __ id (__ "take" __ int __ "parameters:" __ func_def_params __", and "):? __ "do the following" __ statements
+
+func_def_params ::= call_args ::= ((id __ "," __):? id __ "and" __):? id
+
+return ::= "return" __ ("the value" __ expr):?
+
+while ::= "while" __ expr __ "do the following" __ statements __ end
+
+if ::= "if" __ expr __ "then do the following" __ statements __ (("else if" __ expr __ "then do" __ statements __):* "else do the following instead" __ statements):?
+
+let ::= "let the variable" __ id __ "have the value" __ expr
+
+call_args ::= ((expr __ "," __):? expr __ "and" __):? expr
+
+expr ::= prec3
+
+prec2 ::= (prec2 __ "if" __ expr __ "else" __ expr) | prec3
+prec3 ::= (prec3 __ ("or")):? __ prec4
+prec4 ::= (prec4 __ ("and")):? __ prec5
+prec8 ::= (prec8 __ ("is" | "is equal to" | "does not equal")):? __ prec11
+prec11 ::= (prec11 __ ("plus" | "minus")):? __ prec12
+prec12 ::= (prec12 __ ("times" | "divided by")):? __ prec14
+prec14 ::= (("not" | "plus" | "minus") __ prec14) | prec17
+prec17 ::= ("the function" __ id (__ "called with" __ int __ "args:" __ call_args):?) | prec18
+prec18 ::= ("group starting here" __ prec18 __ "and ending here") | atom
+
+atom ::= id | string | boolean | int | scientific
+
+id ::= /[a-zA-Z][a-zA-Z]*/
+string ::= /„.*?‟/
+boolean ::= "true" | "false"
+
+scientific ::= zero_to_trillions __ ("point" __ zero_to_nine:+ __):? "to the power of" __ zero_to_trillions ("point" __ zero_to_nine:+ __):?
+
+int ::= zero_to_trillions
+zero_to_trillions ::= (one_to_nine __ "trillion and" __):? zero_to_billions
+zero_to_billions ::= (one_to_nine __ "billion and" __):? zero_to_millions
+zero_to_millions ::= (one_to_nine __ "million and" __):? zero_to_thousands
+zero_to_thousands ::= (one_to_nine __ "thousand and" __):? zero_to_hundreds
+zero_to_hundreds ::= (one_to_nine __ "hundred and" __):? zero_to_ninety_nine
+zero_to_ninety_nine ::= twenty_to_ninety_tens one_to_nine:? | zero_to_nineteen
+zero_to_nineteen ::= ("thir" | "four" | "fif" | "six" | "seven" | "eight" | "nine") "teen" | zero_to_twelve
+zero_to_twelve ::=  "ten" | "eleven" | "twelve" | zero_to_nine
+zero_to_nine ::= "zero" | one_to_nine
+
+twenty_to_ninety_tens ::= ("twen" | "thir" | "for" | "fif" | six_to_nine) "ty"
+one_to_nine ::= "one" | "two" | "three" | "four" | "five" | six_to_nine
+six_to_nine ::= "six" | "seven" | "eight" | "nine"
+
+__ ::= /\s+/
+_ ::= /\s*/
+
