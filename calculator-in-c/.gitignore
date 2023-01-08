@@ -1,0 +1,4 @@
+*.o
+calculator
+compile_flags.txt
+
